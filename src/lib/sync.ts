@@ -3,7 +3,6 @@ import { isSupabaseConfigured } from './supabase'
 import { listChains, saveChain } from './api'
 import { useStore } from '../store'
 import type { Abteilung, ChainData, Nebentabelle, Produktionstabelle, Schritt } from '../types'
-import type { Mode } from './auth'
 
 const updatedAtMap = new Map<string, string>()
 
@@ -63,13 +62,12 @@ async function loadChainsIntoStore(): Promise<void> {
   })
 }
 
-export function useSupabaseSync(mode: Mode) {
+export function useSupabaseSync() {
   const loadingRef = useRef(false)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Ketten laden (Admin und Gast)
+  // Ketten laden
   useEffect(() => {
-    if (mode !== 'admin' && mode !== 'guest') return
     if (!isSupabaseConfigured()) return
     let cancelled = false
     loadingRef.current = true
@@ -81,11 +79,11 @@ export function useSupabaseSync(mode: Mode) {
     return () => {
       cancelled = true
     }
-  }, [mode])
+  }, [])
 
-  // Debounce-Speichern der aktiven Kette (nur Admin)
+  // Debounce-Speichern der aktiven Kette
   useEffect(() => {
-    if (mode !== 'admin' || !isSupabaseConfigured()) return
+    if (!isSupabaseConfigured()) return
 
     const unsubscribe = useStore.subscribe((state, prevState) => {
       if (loadingRef.current) return
@@ -109,5 +107,5 @@ export function useSupabaseSync(mode: Mode) {
       unsubscribe()
       if (timerRef.current) clearTimeout(timerRef.current)
     }
-  }, [mode])
+  }, [])
 }

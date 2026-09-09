@@ -45,10 +45,6 @@ function nebenKeys(): TableKey[] {
 }
 
 interface Store extends AppState {
-  // Nur-Lesen-Modus (Gast)
-  readOnly: boolean
-  setReadOnly: (v: boolean) => void
-
   // Ketten
   addChain: (name?: string) => void
   renameChain: (id: string, name: string) => void
@@ -113,32 +109,13 @@ const demo = seed()
 
 export const useStore = create<Store>()(
   persist(
-    (originalSet, get) => {
-      // Nur-Lesen-Schutz: blockiert alle Schreibzugriffe, solange readOnly=true
-      // (außer das Setzen von readOnly selbst, damit der Gast-Modus beendet werden kann)
-      const baseSet = originalSet as unknown as (
-        partial: Store | Partial<Store> | ((state: Store) => Store | Partial<Store>),
-        replace?: boolean,
-      ) => void
-      const set = (partial: Store | Partial<Store> | ((state: Store) => Store | Partial<Store>), replace?: boolean) => {
-        if (get().readOnly) {
-          const next = typeof partial === 'function' ? partial(get()) : partial
-          if (next && typeof next === 'object' && 'readOnly' in next && Object.keys(next).length === 1) {
-            baseSet(partial, replace)
-          }
-          return
-        }
-        baseSet(partial, replace)
-      }
-      return {
+    (set) => ({
       chains: demo.chains,
       activeChainId: demo.activeChainId,
       abteilungen: demo.abteilungen,
       schritte: demo.schritte,
       produktionstabellen: demo.produktionstabellen,
       nebentabellen: demo.nebentabellen,
-      readOnly: false,
-      setReadOnly: (v: boolean) => set({ readOnly: v }),
 
       // --- Ketten ---
       addChain: (name) =>
@@ -587,8 +564,7 @@ setKeyLabelNeben: (tabelleId, spalteId, label) =>
         : t,
       ),
     })),
-    }
-  },
+  }),
     {
       name: 'digitale-produktakte',
       version: 2,

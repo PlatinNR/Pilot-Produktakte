@@ -15,19 +15,23 @@ create table if not exists public.chains (
 
 alter table public.chains enable row level security;
 
--- Lesen: erlaubt für alle (auch anonyme Gäste)
+drop policy if exists "chains_select" on public.chains;
+drop policy if exists "chains_insert" on public.chains;
+drop policy if exists "chains_update" on public.chains;
+drop policy if exists "chains_delete" on public.chains;
+
+-- Keine Anmeldung: Lesen und Schreiben für alle erlaubt
 create policy "chains_select" on public.chains
   for select using (true);
 
--- Schreiben: nur angemeldete Nutzer (Admin)
 create policy "chains_insert" on public.chains
-  for insert with check (auth.role() = 'authenticated');
+  for insert with check (true);
 
 create policy "chains_update" on public.chains
-  for update using (auth.role() = 'authenticated');
+  for update using (true);
 
 create policy "chains_delete" on public.chains
-  for delete using (auth.role() = 'authenticated');
+  for delete using (true);
 
 -- updated_at automatisch aktualisieren
 create or replace function public.set_updated_at()
@@ -43,11 +47,3 @@ create trigger chains_set_updated_at
   before update on public.chains
   for each row execute function public.set_updated_at();
 
--- ============================================================
--- Admin-Konto anlegen (in der Supabase-Konsole unter
--- Authentication → Users → "Add user" → "Create new user"):
---   Email:   admin@zollern.de
---   Password: <dein Admin-Passwort>
--- ODER per API/SQL nicht empfohlen. Danach kann sich das Tool
--- mit Benutzername "admin" + Passwort anmelden.
--- ============================================================
