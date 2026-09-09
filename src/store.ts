@@ -14,6 +14,7 @@ import type {
   TableRow,
 } from './types'
 import { NEBEN_SPALTEN, PRODUKTION_SPALTEN } from './types'
+import { createChain as apiCreateChain, renameChain as apiRenameChain, deleteChain as apiDeleteChain } from './lib/api'
 
 let counter = 0
 function nextId(prefix = 'id'): string {
@@ -44,6 +45,10 @@ function nebenKeys(): TableKey[] {
 }
 
 interface Store extends AppState {
+  // Nur-Lesen-Modus (Gast)
+  readOnly: boolean
+  setReadOnly: (v: boolean) => void
+
   // Ketten
   addChain: (name?: string) => void
   renameChain: (id: string, name: string) => void
@@ -108,28 +113,56 @@ const demo = seed()
 
 export const useStore = create<Store>()(
   persist(
-    (set) => ({
+    (originalSet, get) => {
+      // Nur-Lesen-Schutz: blockiert alle Schreibzugriffe, solange readOnly=true
+      // (außer das Setzen von readOnly selbst, damit der Gast-Modus beendet werden kann)
+      const baseSet = originalSet as unknown as (
+        partial: Store | Partial<Store> | ((state: Store) => Store | Partial<Store>),
+        replace?: boolean,
+      ) => void
+      const set = (partial: Store | Partial<Store> | ((state: Store) => Store | Partial<Store>), replace?: boolean) => {
+        if (get().readOnly) {
+          const next = typeof partial === 'function' ? partial(get()) : partial
+          if (next && typeof next === 'object' && 'readOnly' in next && Object.keys(next).length === 1) {
+            baseSet(partial, replace)
+          }
+          return
+        }
+        baseSet(partial, replace)
+      }
+      return {
       chains: demo.chains,
       activeChainId: demo.activeChainId,
       abteilungen: demo.abteilungen,
       schritte: demo.schritte,
       produktionstabellen: demo.produktionstabellen,
       nebentabellen: demo.nebentabellen,
+      readOnly: false,
+      setReadOnly: (v: boolean) => set({ readOnly: v }),
 
       // --- Ketten ---
       addChain: (name) =>
         set((s) => {
           const id = nextId('chain')
+          const chainName = name ?? `Kette ${s.chains.length + 1}`
+          apiCreateChain(id, chainName, {
+            abteilungen: [],
+            schritte: [],
+            produktionstabellen: [],
+            nebentabellen: [],
+          }).catch(() => {})
           return {
-            chains: [...s.chains, { id, name: name ?? `Kette ${s.chains.length + 1}` }],
+            chains: [...s.chains, { id, name: chainName }],
             activeChainId: id,
           }
         }),
 
-      renameChain: (id, name) =>
-        set((s) => ({ chains: s.chains.map((c) => (c.id === id ? { ...c, name } : c)) })),
+      renameChain: (id, name) => {
+        set((s) => ({ chains: s.chains.map((c) => (c.id === id ? { ...c, name } : c)) }))
+        apiRenameChain(id, name).catch(() => {})
+      },
 
-      removeChain: (id) =>
+      removeChain: (id) => {
         set((s) => {
           const abteilungen = s.abteilungen.filter((a) => a.chainId !== id)
           const abteilungIds = new Set(abteilungen.map((a) => a.id))
@@ -143,7 +176,9 @@ export const useStore = create<Store>()(
             nebentabellen: s.nebentabellen.filter((n) => abteilungIds.has(n.abteilungId)),
             produktionstabellen: s.produktionstabellen.filter((t) => schrittIds.has(t.schrittId)),
           }
-        }),
+        })
+        apiDeleteChain(id).catch(() => {})
+      },
 
       setActiveChain: (id) => set({ activeChainId: id }),
 
@@ -518,9 +553,9 @@ export const useStore = create<Store>()(
 
   setColumnKeyNeben: (tabelleId, spalteId, keyType) =>
     set((s) => ({
-      nebentabellen: s.nebentabellen.map((t) => {
+      nebentabellen: s.nebentabellen.map((t: Nebentabelle) => {
         if (t.id !== tabelleId) return t
-        const keys = t.keys.filter((k) => k.columnId !== spalteId)
+        const keys = t.keys.filter((k: TableKey) => k.columnId !== spalteId)
         if (keyType) {
           keys.push({
             id: nextId('k'),
@@ -536,7 +571,7 @@ export const useStore = create<Store>()(
 
   linkNebenFK: (tabelleId, spalteId, refTableId, refColumnId) =>
     set((s) => ({
-      nebentabellen: s.nebentabellen.map((t) => {
+      nebentabellen: s.nebentabellen.map((t: Nebentabelle) => {
         if (t.id !== tabelleId) return t
         const keys = t.keys.filter((k) => k.columnId !== spalteId)
         keys.push({ id: nextId('k'), columnId: spalteId, type: 'fk', refTableId, refColumnId })
@@ -544,15 +579,16 @@ export const useStore = create<Store>()(
       }),
     })),
 
-  setKeyLabelNeben: (tabelleId, spalteId, label) =>
+setKeyLabelNeben: (tabelleId, spalteId, label) =>
     set((s) => ({
-      nebentabellen: s.nebentabellen.map((t) =>
+      nebentabellen: s.nebentabellen.map((t: Nebentabelle) =>
         t.id === tabelleId
-          ? { ...t, keys: t.keys.map((k) => (k.columnId === spalteId ? { ...k, label } : k)) }
-          : t,
+          ? { ...t, keys: t.keys.map((k: TableKey) => (k.columnId === spalteId ? { ...k, label } : k)) }
+        : t,
       ),
     })),
-    }),
+    }
+  },
     {
       name: 'digitale-produktakte',
       version: 2,
