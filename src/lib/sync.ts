@@ -17,22 +17,21 @@ function extractChainData(chainId: string): ChainData {
   return { abteilungen, schritte, produktionstabellen, nebentabellen }
 }
 
-/** Speichert die aktive Kette sofort in Supabase. */
-export async function saveActiveChain(): Promise<void> {
+/** Speichert alle Ketten global in Supabase. */
+export async function saveAllChains(): Promise<void> {
   if (!isSupabaseConfigured()) return
   const s = useStore.getState()
-  const chainId = s.activeChainId
-  if (!chainId) return
-  const chain = s.chains.find((c) => c.id === chainId)
-  if (!chain) return
-  const data = extractChainData(chainId)
-  const res = await saveChain(chainId, chain.name, data, updatedAtMap.get(chainId) ?? null)
-  if (res.updatedAt) updatedAtMap.set(chainId, res.updatedAt)
+  for (const chain of s.chains) {
+    const data = extractChainData(chain.id)
+    const res = await saveChain(chain.id, chain.name, data, updatedAtMap.get(chain.id) ?? null)
+    if (res.updatedAt) updatedAtMap.set(chain.id, res.updatedAt)
+  }
 }
 
 async function loadChainsIntoStore(): Promise<void> {
   if (!isSupabaseConfigured()) return
   const records = await listChains()
+  if (records.length === 0) return
   const chains = records.map((r) => ({ id: r.id, name: r.name }))
   const abteilungen: Abteilung[] = []
   const schritte: Schritt[] = []
@@ -81,7 +80,7 @@ export function useSupabaseSync() {
     }
   }, [])
 
-  // Debounce-Speichern der aktiven Kette
+  // Debounce-Speichern aller Ketten
   useEffect(() => {
     if (!isSupabaseConfigured()) return
 
@@ -99,7 +98,7 @@ export function useSupabaseSync() {
       }
       if (timerRef.current) clearTimeout(timerRef.current)
       timerRef.current = setTimeout(() => {
-        saveActiveChain()
+        saveAllChains()
       }, 800)
     })
 

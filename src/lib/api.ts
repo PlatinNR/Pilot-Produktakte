@@ -57,8 +57,7 @@ export async function saveChain(
 
   const { data: updated } = await supabase
     .from('chains')
-    .update({ name, data })
-    .eq('id', id)
+    .upsert({ id, name, data }, { onConflict: 'id' })
     .select('updated_at')
     .single()
 

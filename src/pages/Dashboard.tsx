@@ -3,7 +3,7 @@ import type { Filter } from '../types'
 import { EMPTY_FILTER } from '../types'
 import { useStore } from '../store'
 import { isTraceMode } from '../utils/aggregate'
-import { saveActiveChain } from '../lib/sync'
+import { saveAllChains } from '../lib/sync'
 import { FilterBar } from '../components/FilterBar'
 import { TraceView } from '../components/TraceView'
 import { AbteilungBlock } from '../components/AbteilungBlock'
@@ -28,7 +28,7 @@ export function Dashboard() {
   const activeChain = chains.find((c) => c.id === activeChainId)
 
   const handleSave = async () => {
-    await saveActiveChain()
+    await saveAllChains()
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }
