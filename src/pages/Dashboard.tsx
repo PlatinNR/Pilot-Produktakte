@@ -3,6 +3,8 @@ import type { Filter } from '../types'
 import { EMPTY_FILTER } from '../types'
 import { useStore } from '../store'
 import { isTraceMode } from '../utils/aggregate'
+import { useAuth } from '../lib/auth'
+import { saveActiveChain } from '../lib/sync'
 import { FilterBar } from '../components/FilterBar'
 import { TraceView } from '../components/TraceView'
 import { AbteilungBlock } from '../components/AbteilungBlock'
@@ -19,11 +21,19 @@ export function Dashboard() {
   const addChain = useStore((s) => s.addChain)
   const renameChain = useStore((s) => s.renameChain)
   const addAbteilung = useStore((s) => s.addAbteilung)
+  const { mode } = useAuth()
   const [filter, setFilter] = useState<Filter>(EMPTY_FILTER)
   const [view, setView] = useState<View>('zusammen')
+  const [saved, setSaved] = useState(false)
 
   const abteilungen = alleAbteilungen.filter((a) => a.chainId === activeChainId)
   const activeChain = chains.find((c) => c.id === activeChainId)
+
+  const handleSave = async () => {
+    await saveActiveChain()
+    setSaved(true)
+    setTimeout(() => setSaved(false), 2000)
+  }
 
   return (
     <div className="flex h-full flex-col gap-4 overflow-y-auto p-6">
@@ -59,6 +69,18 @@ export function Dashboard() {
           >
             + Kette
           </button>
+          {mode === 'admin' && (
+            <button
+              onClick={handleSave}
+              className={`rounded-lg px-4 py-2 text-sm font-medium ${
+                saved
+                  ? 'bg-emerald-600 text-white'
+                  : 'bg-zollern-700 text-white hover:bg-zollern-800'
+              }`}
+            >
+              {saved ? 'Gespeichert ✓' : 'Speichern'}
+            </button>
+          )}
           <button
             onClick={() => addAbteilung()}
             className="rounded-lg border border-zollern-700 px-4 py-2 text-sm font-medium text-zollern-700 hover:bg-zollern-50"
