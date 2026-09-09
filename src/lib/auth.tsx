@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
-import { supabase, isSupabaseConfigured, ADMIN_EMAIL } from './supabase'
+import { supabase, isSupabaseConfigured } from './supabase'
 import { useStore } from '../store'
 
 export type Mode = 'loading' | 'signedOut' | 'admin' | 'guest'
@@ -7,7 +7,7 @@ export type Mode = 'loading' | 'signedOut' | 'admin' | 'guest'
 interface AuthValue {
   mode: Mode
   configured: boolean
-  signInAdmin: (password: string) => Promise<string | null>
+  signInAdmin: (email: string, password: string) => Promise<string | null>
   signInGuest: () => void
   signOut: () => Promise<void>
 }
@@ -35,9 +35,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .catch(() => setMode('signedOut'))
   }, [configured, setReadOnly])
 
-  const signInAdmin = async (password: string): Promise<string | null> => {
+  const signInAdmin = async (email: string, password: string): Promise<string | null> => {
     if (!supabase) return 'Supabase ist nicht konfiguriert.'
-    const { error } = await supabase.auth.signInWithPassword({ email: ADMIN_EMAIL, password })
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) return error.message
     setReadOnly(false)
     setMode('admin')
