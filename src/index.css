@@ -1,0 +1,55 @@
+@import "tailwindcss";
+
+@theme {
+  /* ============================================================
+     ZOLLERN Design-Tokens (basierend auf dem ZOLLERN Style Guide)
+     Markenfarbe: Orange #F56405
+     ============================================================ */
+
+  /* Orange Markenfarbe als Skala */
+  --color-zollern-50: #fff5ee;
+  --color-zollern-100: #fee8d8;
+  --color-zollern-200: #fccdae;
+  --color-zollern-300: #f9ab7a;
+  --color-zollern-400: #f7843d;
+  --color-zollern-500: #f56405;
+  --color-zollern-600: #d45404;
+  --color-zollern-700: #c45004;
+  --color-zollern-800: #9c3f03;
+  --color-zollern-900: #622802;
+  --color-zollern-950: #3d1801;
+
+  /* Semantische ZOLLERN-Tokens */
+  --color-zo-primary: #f56405;
+  --color-zo-primary-hover: #c45004;
+  --color-zo-primary-light: #f77b2b;
+  --color-zo-primary-bg: #fde0cd;
+  --color-zo-primary-border: #fbc19b;
+  --color-zo-quaternary: #2d1e2f;
+
+  --color-zo-ink: #212121;
+  --color-zo-muted: #555555;
+  --color-zo-border: #cecece;
+  --color-zo-bg: #ffffff;
+  --color-zo-bg-light: #f0f0f0;
+  --color-zo-bg-lighter: #f8f8f8;
+
+  /* Funktionsfarben */
+  --color-zo-success: #3a833a;
+  --color-zo-danger: #d4403a;
+  --color-zo-warning: #a4660e;
+  --color-zo-info: #287f9a;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background-color: #f8f8f8;
+  color: #212121;
+}
