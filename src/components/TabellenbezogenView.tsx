@@ -255,10 +255,10 @@ function computeLine(from: Rect, to: Rect): Geo {
   let labelX: number
   let labelY: number
   if (sameColumn) {
-    const channel = Math.min(from.x, to.x) - 16
-    x1 = from.x
+    const channel = Math.max(from.x, to.x) + Math.max(from.w, to.w) + 16
+    x1 = from.x + from.w
     y1 = from.y + from.h / 2
-    x2 = to.x
+    x2 = to.x + to.w
     y2 = to.y + to.h / 2
     path = `M ${x1} ${y1} H ${channel} V ${y2} H ${x2}`
     labelX = channel
