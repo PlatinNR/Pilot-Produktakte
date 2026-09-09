@@ -91,6 +91,14 @@ export interface AppState {
   nebentabellen: Nebentabelle[]
 }
 
+/** Daten einer einzelnen Prozesskette (als JSON-Dokument in Supabase gespeichert) */
+export interface ChainData {
+  abteilungen: Abteilung[]
+  schritte: Schritt[]
+  produktionstabellen: Produktionstabelle[]
+  nebentabellen: Nebentabelle[]
+}
+
 /** Standardspalten jeder Produktionstabelle (Auftragsnummer = Leitende Nummer) */
 export const PRODUKTION_SPALTEN: TableColumn[] = [
   { id: 'auftragsnummer', name: 'Fertigungsauftrag', type: 'text', fixed: true },
