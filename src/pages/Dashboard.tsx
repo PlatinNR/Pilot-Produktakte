@@ -58,9 +58,9 @@ export function Dashboard() {
             ))}
           </select>
           <EditableName
+            iconOnly
             value={activeChain?.name ?? ''}
             onCommit={(name) => renameChain(activeChainId, name)}
-            className="w-28 rounded-lg border border-slate-300 bg-white px-2 py-2 text-sm text-slate-700 outline-none focus:border-zollern-500"
           />
           <button
             onClick={() => addChain()}
