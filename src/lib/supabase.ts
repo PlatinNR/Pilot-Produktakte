@@ -10,5 +10,5 @@ export function isSupabaseConfigured(): boolean {
   return supabase !== null
 }
 
-/** E-Mail-Domäne für den Login (Benutzername „Admin" → admin@zollern.de). */
-export const ADMIN_EMAIL_DOMAIN = '@zollern.de'
+/** E-Mail des Admin-Kontos (Benutzername im Tool ist „Admin"). */
+export const ADMIN_EMAIL = (import.meta.env.VITE_ADMIN_EMAIL as string | undefined) || 'niclas.roettger@gmx.de'
