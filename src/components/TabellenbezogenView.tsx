@@ -613,7 +613,7 @@ export function TabellenbezogenView({ filter }: Props) {
           const neben = alleNeben.filter((n) => n.abteilungId === a.id)
           const bloecke = alleBloecke.filter((b) => b.abteilungId === a.id)
 
-          // Render-Reihenfolge: feste Schritte zuerst, dann Blöcke mit ihren Schritten
+          // Render-Reihenfolge: feste Schritte zuerst, dann Blöcke (ihre Schritte werden im Block gerendert)
           const renderItems: (
             | { type: 'schritt'; st: (typeof alleSchritte)[number] }
             | { type: 'block'; block: (typeof alleBloecke)[number] }
@@ -621,7 +621,6 @@ export function TabellenbezogenView({ filter }: Props) {
           for (const st of schritte.filter((x) => !x.blockId)) renderItems.push({ type: 'schritt', st })
           for (const block of bloecke) {
             renderItems.push({ type: 'block', block })
-            for (const st of schritte.filter((x) => x.blockId === block.id)) renderItems.push({ type: 'schritt', st })
           }
 
           return (
@@ -678,9 +677,13 @@ export function TabellenbezogenView({ filter }: Props) {
 
                     {renderItems.map((item, i) => {
                       if (item.type === 'block') {
+                        const blockSteps = schritte.filter((x) => x.blockId === item.block.id)
                         return (
-                          <Fragment key={`block-${item.block.id}`}>
-                            <div className="col-span-2 flex items-center gap-2 rounded-lg border border-dashed border-zollern-300 bg-zollern-50/50 px-3 py-1.5">
+                          <div
+                            key={`block-${item.block.id}`}
+                            className="col-span-2 rounded-lg border border-zollern-200 bg-zollern-50/40 p-2"
+                          >
+                            <div className="mb-2 flex items-center gap-2">
                               <span className="h-2 w-2 rounded-full bg-zollern-400" />
                               <span className="text-[9px] font-semibold uppercase tracking-wide text-zollern-500">
                                 Variabler Block
@@ -704,7 +707,79 @@ export function TabellenbezogenView({ filter }: Props) {
                                 ✕
                               </button>
                             </div>
-                          </Fragment>
+
+                            {/* Schritte als Spalten von links nach rechts */}
+                            <div className="overflow-x-auto pb-1">
+                              <div className="flex items-start gap-3">
+                                {blockSteps.map((bst) => {
+                                  const bstepMaschinen = alleMaschinen.filter((m) => m.schrittId === bst.id)
+                                  return (
+                                    <div
+                                      key={bst.id}
+                                      className="w-56 shrink-0 rounded-lg border border-slate-200 bg-white shadow-sm"
+                                    >
+                                      <div className="flex items-center gap-1.5 border-b border-slate-100 px-2 py-1.5">
+                                        <span className="h-2 w-2 shrink-0 rounded-full bg-zollern-500" />
+                                        <EditableName
+                                          value={bst.name}
+                                          onCommit={(name) => renameSchritt(bst.id, name)}
+                                          className="min-w-0 flex-1 text-xs font-semibold text-slate-700 outline-none"
+                                        />
+                                        <button
+                                          onClick={() => removeSchritt(bst.id)}
+                                          className="shrink-0 rounded px-1 text-slate-400 hover:text-red-500"
+                                          title="Schritt löschen"
+                                        >
+                                          ✕
+                                        </button>
+                                      </div>
+                                      <div className="flex flex-col gap-2 p-2">
+                                        {bstepMaschinen.map((m) => (
+                                          <EntityCard
+                                            key={m.id}
+                                            compact
+                                            title={m.name}
+                                            onRename={(name) => renameProduktionstabelle(m.id, name)}
+                                            onRemove={() => removeProduktionstabelle(m.id)}
+                                            onAddColumn={(name, type) => addColumnProduktion(m.id, name, type)}
+                                          >
+                                            {m.columns.map((c) => (
+                                              <ColumnRow
+                                                key={c.id}
+                                                compact
+                                                nodeKey={`m:${m.id}:${c.id}`}
+                                                registerRef={registerRef}
+                                                col={c}
+                                                keyType={keyTypeOf(m.keys, c.id)}
+                                                onRename={(name) => renameColumnProduktion(m.id, c.id, name)}
+                                                onChangeType={(t) => changeColumnTypeProduktion(m.id, c.id, t)}
+                                                onRemove={() => removeColumnProduktion(m.id, c.id)}
+                                                onCycleKey={() =>
+                                                  setColumnKeyProduktion(m.id, c.id, nextKey(keyTypeOf(m.keys, c.id)))
+                                                }
+                                                onStartDrag={startDrag('m', m.id, c.id, keyTypeOf(m.keys, c.id))}
+                                              />
+                                            ))}
+                                          </EntityCard>
+                                        ))}
+                                        <button
+                                          onClick={() => addProduktionstabelle(bst.id)}
+                                          className="flex min-h-[2.5rem] items-center justify-center rounded-lg border-2 border-dashed border-slate-200 text-[11px] text-slate-400 hover:border-zollern-400 hover:text-zollern-600"
+                                        >
+                                          + Maschine
+                                        </button>
+                                      </div>
+                                    </div>
+                                  )
+                                })}
+                                {blockSteps.length === 0 && (
+                                  <div className="flex min-h-[5rem] w-full items-center justify-center rounded-lg border-2 border-dashed border-slate-200 text-sm text-slate-400">
+                                    + Schritt über den Button oben hinzufügen
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
                         )
                       }
                       const st = item.st
