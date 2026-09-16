@@ -322,6 +322,7 @@ export function TabellenbezogenView({ filter }: Props) {
   const alleAbteilungen = useStore((s) => s.abteilungen)
   const activeChainId = useStore((s) => s.activeChainId)
   const alleSchritte = useStore((s) => s.schritte)
+  const alleBloecke = useStore((s) => s.bearbeitungsbloecke)
   const alleMaschinen = useStore((s) => s.produktionstabellen)
   const alleNeben = useStore((s) => s.nebentabellen)
 
@@ -342,8 +343,10 @@ export function TabellenbezogenView({ filter }: Props) {
     setSchrittOptional,
     renameAbteilung,
     removeAbteilung,
-    setAbteilungSequence,
     setAbteilungParent,
+    addBearbeitungsblock,
+    renameBearbeitungsblock,
+    removeBearbeitungsblock,
     addProduktionstabelle,
     renameProduktionstabelle,
     removeProduktionstabelle,
@@ -520,10 +523,9 @@ export function TabellenbezogenView({ filter }: Props) {
     }
   }
   // Schritt -> Schritt (Prozesskette: der Fertigungsauftrag wandert durch die Schritte)
-  // Nur bei Abteilungen mit fester Reihenfolge – variable Abteilungen haben keine feste Kette.
+  // Nur für Schritte ohne Block (feste Reihenfolge) – Schritte in einem Block sind variabel.
   for (const a of abteilungen) {
-    if (a.sequence !== 'fixed') continue
-    const schritte = alleSchritte.filter((st) => st.abteilungId === a.id)
+    const schritte = alleSchritte.filter((st) => st.abteilungId === a.id && !st.blockId)
     for (let i = 0; i < schritte.length - 1; i++) {
       lines.push({
         sourceKey: `s:${schritte[i].id}:auftragsnummer`,
@@ -609,6 +611,18 @@ export function TabellenbezogenView({ filter }: Props) {
         {abteilungen.map((a) => {
           const schritte = alleSchritte.filter((st) => st.abteilungId === a.id)
           const neben = alleNeben.filter((n) => n.abteilungId === a.id)
+          const bloecke = alleBloecke.filter((b) => b.abteilungId === a.id)
+
+          // Render-Reihenfolge: feste Schritte zuerst, dann Blöcke mit ihren Schritten
+          const renderItems: (
+            | { type: 'schritt'; st: (typeof alleSchritte)[number] }
+            | { type: 'block'; block: (typeof alleBloecke)[number] }
+          )[] = []
+          for (const st of schritte.filter((x) => !x.blockId)) renderItems.push({ type: 'schritt', st })
+          for (const block of bloecke) {
+            renderItems.push({ type: 'block', block })
+            for (const st of schritte.filter((x) => x.blockId === block.id)) renderItems.push({ type: 'schritt', st })
+          }
 
           return (
             <section key={a.id} className="rounded-xl border border-slate-200 p-4">
@@ -625,15 +639,12 @@ export function TabellenbezogenView({ filter }: Props) {
                 >
                   + Schritt
                 </button>
-                <select
-                  value={a.sequence}
-                  onChange={(e) => setAbteilungSequence(a.id, e.target.value as 'fixed' | 'variable')}
-                  className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-600"
-                  title="Reihenfolge der Schritte"
+                <button
+                  onClick={() => addBearbeitungsblock(a.id)}
+                  className="rounded border border-zollern-700 px-3 py-1 text-xs font-medium text-zollern-700 hover:bg-zollern-50"
                 >
-                  <option value="fixed">feste Reihenfolge</option>
-                  <option value="variable">variable Reihenfolge</option>
-                </select>
+                  + Variabler Block
+                </button>
                 <select
                   value={a.parentId ?? ''}
                   onChange={(e) => setAbteilungParent(a.id, e.target.value || null)}
@@ -665,7 +676,38 @@ export function TabellenbezogenView({ filter }: Props) {
                     <ColumnLabel>Produktionsstellen</ColumnLabel>
                     <ColumnLabel>Produktionskette</ColumnLabel>
 
-                    {schritte.map((st, i) => {
+                    {renderItems.map((item, i) => {
+                      if (item.type === 'block') {
+                        return (
+                          <Fragment key={`block-${item.block.id}`}>
+                            <div className="col-span-2 flex items-center gap-2 rounded-lg border border-dashed border-zollern-300 bg-zollern-50/50 px-3 py-1.5">
+                              <span className="h-2 w-2 rounded-full bg-zollern-400" />
+                              <span className="text-[9px] font-semibold uppercase tracking-wide text-zollern-500">
+                                Variabler Block
+                              </span>
+                              <EditableName
+                                value={item.block.name}
+                                onCommit={(name) => renameBearbeitungsblock(item.block.id, name)}
+                                className="min-w-0 flex-1 text-xs font-semibold text-zollern-800 outline-none"
+                              />
+                              <button
+                                onClick={() => addSchritt(a.id, item.block.id)}
+                                className="rounded bg-zollern-700 px-2 py-0.5 text-[11px] font-medium text-white hover:bg-zollern-800"
+                              >
+                                + Schritt
+                              </button>
+                              <button
+                                onClick={() => removeBearbeitungsblock(item.block.id)}
+                                className="rounded px-1 text-slate-400 hover:text-red-500"
+                                title="Block löschen"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          </Fragment>
+                        )
+                      }
+                      const st = item.st
                       const stepMaschinen = alleMaschinen.filter((m) => m.schrittId === st.id)
                       const agg = aggregate ? aggregateSchritt(st, stepMaschinen, filter) : null
                       const matchedRows = stepMaschinen.flatMap((m) => m.rows)

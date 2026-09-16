@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { isSupabaseConfigured } from './supabase'
 import { listChains, saveChain } from './api'
 import { useStore } from '../store'
-import type { Abteilung, ChainData, Nebentabelle, Produktionstabelle, Schritt } from '../types'
+import type { Abteilung, Bearbeitungsblock, ChainData, Nebentabelle, Produktionstabelle, Schritt } from '../types'
 
 const updatedAtMap = new Map<string, string>()
 
@@ -10,11 +10,12 @@ function extractChainData(chainId: string): ChainData {
   const s = useStore.getState()
   const abteilungen = s.abteilungen.filter((a) => a.chainId === chainId)
   const abteilungIds = new Set(abteilungen.map((a) => a.id))
+  const bearbeitungsbloecke = s.bearbeitungsbloecke.filter((b) => abteilungIds.has(b.abteilungId))
   const schritte = s.schritte.filter((st) => abteilungIds.has(st.abteilungId))
   const schrittIds = new Set(schritte.map((st) => st.id))
   const produktionstabellen = s.produktionstabellen.filter((t) => schrittIds.has(t.schrittId))
   const nebentabellen = s.nebentabellen.filter((n) => abteilungIds.has(n.abteilungId))
-  return { abteilungen, schritte, produktionstabellen, nebentabellen }
+  return { abteilungen, bearbeitungsbloecke, schritte, produktionstabellen, nebentabellen }
 }
 
 /** Speichert alle Ketten global in Supabase. */
@@ -34,12 +35,14 @@ async function loadChainsIntoStore(): Promise<void> {
   if (records.length === 0) return
   const chains = records.map((r) => ({ id: r.id, name: r.name }))
   const abteilungen: Abteilung[] = []
+  const bearbeitungsbloecke: Bearbeitungsblock[] = []
   const schritte: Schritt[] = []
   const produktionstabellen: Produktionstabelle[] = []
   const nebentabellen: Nebentabelle[] = []
   for (const r of records) {
-    const d = r.data ?? { abteilungen: [], schritte: [], produktionstabellen: [], nebentabellen: [] }
+    const d = r.data ?? { abteilungen: [], bearbeitungsbloecke: [], schritte: [], produktionstabellen: [], nebentabellen: [] }
     for (const a of d.abteilungen ?? []) abteilungen.push({ ...a, chainId: r.id })
+    for (const b of d.bearbeitungsbloecke ?? []) bearbeitungsbloecke.push(b)
     for (const st of d.schritte ?? []) schritte.push(st)
     for (const p of d.produktionstabellen ?? []) produktionstabellen.push(p)
     for (const n of d.nebentabellen ?? []) nebentabellen.push(n)
@@ -55,6 +58,7 @@ async function loadChainsIntoStore(): Promise<void> {
           : chains[0].id
         : '',
     abteilungen,
+    bearbeitungsbloecke,
     schritte,
     produktionstabellen,
     nebentabellen,

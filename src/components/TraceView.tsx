@@ -18,8 +18,7 @@ export function TraceView({ auftragsnummer }: Props) {
   const produktionstabellen = alleMaschinen.filter((t) => schrittIds.has(t.schrittId))
   const nebentabellen = alleNeben.filter((n) => abteilungIds.has(n.abteilungId))
 
-  // Variable Abteilungen: Schritte nach dem Datum des Eintrags ordnen
-  const sequenceByAbteilung = new Map(abteilungen.map((a) => [a.id, a.sequence]))
+  // Schritte in einem Variablen Bearbeitungsblock werden nach dem Datum des Eintrags geordnet
   const stepDatum = (stepId: string): string => {
     for (const m of alleMaschinen) {
       if (m.schrittId !== stepId) continue
@@ -29,9 +28,7 @@ export function TraceView({ auftragsnummer }: Props) {
     return ''
   }
   const orderedSchritte = [...schritte].sort((a, b) => {
-    const sa = sequenceByAbteilung.get(a.abteilungId)
-    const sb = sequenceByAbteilung.get(b.abteilungId)
-    if (sa === 'variable' && sb === 'variable' && a.abteilungId === b.abteilungId) {
+    if (a.blockId && a.blockId === b.blockId) {
       return (stepDatum(a.id) || '9999').localeCompare(stepDatum(b.id) || '9999')
     }
     return 0

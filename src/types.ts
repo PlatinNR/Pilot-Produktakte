@@ -13,14 +13,21 @@ export interface Abteilung {
   name: string
   /** Übergeordnete Abteilung (für hierarchische Abteilungen) */
   parentId: string | null
-  /** 'fixed' = feste Schritt-Reihenfolge, 'variable' = Reihenfolge pro Teil (nach Datum) */
-  sequence: 'fixed' | 'variable'
+}
+
+/** Variabler Bearbeitungsblock – Container mit Schritten in variabler Reihenfolge */
+export interface Bearbeitungsblock {
+  id: string
+  abteilungId: string
+  name: string
 }
 
 /** Ein Produktionsschritt (z. B. „Spritzen", „Modellieren", „Reinigen") */
 export interface Schritt {
   id: string
   abteilungId: string
+  /** Zugehöriger Variabler Bearbeitungsblock (falls in einem) */
+  blockId: string | null
   name: string
   /** Zusätzliche Felder (zusätzlich zu den festen Spalten Auftragsnummer/FN/Datum/Produktion) */
   columns: TableColumn[]
@@ -96,6 +103,7 @@ export interface AppState {
   chains: Chain[]
   activeChainId: string
   abteilungen: Abteilung[]
+  bearbeitungsbloecke: Bearbeitungsblock[]
   schritte: Schritt[]
   produktionstabellen: Produktionstabelle[]
   nebentabellen: Nebentabelle[]
@@ -104,6 +112,7 @@ export interface AppState {
 /** Daten einer einzelnen Prozesskette (als JSON-Dokument in Supabase gespeichert) */
 export interface ChainData {
   abteilungen: Abteilung[]
+  bearbeitungsbloecke: Bearbeitungsblock[]
   schritte: Schritt[]
   produktionstabellen: Produktionstabelle[]
   nebentabellen: Nebentabelle[]

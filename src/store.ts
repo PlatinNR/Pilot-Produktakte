@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware'
 import type {
   Abteilung,
   AppState,
+  Bearbeitungsblock,
   Chain,
   ColumnType,
   KeyType,
@@ -55,11 +56,15 @@ interface Store extends AppState {
   addAbteilung: (name?: string) => void
   renameAbteilung: (id: string, name: string) => void
   removeAbteilung: (id: string) => void
-  setAbteilungSequence: (id: string, sequence: 'fixed' | 'variable') => void
   setAbteilungParent: (id: string, parentId: string | null) => void
 
+  // Variable Bearbeitungsblöcke
+  addBearbeitungsblock: (abteilungId: string, name?: string) => void
+  renameBearbeitungsblock: (id: string, name: string) => void
+  removeBearbeitungsblock: (id: string) => void
+
   // Schritte
-  addSchritt: (abteilungId: string, name?: string) => void
+  addSchritt: (abteilungId: string, blockId?: string | null, name?: string) => void
   renameSchritt: (id: string, name: string) => void
   removeSchritt: (id: string) => void
   moveSchritt: (id: string, direction: 'up' | 'down') => void
@@ -117,6 +122,7 @@ export const useStore = create<Store>()(
       chains: demo.chains,
       activeChainId: demo.activeChainId,
       abteilungen: demo.abteilungen,
+      bearbeitungsbloecke: demo.bearbeitungsbloecke,
       schritte: demo.schritte,
       produktionstabellen: demo.produktionstabellen,
       nebentabellen: demo.nebentabellen,
@@ -128,6 +134,7 @@ export const useStore = create<Store>()(
           const chainName = name ?? `Kette ${s.chains.length + 1}`
           apiCreateChain(id, chainName, {
             abteilungen: [],
+            bearbeitungsbloecke: [],
             schritte: [],
             produktionstabellen: [],
             nebentabellen: [],
@@ -173,7 +180,6 @@ export const useStore = create<Store>()(
               chainId: s.activeChainId,
               name: name ?? 'Neue Abteilung',
               parentId: null,
-              sequence: 'fixed',
             },
           ],
         })),
@@ -181,15 +187,13 @@ export const useStore = create<Store>()(
   renameAbteilung: (id, name) =>
     set((s) => ({ abteilungen: s.abteilungen.map((a) => (a.id === id ? { ...a, name } : a)) })),
 
-  setAbteilungSequence: (id, sequence) =>
-    set((s) => ({ abteilungen: s.abteilungen.map((a) => (a.id === id ? { ...a, sequence } : a)) })),
-
   setAbteilungParent: (id, parentId) =>
     set((s) => ({ abteilungen: s.abteilungen.map((a) => (a.id === id ? { ...a, parentId } : a)) })),
 
   removeAbteilung: (id) =>
     set((s) => ({
       abteilungen: s.abteilungen.filter((a) => a.id !== id),
+      bearbeitungsbloecke: s.bearbeitungsbloecke.filter((b) => b.abteilungId !== id),
       schritte: s.schritte.filter((st) => st.abteilungId !== id),
       nebentabellen: s.nebentabellen.filter((n) => n.abteilungId !== id),
       produktionstabellen: s.produktionstabellen.filter(
@@ -197,14 +201,35 @@ export const useStore = create<Store>()(
       ),
     })),
 
+  // --- Variable Bearbeitungsblöcke ---
+  addBearbeitungsblock: (abteilungId, name) =>
+    set((s) => ({
+      bearbeitungsbloecke: [
+        ...s.bearbeitungsbloecke,
+        { id: nextId('b'), abteilungId, name: name ?? 'Variabler Block' },
+      ],
+    })),
+
+  renameBearbeitungsblock: (id, name) =>
+    set((s) => ({
+      bearbeitungsbloecke: s.bearbeitungsbloecke.map((b) => (b.id === id ? { ...b, name } : b)),
+    })),
+
+  removeBearbeitungsblock: (id) =>
+    set((s) => ({
+      bearbeitungsbloecke: s.bearbeitungsbloecke.filter((b) => b.id !== id),
+      schritte: s.schritte.map((st) => (st.blockId === id ? { ...st, blockId: null } : st)),
+    })),
+
   // --- Schritte ---
-  addSchritt: (abteilungId, name) =>
+  addSchritt: (abteilungId, blockId, name) =>
     set((s) => ({
       schritte: [
         ...s.schritte,
         {
           id: nextId('s'),
           abteilungId,
+          blockId: blockId ?? null,
           name: name ?? `Schritt ${s.schritte.length + 1}`,
           columns: [],
           keys: [],
@@ -598,11 +623,11 @@ setKeyLabelNeben: (tabelleId, spalteId, label) =>
   }),
     {
       name: 'digitale-produktakte',
-      version: 4,
+      version: 5,
       migrate: (persisted, version) => {
         let p = persisted as Partial<AppState> & {
           abteilungen?: (Abteilung & { chainId?: string; parentId?: string | null; sequence?: 'fixed' | 'variable' })[]
-          schritte?: (Schritt & { loopCondition?: string | null; loopTargetId?: string | null; optional?: boolean })[]
+          schritte?: (Schritt & { loopCondition?: string | null; loopTargetId?: string | null; optional?: boolean; blockId?: string | null })[]
         }
         if (version < 2) {
           p = {
@@ -628,11 +653,25 @@ setKeyLabelNeben: (tabelleId, spalteId, label) =>
             abteilungen: (p.abteilungen ?? []).map((a) => ({
               ...a,
               parentId: a.parentId ?? null,
-              sequence: a.sequence ?? 'fixed',
             })),
             schritte: (p.schritte ?? []).map((st) => ({
               ...st,
               optional: st.optional ?? false,
+            })),
+          } as typeof p
+        }
+        if (version < 5) {
+          const cleaned = (p.abteilungen ?? []).map((a) => {
+            const { sequence: _sequence, ...rest } = a as (Abteilung & { sequence?: string })
+            return rest
+          })
+          p = {
+            ...p,
+            abteilungen: cleaned,
+            bearbeitungsbloecke: p.bearbeitungsbloecke ?? [],
+            schritte: (p.schritte ?? []).map((st) => ({
+              ...st,
+              blockId: st.blockId ?? null,
             })),
           } as typeof p
         }
@@ -642,6 +681,7 @@ setKeyLabelNeben: (tabelleId, spalteId, label) =>
         chains: s.chains,
         activeChainId: s.activeChainId,
         abteilungen: s.abteilungen,
+        bearbeitungsbloecke: s.bearbeitungsbloecke,
         schritte: s.schritte,
         produktionstabellen: s.produktionstabellen,
         nebentabellen: s.nebentabellen,
@@ -656,12 +696,14 @@ function seed(): AppState {
   const chains: Chain[] = [{ id: 'chain-test', name: 'Testkette' }]
   const activeChainId = 'chain-test'
 
-  const abteilungen: Abteilung[] = [{ id: 'abt-wachs', chainId: 'chain-test', name: 'Wachs', parentId: null, sequence: 'fixed' }]
+  const abteilungen: Abteilung[] = [{ id: 'abt-wachs', chainId: 'chain-test', name: 'Wachs', parentId: null }]
+
+  const bearbeitungsbloecke: Bearbeitungsblock[] = []
 
   const schritte: Schritt[] = [
-    { id: 's-spritzen', abteilungId: 'abt-wachs', name: '1. Spritzen', columns: [], keys: [], loopCondition: null, loopTargetId: null, optional: false },
-    { id: 's-modellieren', abteilungId: 'abt-wachs', name: '2. Modellieren', columns: [], keys: [], loopCondition: null, loopTargetId: null, optional: false },
-    { id: 's-reinigen', abteilungId: 'abt-wachs', name: '3. Reinigen', columns: [], keys: [], loopCondition: null, loopTargetId: null, optional: false },
+    { id: 's-spritzen', abteilungId: 'abt-wachs', blockId: null, name: '1. Spritzen', columns: [], keys: [], loopCondition: null, loopTargetId: null, optional: false },
+    { id: 's-modellieren', abteilungId: 'abt-wachs', blockId: null, name: '2. Modellieren', columns: [], keys: [], loopCondition: null, loopTargetId: null, optional: false },
+    { id: 's-reinigen', abteilungId: 'abt-wachs', blockId: null, name: '3. Reinigen', columns: [], keys: [], loopCondition: null, loopTargetId: null, optional: false },
   ]
 
   const druckSpalte: TableColumn = { id: 'c-druck', name: 'Druck (bar)', type: 'number', fixed: false }
@@ -750,5 +792,5 @@ function seed(): AppState {
     },
   ]
 
-  return { chains, activeChainId, abteilungen, schritte, produktionstabellen, nebentabellen }
+  return { chains, activeChainId, abteilungen, bearbeitungsbloecke, schritte, produktionstabellen, nebentabellen }
 }
