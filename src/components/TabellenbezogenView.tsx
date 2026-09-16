@@ -339,8 +339,11 @@ export function TabellenbezogenView({ filter }: Props) {
     setColumnKeySchritt,
     linkSchrittFK,
     setSchrittLoop,
+    setSchrittOptional,
     renameAbteilung,
     removeAbteilung,
+    setAbteilungSequence,
+    setAbteilungParent,
     addProduktionstabelle,
     renameProduktionstabelle,
     removeProduktionstabelle,
@@ -517,7 +520,9 @@ export function TabellenbezogenView({ filter }: Props) {
     }
   }
   // Schritt -> Schritt (Prozesskette: der Fertigungsauftrag wandert durch die Schritte)
+  // Nur bei Abteilungen mit fester Reihenfolge – variable Abteilungen haben keine feste Kette.
   for (const a of abteilungen) {
+    if (a.sequence !== 'fixed') continue
     const schritte = alleSchritte.filter((st) => st.abteilungId === a.id)
     for (let i = 0; i < schritte.length - 1; i++) {
       lines.push({
@@ -620,6 +625,30 @@ export function TabellenbezogenView({ filter }: Props) {
                 >
                   + Schritt
                 </button>
+                <select
+                  value={a.sequence}
+                  onChange={(e) => setAbteilungSequence(a.id, e.target.value as 'fixed' | 'variable')}
+                  className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-600"
+                  title="Reihenfolge der Schritte"
+                >
+                  <option value="fixed">feste Reihenfolge</option>
+                  <option value="variable">variable Reihenfolge</option>
+                </select>
+                <select
+                  value={a.parentId ?? ''}
+                  onChange={(e) => setAbteilungParent(a.id, e.target.value || null)}
+                  className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-600"
+                  title="Übergeordnete Abteilung"
+                >
+                  <option value="">keine übergeordnete</option>
+                  {abteilungen
+                    .filter((x) => x.id !== a.id)
+                    .map((x) => (
+                      <option key={x.id} value={x.id}>
+                        {x.name}
+                      </option>
+                    ))}
+                </select>
                 <button
                   onClick={() => removeAbteilung(a.id)}
                   className="rounded px-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"
@@ -768,8 +797,17 @@ export function TabellenbezogenView({ filter }: Props) {
                                 onStartDrag={startDrag('s', st.id, c.id, keyTypeOf(st.keys, c.id))}
                               />
                             ))}
-                            {/* Schleife (Rücksprung mit Bedingung) */}
+                            {/* Überspringbar (optional) + Schleife (Rücksprung mit Bedingung) */}
                             <div className="border-t border-slate-100 bg-slate-50/60 px-2 py-1.5">
+                              <label className="mb-1 flex items-center gap-1.5 text-[10px] text-slate-600">
+                                <input
+                                  type="checkbox"
+                                  checked={st.optional}
+                                  onChange={(e) => setSchrittOptional(st.id, e.target.checked)}
+                                  className="h-3 w-3 accent-zollern-600"
+                                />
+                                optional (überspringbar, wenn kein Eintrag)
+                              </label>
                               <div className="mb-1 flex items-center gap-1">
                                 <span className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">
                                   Schleife

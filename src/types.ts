@@ -11,6 +11,10 @@ export interface Abteilung {
   id: string
   chainId: string
   name: string
+  /** Übergeordnete Abteilung (für hierarchische Abteilungen) */
+  parentId: string | null
+  /** 'fixed' = feste Schritt-Reihenfolge, 'variable' = Reihenfolge pro Teil (nach Datum) */
+  sequence: 'fixed' | 'variable'
 }
 
 /** Ein Produktionsschritt (z. B. „Spritzen", „Modellieren", „Reinigen") */
@@ -26,6 +30,8 @@ export interface Schritt {
   loopCondition: string | null
   /** Schritt-ID, zu der zurückgesprungen wird (Schleife) */
   loopTargetId: string | null
+  /** Optionaler Schritt – kann übersprungen werden, wenn für ein Teil kein Eintrag besteht */
+  optional: boolean
 }
 
 /** Spaltentyp einer Tabelle */

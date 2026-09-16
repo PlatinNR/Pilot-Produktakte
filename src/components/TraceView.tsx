@@ -18,7 +18,26 @@ export function TraceView({ auftragsnummer }: Props) {
   const produktionstabellen = alleMaschinen.filter((t) => schrittIds.has(t.schrittId))
   const nebentabellen = alleNeben.filter((n) => abteilungIds.has(n.abteilungId))
 
-  const trace = traceAuftrag(schritte, produktionstabellen, auftragsnummer)
+  // Variable Abteilungen: Schritte nach dem Datum des Eintrags ordnen
+  const sequenceByAbteilung = new Map(abteilungen.map((a) => [a.id, a.sequence]))
+  const stepDatum = (stepId: string): string => {
+    for (const m of alleMaschinen) {
+      if (m.schrittId !== stepId) continue
+      const row = m.rows.find((r) => r.auftragsnummer === auftragsnummer)
+      if (row) return row.datum ?? ''
+    }
+    return ''
+  }
+  const orderedSchritte = [...schritte].sort((a, b) => {
+    const sa = sequenceByAbteilung.get(a.abteilungId)
+    const sb = sequenceByAbteilung.get(b.abteilungId)
+    if (sa === 'variable' && sb === 'variable' && a.abteilungId === b.abteilungId) {
+      return (stepDatum(a.id) || '9999').localeCompare(stepDatum(b.id) || '9999')
+    }
+    return 0
+  })
+
+  const trace = traceAuftrag(orderedSchritte, produktionstabellen, auftragsnummer)
 
   if (!trace.found) {
     return (
@@ -43,23 +62,35 @@ export function TraceView({ auftragsnummer }: Props) {
       </div>
 
       <div className="flex flex-wrap items-stretch gap-2">
-        {trace.stops.map((stop, i) => (
-          <div key={stop.schritt.id} className="flex items-center gap-2">
-            <div
-              className={`rounded-lg border px-3 py-2 ${
-                stop.tabelle
-                  ? 'border-zollern-500 bg-white shadow-sm'
-                  : 'border-slate-200 bg-slate-50'
-              }`}
-            >
-              <div className="text-[11px] uppercase tracking-wide text-slate-400">{stop.schritt.name}</div>
-              <div className={`text-sm font-semibold ${stop.tabelle ? 'text-zollern-800' : 'text-slate-400'}`}>
-                {stop.tabelle ? stop.tabelle.name : '—'}
+        {trace.stops.map((stop, i) => {
+          const skipped = !stop.tabelle && stop.schritt.optional
+          return (
+            <div key={stop.schritt.id} className="flex items-center gap-2">
+              <div
+                className={`rounded-lg border px-3 py-2 ${
+                  stop.tabelle
+                    ? 'border-zollern-500 bg-white shadow-sm'
+                    : skipped
+                      ? 'border-dashed border-slate-300 bg-slate-50'
+                      : 'border-slate-200 bg-slate-50'
+                }`}
+              >
+                <div className="text-[11px] uppercase tracking-wide text-slate-400">
+                  {stop.schritt.name}
+                  {stop.schritt.optional && <span className="ml-1 text-slate-300">(opt.)</span>}
+                </div>
+                <div
+                  className={`text-sm font-semibold ${
+                    stop.tabelle ? 'text-zollern-800' : skipped ? 'text-slate-300 italic' : 'text-slate-400'
+                  }`}
+                >
+                  {stop.tabelle ? stop.tabelle.name : skipped ? 'übersprungen' : '—'}
+                </div>
               </div>
+              {i < trace.stops.length - 1 && <span className="text-lg font-bold text-zollern-400">→</span>}
             </div>
-            {i < trace.stops.length - 1 && <span className="text-lg font-bold text-zollern-400">→</span>}
-          </div>
-        ))}
+          )
+        })}
       </div>
 
       {nebenZuZeitpunkt.length > 0 && (

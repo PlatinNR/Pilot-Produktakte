@@ -55,6 +55,8 @@ interface Store extends AppState {
   addAbteilung: (name?: string) => void
   renameAbteilung: (id: string, name: string) => void
   removeAbteilung: (id: string) => void
+  setAbteilungSequence: (id: string, sequence: 'fixed' | 'variable') => void
+  setAbteilungParent: (id: string, parentId: string | null) => void
 
   // Schritte
   addSchritt: (abteilungId: string, name?: string) => void
@@ -69,6 +71,7 @@ interface Store extends AppState {
   linkSchrittFK: (schrittId: string, spalteId: string, refTableId: string, refColumnId: string) => void
   setKeyLabelSchritt: (schrittId: string, spalteId: string, label: string) => void
   setSchrittLoop: (schrittId: string, loopTargetId: string | null, loopCondition: string | null) => void
+  setSchrittOptional: (schrittId: string, optional: boolean) => void
 
   // Produktionstabellen (Maschinen)
   addProduktionstabelle: (schrittId: string, name?: string) => void
@@ -165,12 +168,24 @@ export const useStore = create<Store>()(
         set((s) => ({
           abteilungen: [
             ...s.abteilungen,
-            { id: nextId('a'), chainId: s.activeChainId, name: name ?? 'Neue Abteilung' },
+            {
+              id: nextId('a'),
+              chainId: s.activeChainId,
+              name: name ?? 'Neue Abteilung',
+              parentId: null,
+              sequence: 'fixed',
+            },
           ],
         })),
 
   renameAbteilung: (id, name) =>
     set((s) => ({ abteilungen: s.abteilungen.map((a) => (a.id === id ? { ...a, name } : a)) })),
+
+  setAbteilungSequence: (id, sequence) =>
+    set((s) => ({ abteilungen: s.abteilungen.map((a) => (a.id === id ? { ...a, sequence } : a)) })),
+
+  setAbteilungParent: (id, parentId) =>
+    set((s) => ({ abteilungen: s.abteilungen.map((a) => (a.id === id ? { ...a, parentId } : a)) })),
 
   removeAbteilung: (id) =>
     set((s) => ({
@@ -195,6 +210,7 @@ export const useStore = create<Store>()(
           keys: [],
           loopCondition: null,
           loopTargetId: null,
+          optional: false,
         },
       ],
     })),
@@ -288,6 +304,11 @@ export const useStore = create<Store>()(
       schritte: s.schritte.map((st) =>
         st.id === schrittId ? { ...st, loopTargetId, loopCondition } : st,
       ),
+    })),
+
+  setSchrittOptional: (schrittId, optional) =>
+    set((s) => ({
+      schritte: s.schritte.map((st) => (st.id === schrittId ? { ...st, optional } : st)),
     })),
 
   moveSchritt: (id, direction) =>
@@ -577,11 +598,11 @@ setKeyLabelNeben: (tabelleId, spalteId, label) =>
   }),
     {
       name: 'digitale-produktakte',
-      version: 3,
+      version: 4,
       migrate: (persisted, version) => {
         let p = persisted as Partial<AppState> & {
-          abteilungen?: (Abteilung & { chainId?: string })[]
-          schritte?: (Schritt & { loopCondition?: string | null; loopTargetId?: string | null })[]
+          abteilungen?: (Abteilung & { chainId?: string; parentId?: string | null; sequence?: 'fixed' | 'variable' })[]
+          schritte?: (Schritt & { loopCondition?: string | null; loopTargetId?: string | null; optional?: boolean })[]
         }
         if (version < 2) {
           p = {
@@ -598,6 +619,20 @@ setKeyLabelNeben: (tabelleId, spalteId, label) =>
               ...st,
               loopCondition: st.loopCondition ?? null,
               loopTargetId: st.loopTargetId ?? null,
+            })),
+          } as typeof p
+        }
+        if (version < 4) {
+          p = {
+            ...p,
+            abteilungen: (p.abteilungen ?? []).map((a) => ({
+              ...a,
+              parentId: a.parentId ?? null,
+              sequence: a.sequence ?? 'fixed',
+            })),
+            schritte: (p.schritte ?? []).map((st) => ({
+              ...st,
+              optional: st.optional ?? false,
             })),
           } as typeof p
         }
@@ -621,12 +656,12 @@ function seed(): AppState {
   const chains: Chain[] = [{ id: 'chain-test', name: 'Testkette' }]
   const activeChainId = 'chain-test'
 
-  const abteilungen: Abteilung[] = [{ id: 'abt-wachs', chainId: 'chain-test', name: 'Wachs' }]
+  const abteilungen: Abteilung[] = [{ id: 'abt-wachs', chainId: 'chain-test', name: 'Wachs', parentId: null, sequence: 'fixed' }]
 
   const schritte: Schritt[] = [
-    { id: 's-spritzen', abteilungId: 'abt-wachs', name: '1. Spritzen', columns: [], keys: [], loopCondition: null, loopTargetId: null },
-    { id: 's-modellieren', abteilungId: 'abt-wachs', name: '2. Modellieren', columns: [], keys: [], loopCondition: null, loopTargetId: null },
-    { id: 's-reinigen', abteilungId: 'abt-wachs', name: '3. Reinigen', columns: [], keys: [], loopCondition: null, loopTargetId: null },
+    { id: 's-spritzen', abteilungId: 'abt-wachs', name: '1. Spritzen', columns: [], keys: [], loopCondition: null, loopTargetId: null, optional: false },
+    { id: 's-modellieren', abteilungId: 'abt-wachs', name: '2. Modellieren', columns: [], keys: [], loopCondition: null, loopTargetId: null, optional: false },
+    { id: 's-reinigen', abteilungId: 'abt-wachs', name: '3. Reinigen', columns: [], keys: [], loopCondition: null, loopTargetId: null, optional: false },
   ]
 
   const druckSpalte: TableColumn = { id: 'c-druck', name: 'Druck (bar)', type: 'number', fixed: false }
