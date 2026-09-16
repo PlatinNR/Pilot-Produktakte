@@ -255,10 +255,10 @@ function computeLine(from: Rect, to: Rect): Geo {
   let labelX: number
   let labelY: number
   if (sameColumn) {
-    const channel = Math.max(from.x, to.x) + Math.max(from.w, to.w) + 16
-    x1 = from.x + from.w
+    const channel = Math.min(from.x, to.x) - 16
+    x1 = from.x
     y1 = from.y + from.h / 2
-    x2 = to.x + to.w
+    x2 = to.x
     y2 = to.y + to.h / 2
     path = `M ${x1} ${y1} H ${channel} V ${y2} H ${x2}`
     labelX = channel
@@ -540,24 +540,6 @@ export function TabellenbezogenView({ filter }: Props) {
       })
     }
   }
-  // Abteilungsübergreifend: unterster Schritt einer Abteilung -> oberster Schritt der nächsten
-  for (let i = 0; i < abteilungen.length - 1; i++) {
-    const curr = alleSchritte.filter((st) => st.abteilungId === abteilungen[i].id && !st.blockId).sort((x, y) => x.position - y.position)
-    const next = alleSchritte.filter((st) => st.abteilungId === abteilungen[i + 1].id && !st.blockId).sort((x, y) => x.position - y.position)
-    const last = curr[curr.length - 1]
-    const first = next[0]
-    if (last && first) {
-      lines.push({
-        sourceKey: `s:${last.id}:auftragsnummer`,
-        targetKey: `s:${first.id}:auftragsnummer`,
-        label: 'Auftragsnummer',
-        n1: false,
-        keyKind: null,
-        keyTableId: null,
-        keyColumnId: null,
-      })
-    }
-  }
   // Schritt-Felder als Fremdschlüssel
   for (const st of alleSchritte) {
     for (const k of st.keys) {
@@ -751,26 +733,125 @@ export function TabellenbezogenView({ filter }: Props) {
                                 {blockSteps.map((bst) => {
                                   const bstepMaschinen = alleMaschinen.filter((m) => m.schrittId === bst.id)
                                   return (
-                                    <div
-                                      key={bst.id}
-                                      className="w-56 shrink-0 rounded-lg border border-slate-200 bg-white shadow-sm"
-                                    >
-                                      <div className="flex items-center gap-1.5 border-b border-slate-100 px-2 py-1.5">
-                                        <span className="h-2 w-2 shrink-0 rounded-full bg-zollern-500" />
-                                        <EditableName
-                                          value={bst.name}
-                                          onCommit={(name) => renameSchritt(bst.id, name)}
-                                          className="min-w-0 flex-1 text-xs font-semibold text-slate-700 outline-none"
-                                        />
-                                        <button
-                                          onClick={() => removeSchritt(bst.id)}
-                                          className="shrink-0 rounded px-1 text-slate-400 hover:text-red-500"
-                                          title="Schritt löschen"
-                                        >
-                                          ✕
-                                        </button>
-                                      </div>
-                                      <div className="flex flex-col gap-2 p-2">
+                                    <div key={bst.id} className="flex w-56 shrink-0 flex-col gap-2">
+                                      <EntityCard
+                                        title={bst.name}
+                                        onRename={(name) => renameSchritt(bst.id, name)}
+                                        onRemove={() => removeSchritt(bst.id)}
+                                        onAddColumn={(name, type) => addColumnSchritt(bst.id, name, type)}
+                                      >
+                                        {SCHRITT_TABELLE_SPALTEN.map((c) => (
+                                          <div
+                                            key={c.id}
+                                            ref={registerRef(`s:${bst.id}:${c.id}`)}
+                                            data-column-node={`s:${bst.id}:${c.id}`}
+                                            className="flex items-center gap-1 border-t border-slate-50 px-2 py-1"
+                                          >
+                                            <span className="min-w-0 flex-1 text-[10px] font-medium text-slate-700">
+                                              {c.name}
+                                            </span>
+                                            <span className="text-[8px] uppercase text-slate-400">{c.type}</span>
+                                            {c.id === 'auftragsnummer' && <KeyBadge type="pk" />}
+                                            {c.id === 'auftragsnummer' && (
+                                              <span
+                                                onPointerDown={startDrag('s', bst.id, 'auftragsnummer', 'pk')}
+                                                className="h-3 w-3 shrink-0 cursor-grab rounded-full bg-emerald-500 hover:bg-emerald-600"
+                                                title="Primärschlüssel – ziehen, um zu verbinden"
+                                              />
+                                            )}
+                                          </div>
+                                        ))}
+                                        {bst.columns.map((c) => (
+                                          <ColumnRow
+                                            key={c.id}
+                                            nodeKey={`s:${bst.id}:${c.id}`}
+                                            registerRef={registerRef}
+                                            col={c}
+                                            keyType={keyTypeOf(bst.keys, c.id)}
+                                            onRename={(name) => renameColumnSchritt(bst.id, c.id, name)}
+                                            onChangeType={(t) => changeColumnTypeSchritt(bst.id, c.id, t)}
+                                            onRemove={() => removeColumnSchritt(bst.id, c.id)}
+                                            onCycleKey={() =>
+                                              setColumnKeySchritt(bst.id, c.id, nextKey(keyTypeOf(bst.keys, c.id)))
+                                            }
+                                            onStartDrag={startDrag('s', bst.id, c.id, keyTypeOf(bst.keys, c.id))}
+                                          />
+                                        ))}
+                                        {/* Zugehörigkeit + Überspringbar + Schleife (wie fester Schritt) */}
+                                        <div className="border-t border-slate-100 bg-slate-50/60 px-2 py-1.5">
+                                          <div className="mb-1 flex items-center gap-1">
+                                            <span className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">
+                                              Zugehörigkeit
+                                            </span>
+                                            <select
+                                              value={bst.blockId ?? ''}
+                                              onChange={(e) => setSchrittBlock(bst.id, e.target.value || null)}
+                                              className="min-w-0 flex-1 rounded border border-slate-200 bg-white px-1 py-0.5 text-[10px] text-slate-700"
+                                              title="Schritt in einen anderen Block oder als festen Schritt verschieben"
+                                            >
+                                              <option value="">fester Schritt</option>
+                                              {bloecke.map((b) => (
+                                                <option key={b.id} value={b.id}>
+                                                  {b.name}
+                                                </option>
+                                              ))}
+                                            </select>
+                                          </div>
+                                          <label className="mb-1 flex items-center gap-1.5 text-[10px] text-slate-600">
+                                            <input
+                                              type="checkbox"
+                                              checked={bst.optional}
+                                              onChange={(e) => setSchrittOptional(bst.id, e.target.checked)}
+                                              className="h-3 w-3 accent-zollern-600"
+                                            />
+                                            optional (überspringbar, wenn kein Eintrag)
+                                          </label>
+                                          <div className="mb-1 flex items-center gap-1">
+                                            <span className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">
+                                              Schleife
+                                            </span>
+                                            <select
+                                              value={bst.loopTargetId ?? ''}
+                                              onChange={(e) =>
+                                                setSchrittLoop(bst.id, e.target.value || null, bst.loopCondition)
+                                              }
+                                              className="min-w-0 flex-1 rounded border border-slate-200 bg-white px-1 py-0.5 text-[10px] text-slate-700"
+                                              title="Ziel-Schritt für Rücksprung"
+                                            >
+                                              <option value="">kein Rücksprung</option>
+                                              {schritte
+                                                .filter((x) => x.id !== bst.id)
+                                                .map((x) => (
+                                                  <option key={x.id} value={x.id}>
+                                                    {x.name}
+                                                  </option>
+                                                ))}
+                                            </select>
+                                            {bst.loopTargetId && (
+                                              <button
+                                                onClick={() => setSchrittLoop(bst.id, null, null)}
+                                                className="shrink-0 rounded px-1 text-slate-400 hover:text-red-500"
+                                                title="Schleife entfernen"
+                                              >
+                                                ✕
+                                              </button>
+                                            )}
+                                          </div>
+                                          {bst.loopTargetId && (
+                                            <label className="mt-1 flex flex-col gap-0.5">
+                                              <span className="text-[9px] text-slate-400">Bedingung</span>
+                                              <input
+                                                value={bst.loopCondition ?? ''}
+                                                onChange={(e) =>
+                                                  setSchrittLoop(bst.id, bst.loopTargetId, e.target.value || null)
+                                                }
+                                                className="w-full rounded border border-slate-200 bg-white px-2 py-0.5 text-[10px] text-slate-700 outline-none focus:border-zollern-400"
+                                              />
+                                            </label>
+                                          )}
+                                        </div>
+                                      </EntityCard>
+                                      <div className="flex flex-col gap-2">
                                         {bstepMaschinen.map((m) => (
                                           <EntityCard
                                             key={m.id}
