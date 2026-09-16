@@ -20,6 +20,8 @@ export interface Bearbeitungsblock {
   id: string
   abteilungId: string
   name: string
+  /** Position in der Schrittkette (der Block ist ein Knoten in der Kette) */
+  position: number
 }
 
 /** Ein Produktionsschritt (z. B. „Spritzen", „Modellieren", „Reinigen") */
@@ -29,6 +31,8 @@ export interface Schritt {
   /** Zugehöriger Variabler Bearbeitungsblock (falls in einem) */
   blockId: string | null
   name: string
+  /** Position in der Schrittkette (nur für feste Schritte; Block-Schritte haben 0) */
+  position: number
   /** Zusätzliche Felder (zusätzlich zu den festen Spalten Auftragsnummer/FN/Datum/Produktion) */
   columns: TableColumn[]
   /** Schlüssel der zusätzlichen Felder (PK/FK) */

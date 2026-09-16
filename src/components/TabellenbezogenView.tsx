@@ -341,12 +341,14 @@ export function TabellenbezogenView({ filter }: Props) {
     linkSchrittFK,
     setSchrittLoop,
     setSchrittOptional,
+    setSchrittBlock,
     renameAbteilung,
     removeAbteilung,
     setAbteilungParent,
     addBearbeitungsblock,
     renameBearbeitungsblock,
     removeBearbeitungsblock,
+    moveBearbeitungsblock,
     addProduktionstabelle,
     renameProduktionstabelle,
     removeProduktionstabelle,
@@ -525,11 +527,29 @@ export function TabellenbezogenView({ filter }: Props) {
   // Schritt -> Schritt (Prozesskette: der Fertigungsauftrag wandert durch die Schritte)
   // Nur für Schritte ohne Block (feste Reihenfolge) – Schritte in einem Block sind variabel.
   for (const a of abteilungen) {
-    const schritte = alleSchritte.filter((st) => st.abteilungId === a.id && !st.blockId)
+    const schritte = alleSchritte.filter((st) => st.abteilungId === a.id && !st.blockId).sort((x, y) => x.position - y.position)
     for (let i = 0; i < schritte.length - 1; i++) {
       lines.push({
         sourceKey: `s:${schritte[i].id}:auftragsnummer`,
         targetKey: `s:${schritte[i + 1].id}:auftragsnummer`,
+        label: 'Auftragsnummer',
+        n1: false,
+        keyKind: null,
+        keyTableId: null,
+        keyColumnId: null,
+      })
+    }
+  }
+  // Abteilungsübergreifend: unterster Schritt einer Abteilung -> oberster Schritt der nächsten
+  for (let i = 0; i < abteilungen.length - 1; i++) {
+    const curr = alleSchritte.filter((st) => st.abteilungId === abteilungen[i].id && !st.blockId).sort((x, y) => x.position - y.position)
+    const next = alleSchritte.filter((st) => st.abteilungId === abteilungen[i + 1].id && !st.blockId).sort((x, y) => x.position - y.position)
+    const last = curr[curr.length - 1]
+    const first = next[0]
+    if (last && first) {
+      lines.push({
+        sourceKey: `s:${last.id}:auftragsnummer`,
+        targetKey: `s:${first.id}:auftragsnummer`,
         label: 'Auftragsnummer',
         n1: false,
         keyKind: null,
@@ -613,15 +633,18 @@ export function TabellenbezogenView({ filter }: Props) {
           const neben = alleNeben.filter((n) => n.abteilungId === a.id)
           const bloecke = alleBloecke.filter((b) => b.abteilungId === a.id)
 
-          // Render-Reihenfolge: feste Schritte zuerst, dann Blöcke (ihre Schritte werden im Block gerendert)
+          // Render-Reihenfolge: Kettenknoten (feste Schritte + Blöcke) nach Position sortiert
           const renderItems: (
             | { type: 'schritt'; st: (typeof alleSchritte)[number] }
             | { type: 'block'; block: (typeof alleBloecke)[number] }
           )[] = []
           for (const st of schritte.filter((x) => !x.blockId)) renderItems.push({ type: 'schritt', st })
-          for (const block of bloecke) {
-            renderItems.push({ type: 'block', block })
-          }
+          for (const block of bloecke) renderItems.push({ type: 'block', block })
+          renderItems.sort((a, b) => {
+            const posA = a.type === 'schritt' ? a.st.position : a.block.position
+            const posB = b.type === 'schritt' ? b.st.position : b.block.position
+            return posA - posB
+          })
 
           return (
             <section key={a.id} className="rounded-xl border border-slate-200 p-4">
@@ -693,6 +716,20 @@ export function TabellenbezogenView({ filter }: Props) {
                                 onCommit={(name) => renameBearbeitungsblock(item.block.id, name)}
                                 className="min-w-0 flex-1 text-xs font-semibold text-zollern-800 outline-none"
                               />
+                              <button
+                                onClick={() => moveBearbeitungsblock(item.block.id, 'up')}
+                                className="rounded px-1 text-slate-400 hover:bg-slate-100"
+                                title="Block nach oben"
+                              >
+                                ↑
+                              </button>
+                              <button
+                                onClick={() => moveBearbeitungsblock(item.block.id, 'down')}
+                                className="rounded px-1 text-slate-400 hover:bg-slate-100"
+                                title="Block nach unten"
+                              >
+                                ↓
+                              </button>
                               <button
                                 onClick={() => addSchritt(a.id, item.block.id)}
                                 className="rounded bg-zollern-700 px-2 py-0.5 text-[11px] font-medium text-white hover:bg-zollern-800"
@@ -916,6 +953,24 @@ export function TabellenbezogenView({ filter }: Props) {
                             ))}
                             {/* Überspringbar (optional) + Schleife (Rücksprung mit Bedingung) */}
                             <div className="border-t border-slate-100 bg-slate-50/60 px-2 py-1.5">
+                              <div className="mb-1 flex items-center gap-1">
+                                <span className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">
+                                  Zugehörigkeit
+                                </span>
+                                <select
+                                  value={st.blockId ?? ''}
+                                  onChange={(e) => setSchrittBlock(st.id, e.target.value || null)}
+                                  className="min-w-0 flex-1 rounded border border-slate-200 bg-white px-1 py-0.5 text-[10px] text-slate-700"
+                                  title="Schritt in einen Variablen Block verschieben"
+                                >
+                                  <option value="">fester Schritt</option>
+                                  {bloecke.map((b) => (
+                                    <option key={b.id} value={b.id}>
+                                      {b.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
                               <label className="mb-1 flex items-center gap-1.5 text-[10px] text-slate-600">
                                 <input
                                   type="checkbox"

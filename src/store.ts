@@ -45,6 +45,59 @@ function nebenKeys(): TableKey[] {
   return []
 }
 
+/** Höchste Position in der Schrittkette einer Abteilung (feste Schritte + Blöcke). */
+function maxChainPosition(s: AppState, abteilungId: string): number {
+  let max = 0
+  for (const st of s.schritte) {
+    if (st.abteilungId === abteilungId && !st.blockId && st.position > max) max = st.position
+  }
+  for (const b of s.bearbeitungsbloecke) {
+    if (b.abteilungId === abteilungId && b.position > max) max = b.position
+  }
+  return max
+}
+
+/** Vertauscht die Position eines Kettenknotens (Schritt oder Block) mit dem Nachbarn. */
+function swapChainNode(
+  s: AppState,
+  id: string,
+  direction: 'up' | 'down',
+): { schritte: Schritt[]; bearbeitungsbloecke: Bearbeitungsblock[] } {
+  const step = s.schritte.find((x) => x.id === id)
+  const block = s.bearbeitungsbloecke.find((x) => x.id === id)
+  const abteilungId = step?.abteilungId ?? block?.abteilungId
+  if (!abteilungId) return { schritte: s.schritte, bearbeitungsbloecke: s.bearbeitungsbloecke }
+
+  const nodes: { id: string; position: number; isStep: boolean }[] = []
+  for (const x of s.schritte) {
+    if (x.abteilungId === abteilungId && !x.blockId) nodes.push({ id: x.id, position: x.position, isStep: true })
+  }
+  for (const b of s.bearbeitungsbloecke) {
+    if (b.abteilungId === abteilungId) nodes.push({ id: b.id, position: b.position, isStep: false })
+  }
+  nodes.sort((a, b) => a.position - b.position)
+
+  const idx = nodes.findIndex((n) => n.id === id)
+  const target = direction === 'up' ? idx - 1 : idx + 1
+  if (idx < 0 || target < 0 || target >= nodes.length) {
+    return { schritte: s.schritte, bearbeitungsbloecke: s.bearbeitungsbloecke }
+  }
+  const a = nodes[idx]
+  const b = nodes[target]
+
+  const schritte = s.schritte.map((x) => {
+    if (a.isStep && x.id === a.id) return { ...x, position: b.position }
+    if (b.isStep && x.id === b.id) return { ...x, position: a.position }
+    return x
+  })
+  const bearbeitungsbloecke = s.bearbeitungsbloecke.map((x) => {
+    if (!a.isStep && x.id === a.id) return { ...x, position: b.position }
+    if (!b.isStep && x.id === b.id) return { ...x, position: a.position }
+    return x
+  })
+  return { schritte, bearbeitungsbloecke }
+}
+
 interface Store extends AppState {
   // Ketten
   addChain: (name?: string) => void
@@ -62,6 +115,7 @@ interface Store extends AppState {
   addBearbeitungsblock: (abteilungId: string, name?: string) => void
   renameBearbeitungsblock: (id: string, name: string) => void
   removeBearbeitungsblock: (id: string) => void
+  moveBearbeitungsblock: (id: string, direction: 'up' | 'down') => void
 
   // Schritte
   addSchritt: (abteilungId: string, blockId?: string | null, name?: string) => void
@@ -77,6 +131,7 @@ interface Store extends AppState {
   setKeyLabelSchritt: (schrittId: string, spalteId: string, label: string) => void
   setSchrittLoop: (schrittId: string, loopTargetId: string | null, loopCondition: string | null) => void
   setSchrittOptional: (schrittId: string, optional: boolean) => void
+  setSchrittBlock: (schrittId: string, blockId: string | null) => void
 
   // Produktionstabellen (Maschinen)
   addProduktionstabelle: (schrittId: string, name?: string) => void
@@ -206,7 +261,12 @@ export const useStore = create<Store>()(
     set((s) => ({
       bearbeitungsbloecke: [
         ...s.bearbeitungsbloecke,
-        { id: nextId('b'), abteilungId, name: name ?? 'Variabler Block' },
+        {
+          id: nextId('b'),
+          abteilungId,
+          name: name ?? 'Variabler Block',
+          position: maxChainPosition(s, abteilungId) + 1,
+        },
       ],
     })),
 
@@ -215,11 +275,23 @@ export const useStore = create<Store>()(
       bearbeitungsbloecke: s.bearbeitungsbloecke.map((b) => (b.id === id ? { ...b, name } : b)),
     })),
 
+  moveBearbeitungsblock: (id, direction) => set((s) => swapChainNode(s, id, direction)),
+
   removeBearbeitungsblock: (id) =>
-    set((s) => ({
-      bearbeitungsbloecke: s.bearbeitungsbloecke.filter((b) => b.id !== id),
-      schritte: s.schritte.map((st) => (st.blockId === id ? { ...st, blockId: null } : st)),
-    })),
+    set((s) => {
+      const block = s.bearbeitungsbloecke.find((b) => b.id === id)
+      if (!block) return s
+      let next = maxChainPosition(s, block.abteilungId)
+      const schritte = s.schritte.map((st) => {
+        if (st.blockId !== id) return st
+        next += 1
+        return { ...st, blockId: null, position: next }
+      })
+      return {
+        bearbeitungsbloecke: s.bearbeitungsbloecke.filter((b) => b.id !== id),
+        schritte,
+      }
+    }),
 
   // --- Schritte ---
   addSchritt: (abteilungId, blockId, name) =>
@@ -231,6 +303,7 @@ export const useStore = create<Store>()(
           abteilungId,
           blockId: blockId ?? null,
           name: name ?? `Schritt ${s.schritte.length + 1}`,
+          position: blockId ? 0 : maxChainPosition(s, abteilungId) + 1,
           columns: [],
           keys: [],
           loopCondition: null,
@@ -336,22 +409,19 @@ export const useStore = create<Store>()(
       schritte: s.schritte.map((st) => (st.id === schrittId ? { ...st, optional } : st)),
     })),
 
-  moveSchritt: (id, direction) =>
+  setSchrittBlock: (schrittId, blockId) =>
     set((s) => {
-      const schritt = s.schritte.find((st) => st.id === id)
-      if (!schritt) return s
-      const siblings = s.schritte
-        .map((st, i) => ({ st, i }))
-        .filter((x) => x.st.abteilungId === schritt.abteilungId)
-      const idx = siblings.findIndex((x) => x.st.id === id)
-      const target = direction === 'up' ? idx - 1 : idx + 1
-      if (target < 0 || target >= siblings.length) return s
-      const schritte = [...s.schritte]
-      const a = siblings[idx].i
-      const b = siblings[target].i
-      ;[schritte[a], schritte[b]] = [schritte[b], schritte[a]]
-      return { schritte }
+      const st = s.schritte.find((x) => x.id === schrittId)
+      if (!st) return s
+      const position = blockId ? 0 : maxChainPosition(s, st.abteilungId) + 1
+      return {
+        schritte: s.schritte.map((x) =>
+          x.id === schrittId ? { ...x, blockId, position } : x,
+        ),
+      }
     }),
+
+  moveSchritt: (id, direction) => set((s) => swapChainNode(s, id, direction)),
 
   // --- Produktionstabellen ---
   addProduktionstabelle: (schrittId, name) =>
@@ -623,7 +693,7 @@ setKeyLabelNeben: (tabelleId, spalteId, label) =>
   }),
     {
       name: 'digitale-produktakte',
-      version: 5,
+      version: 6,
       migrate: (persisted, version) => {
         let p = persisted as Partial<AppState> & {
           abteilungen?: (Abteilung & { chainId?: string; parentId?: string | null; sequence?: 'fixed' | 'variable' })[]
@@ -675,6 +745,21 @@ setKeyLabelNeben: (tabelleId, spalteId, label) =>
             })),
           } as typeof p
         }
+        if (version < 6) {
+          const blocks = (p.bearbeitungsbloecke ?? []).map((b, i) => ({
+            ...b,
+            position: (b as Bearbeitungsblock).position ?? i + 1,
+          }))
+          const steps = (p.schritte ?? []).map((st, i) => ({
+            ...st,
+            position: (st as Schritt).position ?? (st.blockId ? 0 : i + 1),
+          }))
+          p = {
+            ...p,
+            bearbeitungsbloecke: blocks,
+            schritte: steps,
+          } as typeof p
+        }
         return p as AppState
       },
       partialize: (s) => ({
@@ -701,9 +786,9 @@ function seed(): AppState {
   const bearbeitungsbloecke: Bearbeitungsblock[] = []
 
   const schritte: Schritt[] = [
-    { id: 's-spritzen', abteilungId: 'abt-wachs', blockId: null, name: '1. Spritzen', columns: [], keys: [], loopCondition: null, loopTargetId: null, optional: false },
-    { id: 's-modellieren', abteilungId: 'abt-wachs', blockId: null, name: '2. Modellieren', columns: [], keys: [], loopCondition: null, loopTargetId: null, optional: false },
-    { id: 's-reinigen', abteilungId: 'abt-wachs', blockId: null, name: '3. Reinigen', columns: [], keys: [], loopCondition: null, loopTargetId: null, optional: false },
+    { id: 's-spritzen', abteilungId: 'abt-wachs', blockId: null, name: '1. Spritzen', position: 1, columns: [], keys: [], loopCondition: null, loopTargetId: null, optional: false },
+    { id: 's-modellieren', abteilungId: 'abt-wachs', blockId: null, name: '2. Modellieren', position: 2, columns: [], keys: [], loopCondition: null, loopTargetId: null, optional: false },
+    { id: 's-reinigen', abteilungId: 'abt-wachs', blockId: null, name: '3. Reinigen', position: 3, columns: [], keys: [], loopCondition: null, loopTargetId: null, optional: false },
   ]
 
   const druckSpalte: TableColumn = { id: 'c-druck', name: 'Druck (bar)', type: 'number', fixed: false }
