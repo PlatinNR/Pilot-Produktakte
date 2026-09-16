@@ -296,6 +296,28 @@ function RelationshipLine({ geo, n1 }: { geo: Geo; n1: boolean }) {
   )
 }
 
+function LoopLine({ from, to, condition }: { from: Rect; to: Rect; condition: string }) {
+  const x1 = from.x
+  const y1 = from.y + from.h / 2
+  const x2 = to.x
+  const y2 = to.y + to.h / 2
+  const curve = 54
+  const path = `M ${x1} ${y1} C ${x1 - curve} ${y1}, ${x2 - curve} ${y2}, ${x2} ${y2}`
+  const labelX = Math.min(x1, x2) - curve - 4
+  const labelY = (y1 + y2) / 2
+  const halo = { paintOrder: 'stroke' as const, stroke: '#ffffff', strokeWidth: 3 }
+  return (
+    <g>
+      <path d={path} stroke="#c45004" strokeWidth={1.5} fill="none" strokeDasharray="5 4" markerEnd="url(#er-loop-arrow)" />
+      {condition && (
+        <text x={labelX} y={labelY} textAnchor="end" fontSize={9} fill="#c45004" style={halo}>
+          {condition}
+        </text>
+      )}
+    </g>
+  )
+}
+
 export function TabellenbezogenView({ filter }: Props) {
   const alleAbteilungen = useStore((s) => s.abteilungen)
   const activeChainId = useStore((s) => s.activeChainId)
@@ -316,6 +338,7 @@ export function TabellenbezogenView({ filter }: Props) {
     removeColumnSchritt,
     setColumnKeySchritt,
     linkSchrittFK,
+    setSchrittLoop,
     renameAbteilung,
     removeAbteilung,
     addProduktionstabelle,
@@ -526,6 +549,16 @@ export function TabellenbezogenView({ filter }: Props) {
       })
     }
   }
+  // Schleifen (Rücksprünge mit Bedingung)
+  const loops: { sourceKey: string; targetKey: string; condition: string }[] = []
+  for (const st of alleSchritte) {
+    if (!st.loopTargetId) continue
+    loops.push({
+      sourceKey: `s:${st.id}:auftragsnummer`,
+      targetKey: `s:${st.loopTargetId}:auftragsnummer`,
+      condition: st.loopCondition ?? '',
+    })
+  }
 
   const dragSource = dragPos ? boxes[dragPos.sourceKey] : undefined
   const dragLine =
@@ -546,12 +579,21 @@ export function TabellenbezogenView({ filter }: Props) {
           <marker id="er-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
             <path d="M0,0 L8,4 L0,8 z" fill="#94a3b8" />
           </marker>
+          <marker id="er-loop-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+            <path d="M0,0 L8,4 L0,8 z" fill="#c45004" />
+          </marker>
         </defs>
         {lines.map((ln, i) => {
           const from = boxes[ln.sourceKey]
           const to = boxes[ln.targetKey]
           if (!from || !to) return null
           return <RelationshipLine key={i} geo={computeLine(from, to)} n1={ln.n1} />
+        })}
+        {loops.map((lp, i) => {
+          const from = boxes[lp.sourceKey]
+          const to = boxes[lp.targetKey]
+          if (!from || !to) return null
+          return <LoopLine key={`loop-${i}`} from={from} to={to} condition={lp.condition} />
         })}
         {dragLine && (
           <path d={dragLine} stroke="#c45004" strokeWidth={2} fill="none" strokeDasharray="4 3" />
@@ -726,6 +768,52 @@ export function TabellenbezogenView({ filter }: Props) {
                                 onStartDrag={startDrag('s', st.id, c.id, keyTypeOf(st.keys, c.id))}
                               />
                             ))}
+                            {/* Schleife (Rücksprung mit Bedingung) */}
+                            <div className="border-t border-slate-100 bg-slate-50/60 px-2 py-1.5">
+                              <div className="mb-1 flex items-center gap-1">
+                                <span className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">
+                                  Schleife
+                                </span>
+                                <select
+                                  value={st.loopTargetId ?? ''}
+                                  onChange={(e) =>
+                                    setSchrittLoop(st.id, e.target.value || null, st.loopCondition)
+                                  }
+                                  className="min-w-0 flex-1 rounded border border-slate-200 bg-white px-1 py-0.5 text-[10px] text-slate-700"
+                                  title="Ziel-Schritt für Rücksprung"
+                                >
+                                  <option value="">kein Rücksprung</option>
+                                  {schritte
+                                    .filter((x) => x.id !== st.id)
+                                    .map((x) => (
+                                      <option key={x.id} value={x.id}>
+                                        {x.name}
+                                      </option>
+                                    ))}
+                                </select>
+                                {st.loopTargetId && (
+                                  <button
+                                    onClick={() => setSchrittLoop(st.id, null, null)}
+                                    className="shrink-0 rounded px-1 text-slate-400 hover:text-red-500"
+                                    title="Schleife entfernen"
+                                  >
+                                    ✕
+                                  </button>
+                                )}
+                              </div>
+                              {st.loopTargetId && (
+                                <label className="mt-1 flex flex-col gap-0.5">
+                                  <span className="text-[9px] text-slate-400">Bedingung</span>
+                                  <input
+                                    value={st.loopCondition ?? ''}
+                                    onChange={(e) =>
+                                      setSchrittLoop(st.id, st.loopTargetId, e.target.value || null)
+                                    }
+                                    className="w-full rounded border border-slate-200 bg-white px-2 py-0.5 text-[10px] text-slate-700 outline-none focus:border-zollern-400"
+                                  />
+                                </label>
+                              )}
+                            </div>
                           </EntityCard>
                         </Fragment>
                       )

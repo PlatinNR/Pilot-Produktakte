@@ -68,6 +68,7 @@ interface Store extends AppState {
   setColumnKeySchritt: (schrittId: string, spalteId: string, keyType: KeyType | null) => void
   linkSchrittFK: (schrittId: string, spalteId: string, refTableId: string, refColumnId: string) => void
   setKeyLabelSchritt: (schrittId: string, spalteId: string, label: string) => void
+  setSchrittLoop: (schrittId: string, loopTargetId: string | null, loopCondition: string | null) => void
 
   // Produktionstabellen (Maschinen)
   addProduktionstabelle: (schrittId: string, name?: string) => void
@@ -192,6 +193,8 @@ export const useStore = create<Store>()(
           name: name ?? `Schritt ${s.schritte.length + 1}`,
           columns: [],
           keys: [],
+          loopCondition: null,
+          loopTargetId: null,
         },
       ],
     })),
@@ -277,6 +280,13 @@ export const useStore = create<Store>()(
         st.id === schrittId
           ? { ...st, keys: st.keys.map((k) => (k.columnId === spalteId ? { ...k, label } : k)) }
           : st,
+      ),
+    })),
+
+  setSchrittLoop: (schrittId, loopTargetId, loopCondition) =>
+    set((s) => ({
+      schritte: s.schritte.map((st) =>
+        st.id === schrittId ? { ...st, loopTargetId, loopCondition } : st,
       ),
     })),
 
@@ -567,20 +577,31 @@ setKeyLabelNeben: (tabelleId, spalteId, label) =>
   }),
     {
       name: 'digitale-produktakte',
-      version: 2,
+      version: 3,
       migrate: (persisted, version) => {
-        const p = persisted as Partial<AppState> & {
+        let p = persisted as Partial<AppState> & {
           abteilungen?: (Abteilung & { chainId?: string })[]
+          schritte?: (Schritt & { loopCondition?: string | null; loopTargetId?: string | null })[]
         }
         if (version < 2) {
-          return {
+          p = {
             ...p,
             chains: p.chains && p.chains.length > 0 ? p.chains : [{ id: 'chain-test', name: 'Testkette' }],
             activeChainId: p.activeChainId || 'chain-test',
             abteilungen: (p.abteilungen ?? []).map((a) => ({ ...a, chainId: a.chainId ?? 'chain-test' })),
-          } as AppState
+          } as typeof p
         }
-        return persisted as AppState
+        if (version < 3) {
+          p = {
+            ...p,
+            schritte: (p.schritte ?? []).map((st) => ({
+              ...st,
+              loopCondition: st.loopCondition ?? null,
+              loopTargetId: st.loopTargetId ?? null,
+            })),
+          } as typeof p
+        }
+        return p as AppState
       },
       partialize: (s) => ({
         chains: s.chains,
@@ -603,9 +624,9 @@ function seed(): AppState {
   const abteilungen: Abteilung[] = [{ id: 'abt-wachs', chainId: 'chain-test', name: 'Wachs' }]
 
   const schritte: Schritt[] = [
-    { id: 's-spritzen', abteilungId: 'abt-wachs', name: '1. Spritzen', columns: [], keys: [] },
-    { id: 's-modellieren', abteilungId: 'abt-wachs', name: '2. Modellieren', columns: [], keys: [] },
-    { id: 's-reinigen', abteilungId: 'abt-wachs', name: '3. Reinigen', columns: [], keys: [] },
+    { id: 's-spritzen', abteilungId: 'abt-wachs', name: '1. Spritzen', columns: [], keys: [], loopCondition: null, loopTargetId: null },
+    { id: 's-modellieren', abteilungId: 'abt-wachs', name: '2. Modellieren', columns: [], keys: [], loopCondition: null, loopTargetId: null },
+    { id: 's-reinigen', abteilungId: 'abt-wachs', name: '3. Reinigen', columns: [], keys: [], loopCondition: null, loopTargetId: null },
   ]
 
   const druckSpalte: TableColumn = { id: 'c-druck', name: 'Druck (bar)', type: 'number', fixed: false }

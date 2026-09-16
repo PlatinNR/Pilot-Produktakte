@@ -22,6 +22,10 @@ export interface Schritt {
   columns: TableColumn[]
   /** Schlüssel der zusätzlichen Felder (PK/FK) */
   keys: TableKey[]
+  /** Schleifen-Bedingung (z. B. „Schichtdicke < Soll") – wenn erfüllt, wird zurückgesprungen */
+  loopCondition: string | null
+  /** Schritt-ID, zu der zurückgesprungen wird (Schleife) */
+  loopTargetId: string | null
 }
 
 /** Spaltentyp einer Tabelle */
