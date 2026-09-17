@@ -23,6 +23,22 @@ function nextId(prefix = 'id'): string {
   return `${prefix}-${Date.now().toString(36)}-${counter}`
 }
 
+/** Ketten-IDs müssen UUIDs sein (Spalte chains.id ist uuid in Supabase). */
+function uuid(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0
+    const v = c === 'x' ? r : (r & 0x3) | 0x8
+    return v.toString(16)
+  })
+}
+
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
+}
+
 function cloneSpalten(spalten: TableColumn[]): TableColumn[] {
   return spalten.map((s) => ({ ...s, id: s.fixed ? s.id : nextId('c') }))
 }
@@ -185,7 +201,7 @@ export const useStore = create<Store>()(
       // --- Ketten ---
       addChain: (name) =>
         set((s) => {
-          const id = nextId('chain')
+          const id = uuid()
           const chainName = name ?? `Kette ${s.chains.length + 1}`
           apiCreateChain(id, chainName, {
             abteilungen: [],
@@ -693,7 +709,7 @@ setKeyLabelNeben: (tabelleId, spalteId, label) =>
   }),
     {
       name: 'digitale-produktakte',
-      version: 6,
+      version: 7,
       migrate: (persisted, version) => {
         let p = persisted as Partial<AppState> & {
           abteilungen?: (Abteilung & { chainId?: string; parentId?: string | null; sequence?: 'fixed' | 'variable' })[]
@@ -760,6 +776,25 @@ setKeyLabelNeben: (tabelleId, spalteId, label) =>
             schritte: steps,
           } as typeof p
         }
+        if (version < 7) {
+          // Ketten-IDs auf UUIDs umstellen (Supabase-Spalte chains.id ist uuid)
+          const renames = new Map<string, string>()
+          const chains = (p.chains ?? []).map((c) => {
+            if (isUuid(c.id)) return c
+            const id = uuid()
+            renames.set(c.id, id)
+            return { ...c, id }
+          })
+          p = {
+            ...p,
+            chains,
+            activeChainId: renames.get(p.activeChainId ?? '') ?? p.activeChainId,
+            abteilungen: (p.abteilungen ?? []).map((a) => ({
+              ...a,
+              chainId: renames.get(a.chainId) ?? a.chainId,
+            })),
+          } as typeof p
+        }
         return p as AppState
       },
       partialize: (s) => ({
@@ -778,10 +813,11 @@ setKeyLabelNeben: (tabelleId, spalteId, label) =>
 // --- Demo-Daten (Wachs: Spritzen / Modellieren / Reinigen, je 4 Maschinen) ---
 
 function seed(): AppState {
-  const chains: Chain[] = [{ id: 'chain-test', name: 'Testkette' }]
-  const activeChainId = 'chain-test'
+  const chainId = uuid()
+  const chains: Chain[] = [{ id: chainId, name: 'Testkette' }]
+  const activeChainId = chainId
 
-  const abteilungen: Abteilung[] = [{ id: 'abt-wachs', chainId: 'chain-test', name: 'Wachs', parentId: null }]
+  const abteilungen: Abteilung[] = [{ id: 'abt-wachs', chainId, name: 'Wachs', parentId: null }]
 
   const bearbeitungsbloecke: Bearbeitungsblock[] = []
 

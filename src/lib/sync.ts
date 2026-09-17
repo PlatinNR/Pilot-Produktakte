@@ -30,7 +30,15 @@ function setStatus(patch: Partial<SyncStatus>) {
 }
 
 function errorText(e: unknown): string {
-  return e instanceof Error ? e.message : String(e)
+  if (e instanceof Error) return e.message
+  if (e && typeof e === 'object') {
+    const o = e as { message?: unknown; details?: unknown; hint?: unknown; code?: unknown }
+    const parts = [o.message, o.details, o.hint, o.code ? `Code ${o.code}` : null].filter(
+      (x): x is string => typeof x === 'string' && x.length > 0,
+    )
+    if (parts.length > 0) return parts.join(' · ')
+  }
+  return String(e)
 }
 
 /** Reaktiver Sync-Status für die Oberfläche. */
