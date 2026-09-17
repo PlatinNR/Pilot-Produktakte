@@ -61,12 +61,13 @@ export function TraceView({ auftragsnummer }: Props) {
 
       <div className="flex flex-wrap items-stretch gap-2">
         {trace.stops.map((stop, i) => {
-          const skipped = !stop.tabelle && stop.schritt.optional
+          const tabellen = stop.tabellen ?? (stop.tabelle ? [stop.tabelle] : [])
+          const skipped = tabellen.length === 0 && stop.schritt.optional
           return (
             <div key={stop.schritt.id} className="flex items-center gap-2">
               <div
                 className={`rounded-lg border px-3 py-2 ${
-                  stop.tabelle
+                  tabellen.length > 0
                     ? 'border-zollern-500 bg-white shadow-sm'
                     : skipped
                       ? 'border-dashed border-slate-300 bg-slate-50'
@@ -77,16 +78,18 @@ export function TraceView({ auftragsnummer }: Props) {
                   {stop.schritt.name}
                   {stop.schritt.optional && <span className="ml-1 text-slate-300">(opt.)</span>}
                 </div>
-                <div
-                  className={`text-sm font-semibold ${
-                    stop.tabelle ? 'text-zollern-800' : skipped ? 'text-slate-300 italic' : 'text-slate-400'
-                  }`}
-                >
-                  {stop.tabelle ? stop.tabelle.name : skipped ? 'übersprungen' : '—'}
-                </div>
-                {stop.tabelle && (
-                  <div className="mt-1.5">
-                    <DurchlaufWahl tabelle={stop.tabelle} auftragsnummer={auftragsnummer} kompakt />
+                {tabellen.length > 0 ? (
+                  tabellen.map((t) => (
+                    <div key={t.id} className="mt-1">
+                      <div className="text-sm font-semibold text-zollern-800">{t.name}</div>
+                      <div className="mt-1.5">
+                        <DurchlaufWahl tabelle={t} auftragsnummer={auftragsnummer} kompakt />
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className={`text-sm font-semibold ${skipped ? 'text-slate-300 italic' : 'text-slate-400'}`}>
+                    {skipped ? 'übersprungen' : '—'}
                   </div>
                 )}
               </div>

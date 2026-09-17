@@ -50,6 +50,8 @@ export function aggregateSchritt(
 export interface TraceStop {
   schritt: Schritt
   tabelle?: Produktionstabelle
+  /** Alle Maschinen des Schritts, auf denen der Auftrag war */
+  tabellen?: Produktionstabelle[]
   row?: TableRow
 }
 
@@ -68,11 +70,12 @@ export function traceAuftrag(
 ): TraceResult {
   const stops: TraceStop[] = schritte.map((schritt) => {
     const schrittMaschinen = maschinen.filter((t) => t.schrittId === schritt.id)
-    const tabelle = schrittMaschinen.find((t) =>
+    const tabellen = schrittMaschinen.filter((t) =>
       t.rows.some((r) => r.auftragsnummer === auftragsnummer),
     )
+    const tabelle = tabellen[0]
     const row = tabelle?.rows.find((r) => r.auftragsnummer === auftragsnummer)
-    return { schritt, tabelle, row }
+    return { schritt, tabelle, tabellen, row }
   })
 
   const found = stops.some((s) => s.row)

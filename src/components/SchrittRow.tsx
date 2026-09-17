@@ -107,32 +107,45 @@ export function SchrittRow({ schritt, filter }: Props) {
       <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
         {maschinen.map((t, i) => {
           const anteil = aggregate?.entries.find((e) => e.tabelle.id === t.id)
+          const auftrag = filter.auftragsnummer.trim()
+          const trace = isTraceMode(filter)
+          const hatEintrag = trace && t.rows.some((r) => r.auftragsnummer === auftrag)
           return (
-            <DataTable
+            <div
               key={t.id}
-              title={t.name}
-              onRename={(name) => renameProduktionstabelle(t.id, name)}
-              onRemove={() => removeProduktionstabelle(t.id)}
-              columns={t.columns}
-              rows={t.rows}
-              onAddColumn={(name, type) => addColumnProduktion(t.id, name, type)}
-              onRenameColumn={(cid, name) => renameColumnProduktion(t.id, cid, name)}
-              onChangeColumnType={(cid, type) => changeColumnTypeProduktion(t.id, cid, type)}
-              onRemoveColumn={(cid) => removeColumnProduktion(t.id, cid)}
-              onAddRow={() => addRowProduktion(t.id)}
-              onUpdateCell={(ri, cid, v) => updateCellProduktion(t.id, ri, cid, v)}
-              onRemoveRow={(ri) => removeRowProduktion(t.id, ri)}
-              percent={anteil && aggregate && aggregate.total > 0 ? anteil.percent : null}
-              colorClass={MASCHINEN_FARBEN[i % MASCHINEN_FARBEN.length]}
-              arbeitsplatz={t.arbeitsplatz}
-              onArbeitsplatzChange={(wert) => setProduktionArbeitsplatz(t.id, wert)}
-              kopfExtra={
-                isTraceMode(filter) &&
-                t.rows.filter((r) => r.auftragsnummer === filter.auftragsnummer.trim()).length > 1 ? (
-                  <DurchlaufWahl tabelle={t} auftragsnummer={filter.auftragsnummer.trim()} kompakt />
-                ) : undefined
+              className="rounded-lg"
+              style={
+                trace
+                  ? {
+                      opacity: hatEintrag ? 1 : 0.3,
+                      outline: hatEintrag ? '2px solid #F56405' : 'none',
+                      outlineOffset: '1px',
+                    }
+                  : undefined
               }
-            />
+            >
+              <DataTable
+                title={t.name}
+                onRename={(name) => renameProduktionstabelle(t.id, name)}
+                onRemove={() => removeProduktionstabelle(t.id)}
+                columns={t.columns}
+                rows={t.rows}
+                onAddColumn={(name, type) => addColumnProduktion(t.id, name, type)}
+                onRenameColumn={(cid, name) => renameColumnProduktion(t.id, cid, name)}
+                onChangeColumnType={(cid, type) => changeColumnTypeProduktion(t.id, cid, type)}
+                onRemoveColumn={(cid) => removeColumnProduktion(t.id, cid)}
+                onAddRow={() => addRowProduktion(t.id)}
+                onUpdateCell={(ri, cid, v) => updateCellProduktion(t.id, ri, cid, v)}
+                onRemoveRow={(ri) => removeRowProduktion(t.id, ri)}
+                percent={anteil && aggregate && aggregate.total > 0 ? anteil.percent : null}
+                colorClass={MASCHINEN_FARBEN[i % MASCHINEN_FARBEN.length]}
+                arbeitsplatz={t.arbeitsplatz}
+                onArbeitsplatzChange={(wert) => setProduktionArbeitsplatz(t.id, wert)}
+                kopfExtra={
+                  hatEintrag ? <DurchlaufWahl tabelle={t} auftragsnummer={auftrag} kompakt /> : undefined
+                }
+              />
+            </div>
           )
         })}
 
