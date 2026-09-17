@@ -140,6 +140,8 @@ interface EntityProps {
   footer?: React.ReactNode
   compact?: boolean
   onAddColumn?: (name: string, type: ColumnType) => void
+  /** 'extern' = Schritt wurde extern bearbeitet (lila Markierung) */
+  rahmen?: 'normal' | 'extern'
 }
 
 function EntityCard({
@@ -152,6 +154,7 @@ function EntityCard({
   footer,
   compact,
   onAddColumn,
+  rahmen = 'normal',
 }: EntityProps) {
   const [addingCol, setAddingCol] = useState(false)
   const [colName, setColName] = useState('')
@@ -166,7 +169,11 @@ function EntityCard({
     setAddingCol(false)
   }
   return (
-    <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+    <div
+      className={`overflow-hidden rounded-lg border shadow-sm ${
+        rahmen === 'extern' ? 'border-purple-400 bg-purple-50 ring-2 ring-purple-300' : 'border-slate-200 bg-white'
+      }`}
+    >
       <div className={`flex items-center gap-1.5 border-b border-slate-100 ${compact ? 'px-1.5 py-0.5' : 'px-2 py-1.5'}`}>
         <span className="h-2 w-2 shrink-0 rounded-full bg-zollern-500" />
         <EditableName
@@ -837,6 +844,10 @@ export function TabellenbezogenView({ filter }: Props) {
                                 {blockSteps.map((bst) => {
                                   const bstepMaschinen = alleMaschinen.filter((m) => m.schrittId === bst.id)
                                   const agg = aggregate ? aggregateSchritt(bst, bstepMaschinen, filter) : null
+                                  const bstepUsed = bstepMaschinen.some((m) =>
+                                    m.rows.some((r) => r.auftragsnummer === auftrag),
+                                  )
+                                  const extern = trace && !bstepUsed && !bst.optional
                                   return (
                                     <div key={bst.id} className="flex w-56 shrink-0 flex-col gap-2">
                                       <EntityCard
@@ -844,7 +855,13 @@ export function TabellenbezogenView({ filter }: Props) {
                                         onRename={(name) => renameSchritt(bst.id, name)}
                                         onRemove={() => removeSchritt(bst.id)}
                                         onAddColumn={(name, type) => addColumnSchritt(bst.id, name, type)}
+                                        rahmen={extern ? 'extern' : 'normal'}
                                       >
+                                        {extern && (
+                                          <div className="border-t border-purple-100 bg-purple-100/70 px-2 py-0.5 text-[10px] font-semibold text-purple-700">
+                                            extern bearbeitet
+                                          </div>
+                                        )}
                                         {SCHRITT_TABELLE_SPALTEN.map((c) => (
                                           <div
                                             key={c.id}
@@ -1055,6 +1072,11 @@ export function TabellenbezogenView({ filter }: Props) {
                       const matched = aggregate
                         ? matchedRows.filter((r) => r.fn === filter.fn.trim() || r.datum === filter.datum).length
                         : 0
+                      // Nicht optionale Schritte ohne Eintrag gelten im Trace als "extern bearbeitet"
+                      const schrittUsed = stepMaschinen.some((m) =>
+                        m.rows.some((r) => r.auftragsnummer === auftrag),
+                      )
+                      const extern = trace && !schrittUsed && !st.optional
                       return (
                         <Fragment key={st.id}>
                           {/* Maschinen dieses Schritts */}
@@ -1124,6 +1146,7 @@ export function TabellenbezogenView({ filter }: Props) {
                             onRemove={() => removeSchritt(st.id)}
                             percent={aggregate && matchedRows.length > 0 ? (matched / matchedRows.length) * 100 : null}
                             onAddColumn={(name, type) => addColumnSchritt(st.id, name, type)}
+                            rahmen={extern ? 'extern' : 'normal'}
                             footer={
                               <div className="flex items-center justify-between gap-1 border-t border-slate-100 px-2 py-1">
                                 <button
@@ -1153,6 +1176,11 @@ export function TabellenbezogenView({ filter }: Props) {
                               </div>
                             }
                           >
+                            {extern && (
+                              <div className="border-t border-purple-100 bg-purple-100/70 px-2 py-0.5 text-[10px] font-semibold text-purple-700">
+                                extern bearbeitet
+                              </div>
+                            )}
                             {SCHRITT_TABELLE_SPALTEN.map((c) => (
                               <div
                                 key={c.id}

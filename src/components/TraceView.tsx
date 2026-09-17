@@ -81,7 +81,7 @@ export function TraceView({ auftragsnummer }: Props) {
                     ? 'border-zollern-500 bg-white shadow-sm'
                     : skipped
                       ? 'border-dashed border-slate-300 bg-slate-50'
-                      : 'border-slate-200 bg-slate-50'
+                      : 'border-purple-300 bg-purple-50'
                 }`}
               >
                 <div className="text-[11px] uppercase tracking-wide text-slate-400">
@@ -112,8 +112,12 @@ export function TraceView({ auftragsnummer }: Props) {
                     )
                   })
                 ) : (
-                  <div className={`text-sm font-semibold ${skipped ? 'text-slate-300 italic' : 'text-slate-400'}`}>
-                    {skipped ? 'übersprungen' : '—'}
+                  <div
+                    className={`text-sm font-semibold ${
+                      skipped ? 'text-slate-300 italic' : 'text-purple-700 italic'
+                    }`}
+                  >
+                    {skipped ? 'übersprungen' : 'extern bearbeitet'}
                   </div>
                 )}
               </div>
