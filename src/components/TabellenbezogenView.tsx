@@ -635,13 +635,16 @@ export function TabellenbezogenView({ filter }: Props) {
       })
     }
   }
-  // Schleifen (Rücksprünge mit Bedingung)
+  // Schleifen (Rücksprünge mit Bedingung) – Ziel kann ein Schritt oder ein variabler Block sein
   const loops: { sourceKey: string; targetKey: string; condition: string }[] = []
+  const blockIds = new Set(alleBloecke.map((b) => b.id))
   for (const st of alleSchritte) {
     if (!st.loopTargetId) continue
     loops.push({
       sourceKey: `s:${st.id}:auftragsnummer`,
-      targetKey: `s:${st.loopTargetId}:auftragsnummer`,
+      targetKey: blockIds.has(st.loopTargetId)
+        ? `b:${st.loopTargetId}`
+        : `s:${st.loopTargetId}:auftragsnummer`,
       condition: st.loopCondition ?? '',
     })
   }
@@ -789,7 +792,7 @@ export function TabellenbezogenView({ filter }: Props) {
                             key={`block-${item.block.id}`}
                             className="col-span-2 rounded-lg border border-zollern-200 bg-zollern-50/40 p-2"
                           >
-                            <div className="mb-2 flex items-center gap-2">
+                            <div ref={registerRef(`b:${item.block.id}`)} className="mb-2 flex items-center gap-2">
                               <span className="h-2 w-2 rounded-full bg-zollern-400" />
                               <span className="text-[9px] font-semibold uppercase tracking-wide text-zollern-500">
                                 Variabler Block
@@ -918,16 +921,27 @@ export function TabellenbezogenView({ filter }: Props) {
                                                 setSchrittLoop(bst.id, e.target.value || null, bst.loopCondition)
                                               }
                                               className="min-w-0 flex-1 rounded border border-slate-200 bg-white px-1 py-0.5 text-[10px] text-slate-700"
-                                              title="Ziel-Schritt für Rücksprung"
+                                              title="Ziel für Rücksprung: Schritt oder variabler Block"
                                             >
                                               <option value="">kein Rücksprung</option>
-                                              {schritte
-                                                .filter((x) => x.id !== bst.id)
-                                                .map((x) => (
-                                                  <option key={x.id} value={x.id}>
-                                                    {x.name}
-                                                  </option>
-                                                ))}
+                                              <optgroup label="Schritte">
+                                                {schritte
+                                                  .filter((x) => x.id !== bst.id)
+                                                  .map((x) => (
+                                                    <option key={x.id} value={x.id}>
+                                                      {x.name}
+                                                    </option>
+                                                  ))}
+                                              </optgroup>
+                                              {bloecke.length > 0 && (
+                                                <optgroup label="Variable Blöcke">
+                                                  {bloecke.map((b) => (
+                                                    <option key={b.id} value={b.id}>
+                                                      {b.name}
+                                                    </option>
+                                                  ))}
+                                                </optgroup>
+                                              )}
                                             </select>
                                             {bst.loopTargetId && (
                                               <button
@@ -1215,16 +1229,27 @@ export function TabellenbezogenView({ filter }: Props) {
                                     setSchrittLoop(st.id, e.target.value || null, st.loopCondition)
                                   }
                                   className="min-w-0 flex-1 rounded border border-slate-200 bg-white px-1 py-0.5 text-[10px] text-slate-700"
-                                  title="Ziel-Schritt für Rücksprung"
+                                  title="Ziel für Rücksprung: Schritt oder variabler Block"
                                 >
                                   <option value="">kein Rücksprung</option>
-                                  {schritte
-                                    .filter((x) => x.id !== st.id)
-                                    .map((x) => (
-                                      <option key={x.id} value={x.id}>
-                                        {x.name}
-                                      </option>
-                                    ))}
+                                  <optgroup label="Schritte">
+                                    {schritte
+                                      .filter((x) => x.id !== st.id)
+                                      .map((x) => (
+                                        <option key={x.id} value={x.id}>
+                                          {x.name}
+                                        </option>
+                                      ))}
+                                  </optgroup>
+                                  {bloecke.length > 0 && (
+                                    <optgroup label="Variable Blöcke">
+                                      {bloecke.map((b) => (
+                                        <option key={b.id} value={b.id}>
+                                          {b.name}
+                                        </option>
+                                      ))}
+                                    </optgroup>
+                                  )}
                                 </select>
                                 {st.loopTargetId && (
                                   <button
