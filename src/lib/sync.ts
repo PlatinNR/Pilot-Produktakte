@@ -1,10 +1,48 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useSyncExternalStore } from 'react'
 import { isSupabaseConfigured } from './supabase'
 import { listChains, saveChain } from './api'
 import { useStore } from '../store'
 import type { Abteilung, Bearbeitungsblock, ChainData, Nebentabelle, Produktionstabelle, Schritt } from '../types'
 
 const updatedAtMap = new Map<string, string>()
+
+export interface SyncStatus {
+  phase: 'idle' | 'loading' | 'saving'
+  cloudChecked: boolean
+  cloudEmpty: boolean
+  lastError: string | null
+  lastSavedAt: number | null
+}
+
+let status: SyncStatus = {
+  phase: 'idle',
+  cloudChecked: false,
+  cloudEmpty: false,
+  lastError: null,
+  lastSavedAt: null,
+}
+
+const listeners = new Set<() => void>()
+
+function setStatus(patch: Partial<SyncStatus>) {
+  status = { ...status, ...patch }
+  for (const l of listeners) l()
+}
+
+function errorText(e: unknown): string {
+  return e instanceof Error ? e.message : String(e)
+}
+
+/** Reaktiver Sync-Status für die Oberfläche. */
+export function useSyncStatus(): SyncStatus {
+  return useSyncExternalStore(
+    (l) => {
+      listeners.add(l)
+      return () => listeners.delete(l)
+    },
+    () => status,
+  )
+}
 
 function extractChainData(chainId: string): ChainData {
   const s = useStore.getState()
@@ -18,51 +56,90 @@ function extractChainData(chainId: string): ChainData {
   return { abteilungen, bearbeitungsbloecke, schritte, produktionstabellen, nebentabellen }
 }
 
-/** Speichert alle Ketten global in Supabase. */
-export async function saveAllChains(): Promise<void> {
-  if (!isSupabaseConfigured()) return
+export function hasLocalData(): boolean {
   const s = useStore.getState()
-  for (const chain of s.chains) {
-    const data = extractChainData(chain.id)
-    const res = await saveChain(chain.id, chain.name, data, updatedAtMap.get(chain.id) ?? null)
-    if (res.updatedAt) updatedAtMap.set(chain.id, res.updatedAt)
+  return s.chains.length > 0 && (s.abteilungen.length > 0 || s.schritte.length > 0)
+}
+
+/** Lädt die lokalen Daten hoch (aktive Kette zuerst, damit sie die Standard-Kette wird). */
+export async function saveAllChains(): Promise<void> {
+  if (!isSupabaseConfigured()) {
+    setStatus({ lastError: 'Supabase ist nicht konfiguriert (Umgebungsvariablen fehlen).' })
+    return
+  }
+  setStatus({ phase: 'saving', lastError: null })
+  try {
+    const s = useStore.getState()
+    const ordered = [...s.chains].sort((a, b) =>
+      a.id === s.activeChainId ? -1 : b.id === s.activeChainId ? 1 : 0,
+    )
+    for (const chain of ordered) {
+      const data = extractChainData(chain.id)
+      const res = await saveChain(chain.id, chain.name, data, updatedAtMap.get(chain.id) ?? null)
+      if (res.updatedAt) updatedAtMap.set(chain.id, res.updatedAt)
+    }
+    setStatus({ phase: 'idle', cloudChecked: true, cloudEmpty: false, lastSavedAt: Date.now() })
+  } catch (e) {
+    setStatus({ phase: 'idle', lastError: errorText(e) })
   }
 }
 
-async function loadChainsIntoStore(): Promise<void> {
-  if (!isSupabaseConfigured()) return
-  const records = await listChains()
-  if (records.length === 0) return
-  const chains = records.map((r) => ({ id: r.id, name: r.name }))
-  const abteilungen: Abteilung[] = []
-  const bearbeitungsbloecke: Bearbeitungsblock[] = []
-  const schritte: Schritt[] = []
-  const produktionstabellen: Produktionstabelle[] = []
-  const nebentabellen: Nebentabelle[] = []
-  for (const r of records) {
-    const d = r.data ?? { abteilungen: [], bearbeitungsbloecke: [], schritte: [], produktionstabellen: [], nebentabellen: [] }
-    for (const a of d.abteilungen ?? []) abteilungen.push({ ...a, chainId: r.id })
-    for (const b of d.bearbeitungsbloecke ?? []) bearbeitungsbloecke.push(b)
-    for (const st of d.schritte ?? []) schritte.push(st)
-    for (const p of d.produktionstabellen ?? []) produktionstabellen.push(p)
-    for (const n of d.nebentabellen ?? []) nebentabellen.push(n)
-    updatedAtMap.set(r.id, r.updated_at)
+/** Holt den Stand aus der Cloud und ersetzt damit die lokalen Daten. */
+export async function loadFromCloud(): Promise<boolean> {
+  if (!isSupabaseConfigured()) {
+    setStatus({ lastError: 'Supabase ist nicht konfiguriert (Umgebungsvariablen fehlen).' })
+    return false
   }
-  const state = useStore.getState()
-  useStore.setState({
-    chains,
-    activeChainId:
-      chains.length > 0
-        ? chains.some((c) => c.id === state.activeChainId)
-          ? state.activeChainId
-          : chains[0].id
-        : '',
-    abteilungen,
-    bearbeitungsbloecke,
-    schritte,
-    produktionstabellen,
-    nebentabellen,
-  })
+  setStatus({ phase: 'loading', lastError: null })
+  try {
+    const records = await listChains()
+    setStatus({ cloudChecked: true, cloudEmpty: records.length === 0 })
+    if (records.length === 0) {
+      setStatus({ phase: 'idle' })
+      return false
+    }
+    const chains = records.map((r) => ({ id: r.id, name: r.name }))
+    const abteilungen: Abteilung[] = []
+    const bearbeitungsbloecke: Bearbeitungsblock[] = []
+    const schritte: Schritt[] = []
+    const produktionstabellen: Produktionstabelle[] = []
+    const nebentabellen: Nebentabelle[] = []
+    for (const r of records) {
+      const d = r.data ?? {
+        abteilungen: [],
+        bearbeitungsbloecke: [],
+        schritte: [],
+        produktionstabellen: [],
+        nebentabellen: [],
+      }
+      for (const a of d.abteilungen ?? []) abteilungen.push({ ...a, chainId: r.id })
+      for (const b of d.bearbeitungsbloecke ?? []) bearbeitungsbloecke.push(b)
+      for (const st of d.schritte ?? []) schritte.push(st)
+      for (const p of d.produktionstabellen ?? []) produktionstabellen.push(p)
+      for (const n of d.nebentabellen ?? []) nebentabellen.push(n)
+      updatedAtMap.set(r.id, r.updated_at)
+    }
+    const state = useStore.getState()
+    useStore.setState({
+      chains,
+      activeChainId:
+        chains.length > 0
+          ? chains.some((c) => c.id === state.activeChainId)
+            ? state.activeChainId
+            : chains[0].id
+          : '',
+      abteilungen,
+      bearbeitungsbloecke,
+      schritte,
+      produktionstabellen,
+      nebentabellen,
+    })
+    setStatus({ phase: 'idle' })
+    return true
+  } catch (e) {
+    setStatus({ phase: 'idle', lastError: errorText(e) })
+    return false
+  }
 }
 
 export function useSupabaseSync() {
@@ -74,7 +151,7 @@ export function useSupabaseSync() {
     if (!isSupabaseConfigured()) return
     let cancelled = false
     loadingRef.current = true
-    loadChainsIntoStore()
+    loadFromCloud()
       .catch(() => {})
       .finally(() => {
         if (!cancelled) loadingRef.current = false
@@ -94,6 +171,7 @@ export function useSupabaseSync() {
         state.chains === prevState.chains &&
         state.activeChainId === prevState.activeChainId &&
         state.abteilungen === prevState.abteilungen &&
+        state.bearbeitungsbloecke === prevState.bearbeitungsbloecke &&
         state.schritte === prevState.schritte &&
         state.produktionstabellen === prevState.produktionstabellen &&
         state.nebentabellen === prevState.nebentabellen

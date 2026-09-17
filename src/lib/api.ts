@@ -41,25 +41,28 @@ export async function saveChain(
 
   let backup = false
   if (expectedUpdatedAt) {
-    const { data: current } = await supabase
+    const { data: current, error: readError } = await supabase
       .from('chains')
       .select('updated_at, name, data')
       .eq('id', id)
-      .single()
+      .maybeSingle()
+    if (readError) throw readError
     if (current && current.updated_at !== expectedUpdatedAt) {
       const date = new Date().toLocaleDateString('de-DE')
-      await supabase
+      const { error: backupError } = await supabase
         .from('chains')
         .insert({ name: `${current.name} (Backup ${date})`, data: current.data })
+      if (backupError) throw backupError
       backup = true
     }
   }
 
-  const { data: updated } = await supabase
+  const { data: updated, error } = await supabase
     .from('chains')
     .upsert({ id, name, data }, { onConflict: 'id' })
     .select('updated_at')
     .single()
+  if (error) throw error
 
   return { updatedAt: updated?.updated_at ?? '', backup }
 }

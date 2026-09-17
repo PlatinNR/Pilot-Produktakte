@@ -3,7 +3,7 @@ import type { Filter } from '../types'
 import { EMPTY_FILTER } from '../types'
 import { useStore } from '../store'
 import { isTraceMode } from '../utils/aggregate'
-import { saveAllChains } from '../lib/sync'
+import { loadFromCloud, saveAllChains, useSyncStatus } from '../lib/sync'
 import { FilterBar } from '../components/FilterBar'
 import { TraceView } from '../components/TraceView'
 import { AbteilungBlock } from '../components/AbteilungBlock'
@@ -20,18 +20,35 @@ export function Dashboard() {
   const addChain = useStore((s) => s.addChain)
   const renameChain = useStore((s) => s.renameChain)
   const addAbteilung = useStore((s) => s.addAbteilung)
+  const sync = useSyncStatus()
   const [filter, setFilter] = useState<Filter>(EMPTY_FILTER)
   const [view, setView] = useState<View>('zusammen')
-  const [saved, setSaved] = useState(false)
 
   const abteilungen = alleAbteilungen.filter((a) => a.chainId === activeChainId)
   const activeChain = chains.find((c) => c.id === activeChainId)
 
-  const handleSave = async () => {
+  const handleUpload = async () => {
     await saveAllChains()
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
   }
+
+  const handleDownload = async () => {
+    await loadFromCloud()
+  }
+
+  const busy = sync.phase !== 'idle'
+  const statusText = sync.lastError
+    ? `Fehler: ${sync.lastError}`
+    : sync.phase === 'saving'
+      ? 'Speichert…'
+      : sync.phase === 'loading'
+        ? 'Lädt…'
+        : sync.lastSavedAt
+          ? `Gespeichert ${new Date(sync.lastSavedAt).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}`
+          : sync.cloudChecked && sync.cloudEmpty
+            ? 'Cloud ist leer'
+            : sync.cloudChecked
+              ? 'Cloud verbunden'
+              : 'Cloud wird geprüft…'
 
   return (
     <div className="flex h-full flex-col gap-4 overflow-y-auto p-6">
@@ -68,14 +85,20 @@ export function Dashboard() {
             + Kette
           </button>
           <button
-            onClick={handleSave}
-            className={`rounded-lg px-4 py-2 text-sm font-medium ${
-              saved
-                ? 'bg-emerald-600 text-white'
-                : 'bg-zollern-700 text-white hover:bg-zollern-800'
-            }`}
+            onClick={handleUpload}
+            disabled={busy}
+            className="rounded-lg bg-zollern-700 px-4 py-2 text-sm font-medium text-white hover:bg-zollern-800 disabled:opacity-60"
+            title="Lokale Daten in die Cloud hochladen"
           >
-            {saved ? 'Gespeichert ✓' : 'Speichern'}
+            {sync.phase === 'saving' ? 'Speichert…' : 'In Cloud speichern'}
+          </button>
+          <button
+            onClick={handleDownload}
+            disabled={busy}
+            className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-600 hover:bg-slate-100 disabled:opacity-60"
+            title="Stand aus der Cloud laden (ersetzt lokale Daten)"
+          >
+            {sync.phase === 'loading' ? 'Lädt…' : 'Aus Cloud laden'}
           </button>
           <button
             onClick={() => addAbteilung()}
@@ -85,6 +108,24 @@ export function Dashboard() {
           </button>
         </div>
       </header>
+
+      <p className={`text-xs ${sync.lastError ? 'text-red-600' : 'text-slate-500'}`}>{statusText}</p>
+
+      {sync.cloudChecked && sync.cloudEmpty && chains.length > 0 && (
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          <span>
+            Die Cloud ist leer – diese Daten liegen nur in diesem Browser. Lade sie hoch, damit sie auf
+            allen PCs sichtbar sind.
+          </span>
+          <button
+            onClick={handleUpload}
+            disabled={busy}
+            className="shrink-0 rounded-lg bg-amber-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-60"
+          >
+            Jetzt hochladen
+          </button>
+        </div>
+      )}
 
       <div className="flex border-b border-slate-200">
         <button
