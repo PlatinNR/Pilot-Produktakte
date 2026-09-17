@@ -376,13 +376,13 @@ export function TabellenbezogenView({ filter }: Props) {
   const auftrag = filter.auftragsnummer.trim()
 
   const containerRef = useRef<HTMLDivElement>(null)
-  const nodeRefs = useRef(new Map<string, HTMLDivElement>())
+  const nodeRefs = useRef(new Map<string, HTMLElement>())
   const [boxes, setBoxes] = useState<Record<string, Rect>>({})
   const [origin, setOrigin] = useState({ left: 0, top: 0 })
   const [dragPos, setDragPos] = useState<{ x: number; y: number; sourceKey: string } | null>(null)
   const [infoAbt, setInfoAbt] = useState<string | null>(null)
 
-  const registerRef = (nodeKey: string) => (el: HTMLDivElement | null) => {
+  const registerRef = (nodeKey: string) => (el: HTMLElement | null) => {
     if (el) nodeRefs.current.set(nodeKey, el)
     else nodeRefs.current.delete(nodeKey)
   }
@@ -408,7 +408,7 @@ export function TabellenbezogenView({ filter }: Props) {
       ro.disconnect()
       window.removeEventListener('resize', measure)
     }
-  }, [alleAbteilungen, alleSchritte, alleMaschinen, alleNeben])
+  }, [alleAbteilungen, alleBloecke, alleSchritte, alleMaschinen, alleNeben])
 
   const resolveKeyType = (kind: string, tableId: string, columnId: string): KeyType | null => {
     if (kind === 'm') {
@@ -605,7 +605,20 @@ export function TabellenbezogenView({ filter }: Props) {
 
   return (
     <div ref={containerRef} className="relative flex flex-col gap-6">
-      <svg className="pointer-events-none absolute inset-0 z-0 h-full w-full">
+      {/* Abteilungsfarben – liegen hinter den Beziehungslinien */}
+      {abteilungen.map((a, i) => {
+        const r = boxes[`abt:${a.id}`]
+        if (!r) return null
+        return (
+          <div
+            key={`abtfarbe-${a.id}`}
+            className={`pointer-events-none absolute z-0 rounded-xl border ${abteilungFarbe(i)}`}
+            style={{ left: r.x, top: r.y, width: r.w, height: r.h }}
+          />
+        )
+      })}
+
+      <svg className="pointer-events-none absolute inset-0 z-10 h-full w-full">
         <defs>
           <marker id="er-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
             <path d="M0,0 L8,4 L0,8 z" fill="#94a3b8" />
@@ -631,8 +644,8 @@ export function TabellenbezogenView({ filter }: Props) {
         )}
       </svg>
 
-      <div className="relative z-10 flex flex-col gap-6">
-        {abteilungen.map((a, abtIndex) => {
+      <div className="relative z-20 flex flex-col gap-6">
+        {abteilungen.map((a) => {
           const schritte = alleSchritte.filter((st) => st.abteilungId === a.id)
           const neben = alleNeben.filter((n) => n.abteilungId === a.id)
           const bloecke = alleBloecke.filter((b) => b.abteilungId === a.id)
@@ -651,7 +664,11 @@ export function TabellenbezogenView({ filter }: Props) {
           })
 
           return (
-            <section key={a.id} className={`rounded-xl border p-4 ${abteilungFarbe(abtIndex)}`}>
+            <section
+              key={a.id}
+              ref={registerRef(`abt:${a.id}`)}
+              className="relative rounded-xl p-4"
+            >
               <div className="mb-3 flex items-center gap-2">
                 <span className="h-3 w-1 rounded-full bg-zollern-500" />
                 <button

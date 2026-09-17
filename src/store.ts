@@ -199,7 +199,11 @@ interface Store extends AppState {
     auftragsnummer: string,
     fn: string,
     datum: string,
-    werte: { tabelleId: string; spalten: Record<string, string> }[],
+    werte: {
+      tabelleId: string
+      spalten: Record<string, string>
+      extraSpalten?: { id: string; name: string; type: ColumnType }[]
+    }[],
   ) => void
   updateCellProduktion: (tabelleId: string, rowIndex: number, spalteId: string, value: string) => void
   removeRowProduktion: (tabelleId: string, rowIndex: number) => void
@@ -636,12 +640,19 @@ export const useStore = create<Store>()(
       produktionstabellen: s.produktionstabellen.map((t) => {
         const eintrag = werte.find((w) => w.tabelleId === t.id)
         if (!eintrag) return t
-        const zeile: TableRow = { ...emptyRow(t.columns), auftragsnummer, fn, datum }
-        for (const c of t.columns) {
+        // Felder aus dem Schritt an der Maschine ergänzen (falls noch nicht vorhanden)
+        const columns = [...t.columns]
+        for (const extra of eintrag.extraSpalten ?? []) {
+          if (columns.some((c) => c.id === extra.id)) continue
+          if (columns.some((c) => c.name.trim().toLowerCase() === extra.name.trim().toLowerCase())) continue
+          columns.push({ id: extra.id, name: extra.name, type: extra.type, fixed: false })
+        }
+        const zeile: TableRow = { ...emptyRow(columns), auftragsnummer, fn, datum }
+        for (const c of columns) {
           if (c.id === 'auftragsnummer' || c.id === 'fn' || c.id === 'datum') continue
           zeile[c.id] = eintrag.spalten[c.id] ?? ''
         }
-        return { ...t, rows: [...t.rows, zeile] }
+        return { ...t, columns, rows: [...t.rows, zeile] }
       }),
     })),
 

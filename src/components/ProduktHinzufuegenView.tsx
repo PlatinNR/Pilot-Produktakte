@@ -31,12 +31,18 @@ export function ProduktHinzufuegenView() {
 
   const speichern = () => {
     if (!kannSpeichern) return
-    addProdukt(
-      auftragsnummer.trim(),
-      fn.trim(),
-      datum,
-      gewaehlt.map((m) => ({ tabelleId: m.id, spalten: werte[m.id] ?? {} })),
-    )
+    const eintraege = gewaehlt.map((m) => {
+      const st = alleSchritte.find((x) => x.id === m.schrittId)
+      const eigene = m.columns.filter((c) => !c.fixed)
+      const namen = new Set(eigene.map((c) => c.name.trim().toLowerCase()))
+      const extra = (st?.columns ?? []).filter((c) => !namen.has(c.name.trim().toLowerCase()))
+      return {
+        tabelleId: m.id,
+        spalten: werte[m.id] ?? {},
+        extraSpalten: extra.map((c) => ({ id: c.id, name: c.name, type: c.type })),
+      }
+    })
+    addProdukt(auftragsnummer.trim(), fn.trim(), datum, eintraege)
     setMeldung(`„${auftragsnummer.trim()}" wurde bei ${gewaehlt.length} Maschine(n) eingetragen.`)
     setAuftragsnummer('')
     setFn('')
@@ -146,6 +152,10 @@ export function ProduktHinzufuegenView() {
                           <div className="grid grid-cols-1 gap-2 lg:grid-cols-2 2xl:grid-cols-3">
                             {maschinen.map((m) => {
                               const eigeneSpalten = m.columns.filter((c) => !c.fixed)
+                              const namen = new Set(eigeneSpalten.map((c) => c.name.trim().toLowerCase()))
+                              const schrittFelder = st.columns.filter(
+                                (c) => !namen.has(c.name.trim().toLowerCase()),
+                              )
                               const bereitsVorhanden =
                                 auftragsnummer.trim().length > 0 &&
                                 m.rows.some((r) => r.auftragsnummer === auftragsnummer.trim())
@@ -172,7 +182,7 @@ export function ProduktHinzufuegenView() {
                                   </label>
                                   {auswahl[m.id] && (
                                     <div className="mt-2 grid grid-cols-2 gap-2">
-                                      {eigeneSpalten.length === 0 && (
+                                      {eigeneSpalten.length === 0 && schrittFelder.length === 0 && (
                                         <p className="col-span-2 text-[11px] text-slate-400">
                                           Keine eigenen Wertspalten an dieser Maschine.
                                         </p>
@@ -180,6 +190,27 @@ export function ProduktHinzufuegenView() {
                                       {eigeneSpalten.map((c) => (
                                         <label key={c.id} className="flex flex-col gap-0.5">
                                           <span className="text-[10px] text-slate-500">{c.name}</span>
+                                          <input
+                                            value={werte[m.id]?.[c.id] ?? ''}
+                                            onChange={(e) => setWert(m.id, c.id, e.target.value)}
+                                            type={
+                                              c.type === 'number' ? 'number' : c.type === 'date' ? 'date' : 'text'
+                                            }
+                                            className={werteEingabe}
+                                          />
+                                        </label>
+                                      ))}
+                                      {schrittFelder.map((c) => (
+                                        <label key={c.id} className="flex flex-col gap-0.5">
+                                          <span className="flex items-center gap-1 text-[10px] text-slate-500">
+                                            {c.name}
+                                            <span
+                                              className="rounded bg-sky-100 px-1 text-[9px] text-sky-700"
+                                              title="Feld ist im Schritt definiert und wird beim Speichern an der Maschine ergänzt"
+                                            >
+                                              aus Schritt
+                                            </span>
+                                          </span>
                                           <input
                                             value={werte[m.id]?.[c.id] ?? ''}
                                             onChange={(e) => setWert(m.id, c.id, e.target.value)}
