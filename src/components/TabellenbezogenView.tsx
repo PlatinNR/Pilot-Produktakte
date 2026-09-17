@@ -524,14 +524,33 @@ export function TabellenbezogenView({ filter }: Props) {
       })
     }
   }
-  // Schritt -> Schritt (Prozesskette: der Fertigungsauftrag wandert durch die Schritte)
-  // Nur für Schritte ohne Block (feste Reihenfolge) – Schritte in einem Block sind variabel.
+  // Prozesskette: Der Fertigungsauftrag wandert durch die Kettenknoten (feste Schritte + variable Blöcke).
+  // Ein Block wird über seinen ersten Schritt betreten und über seinen letzten Schritt verlassen.
   for (const a of abteilungen) {
-    const schritte = alleSchritte.filter((st) => st.abteilungId === a.id && !st.blockId).sort((x, y) => x.position - y.position)
-    for (let i = 0; i < schritte.length - 1; i++) {
+    const nodes: { pos: number; inKey: string; outKey: string }[] = []
+    for (const st of alleSchritte.filter((st) => st.abteilungId === a.id && !st.blockId)) {
+      nodes.push({
+        pos: st.position,
+        inKey: `s:${st.id}:auftragsnummer`,
+        outKey: `s:${st.id}:auftragsnummer`,
+      })
+    }
+    for (const b of alleBloecke.filter((b) => b.abteilungId === a.id)) {
+      const bs = alleSchritte.filter((st) => st.blockId === b.id)
+      const first = bs[0]
+      const last = bs[bs.length - 1]
+      if (!first || !last) continue
+      nodes.push({
+        pos: b.position,
+        inKey: `s:${first.id}:auftragsnummer`,
+        outKey: `s:${last.id}:auftragsnummer`,
+      })
+    }
+    nodes.sort((x, y) => x.pos - y.pos)
+    for (let i = 0; i < nodes.length - 1; i++) {
       lines.push({
-        sourceKey: `s:${schritte[i].id}:auftragsnummer`,
-        targetKey: `s:${schritte[i + 1].id}:auftragsnummer`,
+        sourceKey: nodes[i].outKey,
+        targetKey: nodes[i + 1].inKey,
         label: 'Auftragsnummer',
         n1: false,
         keyKind: null,
@@ -732,6 +751,7 @@ export function TabellenbezogenView({ filter }: Props) {
                               <div className="flex items-start gap-3">
                                 {blockSteps.map((bst) => {
                                   const bstepMaschinen = alleMaschinen.filter((m) => m.schrittId === bst.id)
+                                  const agg = aggregate ? aggregateSchritt(bst, bstepMaschinen, filter) : null
                                   return (
                                     <div key={bst.id} className="flex w-56 shrink-0 flex-col gap-2">
                                       <EntityCard
@@ -852,34 +872,52 @@ export function TabellenbezogenView({ filter }: Props) {
                                         </div>
                                       </EntityCard>
                                       <div className="flex flex-col gap-2">
-                                        {bstepMaschinen.map((m) => (
-                                          <EntityCard
-                                            key={m.id}
-                                            compact
-                                            title={m.name}
-                                            onRename={(name) => renameProduktionstabelle(m.id, name)}
-                                            onRemove={() => removeProduktionstabelle(m.id)}
-                                            onAddColumn={(name, type) => addColumnProduktion(m.id, name, type)}
-                                          >
-                                            {m.columns.map((c) => (
-                                              <ColumnRow
-                                                key={c.id}
+                                        {bstepMaschinen.map((m, mi) => {
+                                          const anteil = agg?.entries.find((e) => e.tabelle.id === m.id)
+                                          const used = m.rows.some((r) => r.auftragsnummer === auftrag)
+                                          let opacity = 1
+                                          if (trace) opacity = used ? 1 : 0.15
+                                          else if (aggregate) opacity = opacityForPercent(anteil?.percent ?? 0)
+                                          return (
+                                            <div
+                                              key={m.id}
+                                              className="rounded-lg"
+                                              style={{
+                                                opacity,
+                                                outline: trace && used ? '2px solid #F56405' : 'none',
+                                                outlineOffset: '1px',
+                                              }}
+                                            >
+                                              <EntityCard
                                                 compact
-                                                nodeKey={`m:${m.id}:${c.id}`}
-                                                registerRef={registerRef}
-                                                col={c}
-                                                keyType={keyTypeOf(m.keys, c.id)}
-                                                onRename={(name) => renameColumnProduktion(m.id, c.id, name)}
-                                                onChangeType={(t) => changeColumnTypeProduktion(m.id, c.id, t)}
-                                                onRemove={() => removeColumnProduktion(m.id, c.id)}
-                                                onCycleKey={() =>
-                                                  setColumnKeyProduktion(m.id, c.id, nextKey(keyTypeOf(m.keys, c.id)))
-                                                }
-                                                onStartDrag={startDrag('m', m.id, c.id, keyTypeOf(m.keys, c.id))}
-                                              />
-                                            ))}
-                                          </EntityCard>
-                                        ))}
+                                                title={m.name}
+                                                onRename={(name) => renameProduktionstabelle(m.id, name)}
+                                                onRemove={() => removeProduktionstabelle(m.id)}
+                                                percent={aggregate && agg ? (anteil?.percent ?? 0) : null}
+                                                colorClass={MASCHINEN_FARBEN[mi % MASCHINEN_FARBEN.length]}
+                                                onAddColumn={(name, type) => addColumnProduktion(m.id, name, type)}
+                                              >
+                                                {m.columns.map((c) => (
+                                                  <ColumnRow
+                                                    key={c.id}
+                                                    compact
+                                                    nodeKey={`m:${m.id}:${c.id}`}
+                                                    registerRef={registerRef}
+                                                    col={c}
+                                                    keyType={keyTypeOf(m.keys, c.id)}
+                                                    onRename={(name) => renameColumnProduktion(m.id, c.id, name)}
+                                                    onChangeType={(t) => changeColumnTypeProduktion(m.id, c.id, t)}
+                                                    onRemove={() => removeColumnProduktion(m.id, c.id)}
+                                                    onCycleKey={() =>
+                                                      setColumnKeyProduktion(m.id, c.id, nextKey(keyTypeOf(m.keys, c.id)))
+                                                    }
+                                                    onStartDrag={startDrag('m', m.id, c.id, keyTypeOf(m.keys, c.id))}
+                                                  />
+                                                ))}
+                                              </EntityCard>
+                                            </div>
+                                          )
+                                        })}
                                         <button
                                           onClick={() => addProduktionstabelle(bst.id)}
                                           className="flex min-h-[2.5rem] items-center justify-center rounded-lg border-2 border-dashed border-slate-200 text-[11px] text-slate-400 hover:border-zollern-400 hover:text-zollern-600"
