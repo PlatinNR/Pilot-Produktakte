@@ -103,6 +103,8 @@ export interface Nebentabelle {
   id: string
   abteilungId: string
   name: string
+  /** Feste Arbeitsplatz-Nummer – gilt für alle Einträge der Nebentabelle */
+  arbeitsplatz: string
   columns: TableColumn[]
   rows: TableRow[]
   keys: TableKey[]

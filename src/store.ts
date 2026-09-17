@@ -215,6 +215,7 @@ interface Store extends AppState {
   // Nebentabellen
   addNebentabelle: (abteilungId: string, name?: string) => void
   renameNebentabelle: (id: string, name: string) => void
+  setNebenArbeitsplatz: (id: string, arbeitsplatz: string) => void
   removeNebentabelle: (id: string) => void
   addColumnNeben: (tabelleId: string, name: string, type: ColumnType) => void
   renameColumnNeben: (tabelleId: string, spalteId: string, name: string) => void
@@ -728,6 +729,7 @@ export const useStore = create<Store>()(
           id: nextId('n'),
           abteilungId,
           name: name ?? 'Neue Nebentabelle',
+          arbeitsplatz: '',
           columns: cloneSpalten(NEBEN_SPALTEN),
           rows: [],
           keys: nebenKeys(),
@@ -737,6 +739,9 @@ export const useStore = create<Store>()(
 
   renameNebentabelle: (id, name) =>
     set((s) => ({ nebentabellen: s.nebentabellen.map((t) => (t.id === id ? { ...t, name } : t)) })),
+
+  setNebenArbeitsplatz: (id, arbeitsplatz) =>
+    set((s) => ({ nebentabellen: s.nebentabellen.map((t) => (t.id === id ? { ...t, arbeitsplatz } : t)) })),
 
   removeNebentabelle: (id) =>
     set((s) => ({ nebentabellen: s.nebentabellen.filter((t) => t.id !== id) })),
@@ -854,7 +859,7 @@ setKeyLabelNeben: (tabelleId, spalteId, label) =>
   }),
     {
       name: 'digitale-produktakte',
-      version: 10,
+      version: 11,
       migrate: (persisted, version) => {
         let p = persisted as Partial<AppState> & {
           abteilungen?: (Abteilung & { chainId?: string; parentId?: string | null; sequence?: 'fixed' | 'variable' })[]
@@ -982,6 +987,16 @@ setKeyLabelNeben: (tabelleId, spalteId, label) =>
             })),
           } as typeof p
         }
+        if (version < 11) {
+          // Jede Nebentabelle bekommt eine feste Arbeitsplatz-Nummer
+          p = {
+            ...p,
+            nebentabellen: (p.nebentabellen ?? []).map((n) => ({
+              ...n,
+              arbeitsplatz: n.arbeitsplatz ?? '',
+            })),
+          } as typeof p
+        }
         return p as AppState
       },
       partialize: (s) => ({
@@ -1094,6 +1109,7 @@ function seed(): AppState {
       id: 'n-wachsqualitaet',
       abteilungId: 'abt-wachs',
       name: 'Wachsqualität',
+      arbeitsplatz: '201',
       columns: [...cloneSpalten(NEBEN_SPALTEN), { id: 'c-qual', name: 'Qualitätswert', type: 'number', fixed: false }],
       rows: [
         { datum: '2026-08-26', 'c-qual': '98' },

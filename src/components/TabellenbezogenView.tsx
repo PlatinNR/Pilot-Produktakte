@@ -390,6 +390,7 @@ export function TabellenbezogenView({ filter }: Props) {
     addNebentabelle,
     renameNebentabelle,
     removeNebentabelle,
+    setNebenArbeitsplatz,
     addColumnNeben,
     renameColumnNeben,
     changeColumnTypeNeben,
@@ -1247,6 +1248,11 @@ export function TabellenbezogenView({ filter }: Props) {
                         onRemove={() => removeNebentabelle(n.id)}
                         onAddColumn={(name, type) => addColumnNeben(n.id, name, type)}
                       >
+                        <ArbeitsplatzZeile
+                          tabelleId={n.id}
+                          wert={n.arbeitsplatz}
+                          onChange={setNebenArbeitsplatz}
+                        />
                         {n.columns.map((c) => (
                           <ColumnRow
                             key={c.id}

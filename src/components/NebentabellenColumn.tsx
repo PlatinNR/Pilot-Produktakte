@@ -12,6 +12,7 @@ export function NebentabellenColumn({ abteilungId }: Props) {
     addNebentabelle,
     renameNebentabelle,
     removeNebentabelle,
+    setNebenArbeitsplatz,
     addColumnNeben,
     renameColumnNeben,
     changeColumnTypeNeben,
@@ -59,6 +60,8 @@ export function NebentabellenColumn({ abteilungId }: Props) {
             onAddRow={() => addRowNeben(t.id)}
             onUpdateCell={(ri, cid, v) => updateCellNeben(t.id, ri, cid, v)}
             onRemoveRow={(ri) => removeRowNeben(t.id, ri)}
+            arbeitsplatz={t.arbeitsplatz}
+            onArbeitsplatzChange={(wert) => setNebenArbeitsplatz(t.id, wert)}
           />
         ))}
       </div>
