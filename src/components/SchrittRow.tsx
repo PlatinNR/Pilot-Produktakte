@@ -22,6 +22,7 @@ export function SchrittRow({ schritt, filter }: Props) {
     addProduktionstabelle,
     renameProduktionstabelle,
     removeProduktionstabelle,
+    setProduktionArbeitsplatz,
     addColumnProduktion,
     renameColumnProduktion,
     changeColumnTypeProduktion,
@@ -122,6 +123,8 @@ export function SchrittRow({ schritt, filter }: Props) {
               onRemoveRow={(ri) => removeRowProduktion(t.id, ri)}
               percent={anteil && aggregate && aggregate.total > 0 ? anteil.percent : null}
               colorClass={MASCHINEN_FARBEN[i % MASCHINEN_FARBEN.length]}
+              arbeitsplatz={t.arbeitsplatz}
+              onArbeitsplatzChange={(wert) => setProduktionArbeitsplatz(t.id, wert)}
             />
           )
         })}

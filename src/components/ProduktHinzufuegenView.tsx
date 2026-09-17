@@ -171,6 +171,14 @@ export function ProduktHinzufuegenView() {
                                       className="h-4 w-4 accent-zollern-600"
                                     />
                                     <span className="min-w-0 flex-1 truncate font-medium">{m.name}</span>
+                                    <span
+                                      className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] ${
+                                        m.arbeitsplatz ? 'bg-slate-100 text-slate-600' : 'bg-red-100 text-red-600'
+                                      }`}
+                                      title="Arbeitsplatz-Nummer der Maschine"
+                                    >
+                                      {m.arbeitsplatz ? `AP ${m.arbeitsplatz}` : 'AP fehlt'}
+                                    </span>
                                     {bereitsVorhanden && (
                                       <span
                                         className="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-700"

@@ -124,7 +124,9 @@ export async function loadFromCloud(): Promise<boolean> {
       for (const a of d.abteilungen ?? []) abteilungen.push({ ...a, chainId: r.id })
       for (const b of d.bearbeitungsbloecke ?? []) bearbeitungsbloecke.push(b)
       for (const st of d.schritte ?? []) schritte.push(st)
-      for (const p of d.produktionstabellen ?? []) produktionstabellen.push(p)
+      for (const p of d.produktionstabellen ?? []) {
+        produktionstabellen.push({ ...p, arbeitsplatz: p.arbeitsplatz ?? '' })
+      }
       for (const n of d.nebentabellen ?? []) nebentabellen.push(n)
       updatedAtMap.set(r.id, r.updated_at)
     }

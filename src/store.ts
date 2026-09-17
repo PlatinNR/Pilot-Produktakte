@@ -189,6 +189,7 @@ interface Store extends AppState {
   // Produktionstabellen (Maschinen)
   addProduktionstabelle: (schrittId: string, name?: string) => void
   renameProduktionstabelle: (id: string, name: string) => void
+  setProduktionArbeitsplatz: (id: string, arbeitsplatz: string) => void
   removeProduktionstabelle: (id: string) => void
   addColumnProduktion: (tabelleId: string, name: string, type: ColumnType) => void
   renameColumnProduktion: (tabelleId: string, spalteId: string, name: string) => void
@@ -564,6 +565,7 @@ export const useStore = create<Store>()(
           id: nextId('p'),
           schrittId,
           name: name ?? 'Neue Maschine',
+          arbeitsplatz: '',
           columns: cloneSpalten(PRODUKTION_SPALTEN),
           rows: [],
           keys: produktionKeys(schrittId),
@@ -574,6 +576,11 @@ export const useStore = create<Store>()(
   renameProduktionstabelle: (id, name) =>
     set((s) => ({
       produktionstabellen: s.produktionstabellen.map((t) => (t.id === id ? { ...t, name } : t)),
+    })),
+
+  setProduktionArbeitsplatz: (id, arbeitsplatz) =>
+    set((s) => ({
+      produktionstabellen: s.produktionstabellen.map((t) => (t.id === id ? { ...t, arbeitsplatz } : t)),
     })),
 
   removeProduktionstabelle: (id) =>
@@ -847,7 +854,7 @@ setKeyLabelNeben: (tabelleId, spalteId, label) =>
   }),
     {
       name: 'digitale-produktakte',
-      version: 9,
+      version: 10,
       migrate: (persisted, version) => {
         let p = persisted as Partial<AppState> & {
           abteilungen?: (Abteilung & { chainId?: string; parentId?: string | null; sequence?: 'fixed' | 'variable' })[]
@@ -965,6 +972,16 @@ setKeyLabelNeben: (tabelleId, spalteId, label) =>
             chains: (p.chains ?? []).map((c) => ({ ...c, info: c.info ?? emptyInfo() })),
           } as typeof p
         }
+        if (version < 10) {
+          // Jede Maschine bekommt eine feste Arbeitsplatz-Nummer
+          p = {
+            ...p,
+            produktionstabellen: (p.produktionstabellen ?? []).map((t) => ({
+              ...t,
+              arbeitsplatz: t.arbeitsplatz ?? '',
+            })),
+          } as typeof p
+        }
         return p as AppState
       },
       partialize: (s) => ({
@@ -1006,13 +1023,16 @@ function seed(): AppState {
     's-reinigen': ['Reinigungsmaschine 1', 'Reinigungsmaschine 2', 'Reinigungsmaschine 3', 'Reinigungsmaschine 4'],
   }
 
+  let arbeitsplatzNr = 100
   for (const s of schritte) {
     const names = schrittMachineNames[s.id]
     for (let i = 0; i < names.length; i++) {
+      arbeitsplatzNr += 1
       produktionstabellen.push({
         id: `p-${s.id}-${i + 1}`,
         schrittId: s.id,
         name: names[i],
+        arbeitsplatz: String(arbeitsplatzNr),
         columns: [...cloneSpalten(PRODUKTION_SPALTEN), { ...druckSpalte, id: `c-druck-${s.id}-${i + 1}` }],
         rows: [],
         keys: [

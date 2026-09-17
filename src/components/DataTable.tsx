@@ -22,6 +22,9 @@ interface Props {
   colorClass?: string
   keys?: TableKey[]
   onCycleKey?: (columnId: string) => void
+  /** Feste Arbeitsplatz-Nummer der Maschine (gleiche Nummer für alle Einträge) */
+  arbeitsplatz?: string
+  onArbeitsplatzChange?: (wert: string) => void
 }
 
 function inputType(type: ColumnType): string {
@@ -47,6 +50,8 @@ export function DataTable({
   colorClass,
   keys,
   onCycleKey,
+  arbeitsplatz,
+  onArbeitsplatzChange,
 }: Props) {
   const [addingCol, setAddingCol] = useState(false)
   const [colName, setColName] = useState('')
@@ -89,6 +94,21 @@ export function DataTable({
       {showPercent && (
         <div className="h-1 w-full bg-slate-100">
           <div className={`h-full ${colorClass ?? 'bg-zollern-600'}`} style={{ width: `${percent}%` }} />
+        </div>
+      )}
+
+      {onArbeitsplatzChange && (
+        <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50/60 px-3 py-1">
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Arbeitsplatz</span>
+          <input
+            value={arbeitsplatz ?? ''}
+            onChange={(e) => onArbeitsplatzChange(e.target.value)}
+            placeholder="Nr. zuweisen"
+            className={`w-28 rounded border bg-white px-1.5 py-0.5 text-xs outline-none focus:border-zollern-400 ${
+              arbeitsplatz ? 'border-slate-200 text-slate-700' : 'border-red-300 text-slate-500'
+            }`}
+            title={arbeitsplatz ? 'Arbeitsplatz-Nummer (gilt für alle Einträge)' : 'Arbeitsplatz-Nummer fehlt'}
+          />
         </div>
       )}
 

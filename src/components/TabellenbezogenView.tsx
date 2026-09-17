@@ -320,6 +320,32 @@ function LoopLine({ from, to, condition }: { from: Rect; to: Rect; condition: st
   )
 }
 
+/** Arbeitsplatz-Nummer einer Maschine – gilt für alle Einträge. */
+function ArbeitsplatzZeile({
+  tabelleId,
+  wert,
+  onChange,
+}: {
+  tabelleId: string
+  wert?: string
+  onChange: (id: string, wert: string) => void
+}) {
+  return (
+    <div className="flex items-center gap-1 border-t border-slate-50 px-2 py-1">
+      <span className="min-w-0 flex-1 text-[10px] font-medium text-slate-700">Arbeitsplatz</span>
+      <input
+        value={wert ?? ''}
+        onChange={(e) => onChange(tabelleId, e.target.value)}
+        placeholder="Nr."
+        className={`w-20 shrink-0 rounded border px-1 py-0.5 text-[10px] outline-none focus:border-zollern-400 ${
+          wert ? 'border-slate-200 text-slate-700' : 'border-red-300 text-slate-500'
+        }`}
+        title={wert ? 'Arbeitsplatz-Nummer (gilt für alle Einträge)' : 'Arbeitsplatz-Nummer fehlt'}
+      />
+    </div>
+  )
+}
+
 export function TabellenbezogenView({ filter }: Props) {
   const alleAbteilungen = useStore((s) => s.abteilungen)
   const activeChainId = useStore((s) => s.activeChainId)
@@ -354,6 +380,7 @@ export function TabellenbezogenView({ filter }: Props) {
     addProduktionstabelle,
     renameProduktionstabelle,
     removeProduktionstabelle,
+    setProduktionArbeitsplatz,
     addColumnProduktion,
     renameColumnProduktion,
     changeColumnTypeProduktion,
@@ -924,6 +951,11 @@ export function TabellenbezogenView({ filter }: Props) {
                                                 colorClass={MASCHINEN_FARBEN[mi % MASCHINEN_FARBEN.length]}
                                                 onAddColumn={(name, type) => addColumnProduktion(m.id, name, type)}
                                               >
+                                                <ArbeitsplatzZeile
+                                                  tabelleId={m.id}
+                                                  wert={m.arbeitsplatz}
+                                                  onChange={setProduktionArbeitsplatz}
+                                                />
                                                 {m.columns.map((c) => (
                                                   <ColumnRow
                                                     key={c.id}
@@ -1001,6 +1033,11 @@ export function TabellenbezogenView({ filter }: Props) {
                                     colorClass={MASCHINEN_FARBEN[mi % MASCHINEN_FARBEN.length]}
                                     onAddColumn={(name, type) => addColumnProduktion(m.id, name, type)}
                                   >
+                                    <ArbeitsplatzZeile
+                                      tabelleId={m.id}
+                                      wert={m.arbeitsplatz}
+                                      onChange={setProduktionArbeitsplatz}
+                                    />
                                     {m.columns.map((c) => (
                                       <ColumnRow
                                         key={c.id}

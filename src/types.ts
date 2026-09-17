@@ -91,6 +91,8 @@ export interface Produktionstabelle {
   id: string
   schrittId: string
   name: string
+  /** Feste Arbeitsplatz-Nummer der Maschine – gilt für alle Einträge der Maschine */
+  arbeitsplatz: string
   columns: TableColumn[]
   rows: TableRow[]
   keys: TableKey[]
