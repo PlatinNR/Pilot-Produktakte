@@ -8,10 +8,11 @@ import { FilterBar } from '../components/FilterBar'
 import { TraceView } from '../components/TraceView'
 import { AbteilungBlock } from '../components/AbteilungBlock'
 import { TabellenbezogenView } from '../components/TabellenbezogenView'
+import { ProduktHinzufuegenView } from '../components/ProduktHinzufuegenView'
 import { ProduktinfoPanel } from '../components/ProduktinfoPanel'
 import { EditableName } from '../components/EditableName'
 
-type View = 'zusammen' | 'tabellen'
+type View = 'zusammen' | 'tabellen' | 'produkt'
 
 export function Dashboard() {
   const alleAbteilungen = useStore((s) => s.abteilungen)
@@ -150,27 +151,43 @@ export function Dashboard() {
         >
           Tabellenbezogen
         </button>
-      </div>
-
-      <FilterBar filter={filter} onChange={setFilter} onClear={() => setFilter(EMPTY_FILTER)} />
-
-      {/* Produktinfo – Tab direkt unter dem Suchblock */}
-      <div className="flex border-b border-slate-200">
         <button
-          onClick={() => setProduktinfoOffen((o) => !o)}
+          onClick={() => setView('produkt')}
           className={`px-4 py-2 text-sm font-medium ${
-            produktinfoOffen
+            view === 'produkt'
               ? 'border-b-2 border-zollern-500 text-zollern-700'
               : 'text-slate-500 hover:text-slate-700'
           }`}
         >
-          Produktinfo
+          Produkt hinzufügen
         </button>
       </div>
 
-      {produktinfoOffen && <ProduktinfoPanel chainId={activeChainId} />}
+      {view !== 'produkt' && (
+        <>
+          <FilterBar filter={filter} onChange={setFilter} onClear={() => setFilter(EMPTY_FILTER)} />
 
-      {view === 'zusammen' ? (
+          {/* Produktinfo – Tab direkt unter dem Suchblock */}
+          <div className="flex border-b border-slate-200">
+            <button
+              onClick={() => setProduktinfoOffen((o) => !o)}
+              className={`px-4 py-2 text-sm font-medium ${
+                produktinfoOffen
+                  ? 'border-b-2 border-zollern-500 text-zollern-700'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              Produktinfo
+            </button>
+          </div>
+
+          {produktinfoOffen && <ProduktinfoPanel chainId={activeChainId} />}
+        </>
+      )}
+
+      {view === 'produkt' ? (
+        <ProduktHinzufuegenView />
+      ) : view === 'zusammen' ? (
         <>
           {isTraceMode(filter) && <TraceView auftragsnummer={filter.auftragsnummer.trim()} />}
 

@@ -195,6 +195,12 @@ interface Store extends AppState {
   changeColumnTypeProduktion: (tabelleId: string, spalteId: string, type: ColumnType) => void
   removeColumnProduktion: (tabelleId: string, spalteId: string) => void
   addRowProduktion: (tabelleId: string) => void
+  addProdukt: (
+    auftragsnummer: string,
+    fn: string,
+    datum: string,
+    werte: { tabelleId: string; spalten: Record<string, string> }[],
+  ) => void
   updateCellProduktion: (tabelleId: string, rowIndex: number, spalteId: string, value: string) => void
   removeRowProduktion: (tabelleId: string, rowIndex: number) => void
   setColumnKeyProduktion: (tabelleId: string, spalteId: string, keyType: KeyType | null) => void
@@ -622,6 +628,21 @@ export const useStore = create<Store>()(
       produktionstabellen: s.produktionstabellen.map((t) =>
         t.id === tabelleId ? { ...t, rows: [...t.rows, emptyRow(t.columns)] } : t,
       ),
+    })),
+
+  /** Fügt einen Fertigungsauftrag bei den gewählten Maschinen ein (mit den benutzten Werten). */
+  addProdukt: (auftragsnummer, fn, datum, werte) =>
+    set((s) => ({
+      produktionstabellen: s.produktionstabellen.map((t) => {
+        const eintrag = werte.find((w) => w.tabelleId === t.id)
+        if (!eintrag) return t
+        const zeile: TableRow = { ...emptyRow(t.columns), auftragsnummer, fn, datum }
+        for (const c of t.columns) {
+          if (c.id === 'auftragsnummer' || c.id === 'fn' || c.id === 'datum') continue
+          zeile[c.id] = eintrag.spalten[c.id] ?? ''
+        }
+        return { ...t, rows: [...t.rows, zeile] }
+      }),
     })),
 
   updateCellProduktion: (tabelleId, rowIndex, spalteId, value) =>
