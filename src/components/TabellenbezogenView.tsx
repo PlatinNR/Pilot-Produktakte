@@ -15,6 +15,7 @@ import {
   MASCHINEN_FARBEN,
 } from '../utils/aggregate'
 import { EditableName } from './EditableName'
+import { InfoModal } from './InfoModal'
 import { KeyBadge } from './KeyBadge'
 import { keyTypeOf, nextKey } from '../utils/keys'
 import { abteilungFarbe } from '../utils/colors'
@@ -379,6 +380,7 @@ export function TabellenbezogenView({ filter }: Props) {
   const [boxes, setBoxes] = useState<Record<string, Rect>>({})
   const [origin, setOrigin] = useState({ left: 0, top: 0 })
   const [dragPos, setDragPos] = useState<{ x: number; y: number; sourceKey: string } | null>(null)
+  const [infoAbt, setInfoAbt] = useState<string | null>(null)
 
   const registerRef = (nodeKey: string) => (el: HTMLDivElement | null) => {
     if (el) nodeRefs.current.set(nodeKey, el)
@@ -653,11 +655,11 @@ export function TabellenbezogenView({ filter }: Props) {
               <div className="mb-3 flex items-center gap-2">
                 <span className="h-3 w-1 rounded-full bg-zollern-500" />
                 <button
-                  onClick={() => {}}
+                  onClick={() => setInfoAbt(a.id)}
                   className="rounded border border-slate-300 bg-white/70 px-2 py-0.5 text-[11px] text-slate-600 hover:bg-white"
-                  title="Modell anzeigen"
+                  title="Info anzeigen"
                 >
-                  Modell anzeigen
+                  Info
                 </button>
                 <EditableName
                   value={a.name}
@@ -1216,6 +1218,7 @@ export function TabellenbezogenView({ filter }: Props) {
           )
         })}
       </div>
+      {infoAbt && <InfoModal abteilungId={infoAbt} onClose={() => setInfoAbt(null)} />}
     </div>
   )
 }

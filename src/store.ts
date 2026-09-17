@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type {
   Abteilung,
+  AbteilungInfo,
   AppState,
   Bearbeitungsblock,
   Chain,
@@ -14,7 +15,7 @@ import type {
   TableKey,
   TableRow,
 } from './types'
-import { NEBEN_SPALTEN, PRODUKTION_SPALTEN } from './types'
+import { NEBEN_SPALTEN, PRODUKTION_SPALTEN, emptyInfo } from './types'
 import { createChain as apiCreateChain, renameChain as apiRenameChain, deleteChain as apiDeleteChain } from './lib/api'
 
 let counter = 0
@@ -73,6 +74,19 @@ function maxChainPosition(s: AppState, abteilungId: string): number {
   return max
 }
 
+/** Aktualisiert den Info-Bereich einer Abteilung. */
+function patchInfo(
+  s: AppState,
+  abteilungId: string,
+  fn: (info: AbteilungInfo) => AbteilungInfo,
+): Partial<AppState> {
+  return {
+    abteilungen: s.abteilungen.map((a) =>
+      a.id === abteilungId ? { ...a, info: fn(a.info ?? emptyInfo()) } : a,
+    ),
+  }
+}
+
 /** Vertauscht die Position eines Kettenknotens (Schritt oder Block) mit dem Nachbarn. */
 function swapChainNode(
   s: AppState,
@@ -126,6 +140,23 @@ interface Store extends AppState {
   renameAbteilung: (id: string, name: string) => void
   removeAbteilung: (id: string) => void
   setAbteilungParent: (id: string, parentId: string | null) => void
+  // Info je Abteilung
+  setAbteilungModel: (abteilungId: string, modelUrl: string | null, modelName: string | null) => void
+  addInfoFeld: (abteilungId: string) => void
+  renameInfoFeld: (abteilungId: string, feldId: string, name: string) => void
+  changeInfoFeldType: (abteilungId: string, feldId: string, type: ColumnType) => void
+  setInfoFeldValue: (abteilungId: string, feldId: string, value: string) => void
+  removeInfoFeld: (abteilungId: string, feldId: string) => void
+  addInfoTabelle: (abteilungId: string) => void
+  renameInfoTabelle: (abteilungId: string, tabelleId: string, name: string) => void
+  removeInfoTabelle: (abteilungId: string, tabelleId: string) => void
+  addInfoSpalte: (abteilungId: string, tabelleId: string, name: string, type: ColumnType) => void
+  renameInfoSpalte: (abteilungId: string, tabelleId: string, spalteId: string, name: string) => void
+  changeInfoSpalteType: (abteilungId: string, tabelleId: string, spalteId: string, type: ColumnType) => void
+  removeInfoSpalte: (abteilungId: string, tabelleId: string, spalteId: string) => void
+  addInfoZeile: (abteilungId: string, tabelleId: string) => void
+  setInfoZeile: (abteilungId: string, tabelleId: string, zeileIndex: number, spalteId: string, wert: string) => void
+  removeInfoZeile: (abteilungId: string, tabelleId: string, zeileIndex: number) => void
 
   // Variable Bearbeitungsblöcke
   addBearbeitungsblock: (abteilungId: string, name?: string) => void
@@ -260,6 +291,171 @@ export const useStore = create<Store>()(
 
   setAbteilungParent: (id, parentId) =>
     set((s) => ({ abteilungen: s.abteilungen.map((a) => (a.id === id ? { ...a, parentId } : a)) })),
+
+  // --- Info je Abteilung (CAD-Modell, Felder, Tabellen) ---
+  setAbteilungModel: (abteilungId, modelUrl, modelName) =>
+    set((s) => patchInfo(s, abteilungId, (info) => ({ ...info, modelUrl, modelName }))),
+
+  addInfoFeld: (abteilungId) =>
+    set((s) =>
+      patchInfo(s, abteilungId, (info) => ({
+        ...info,
+        felder: [...info.felder, { id: nextId('f'), name: 'Neue Info', type: 'text', value: '' }],
+      })),
+    ),
+
+  renameInfoFeld: (abteilungId, feldId, name) =>
+    set((s) =>
+      patchInfo(s, abteilungId, (info) => ({
+        ...info,
+        felder: info.felder.map((f) => (f.id === feldId ? { ...f, name } : f)),
+      })),
+    ),
+
+  changeInfoFeldType: (abteilungId, feldId, type) =>
+    set((s) =>
+      patchInfo(s, abteilungId, (info) => ({
+        ...info,
+        felder: info.felder.map((f) => (f.id === feldId ? { ...f, type } : f)),
+      })),
+    ),
+
+  setInfoFeldValue: (abteilungId, feldId, value) =>
+    set((s) =>
+      patchInfo(s, abteilungId, (info) => ({
+        ...info,
+        felder: info.felder.map((f) => (f.id === feldId ? { ...f, value } : f)),
+      })),
+    ),
+
+  removeInfoFeld: (abteilungId, feldId) =>
+    set((s) =>
+      patchInfo(s, abteilungId, (info) => ({
+        ...info,
+        felder: info.felder.filter((f) => f.id !== feldId),
+      })),
+    ),
+
+  addInfoTabelle: (abteilungId) =>
+    set((s) =>
+      patchInfo(s, abteilungId, (info) => ({
+        ...info,
+        tabellen: [
+          ...info.tabellen,
+          {
+            id: nextId('it'),
+            name: 'Neue Tabelle',
+            spalten: [{ id: nextId('ic'), name: 'Bezeichnung', type: 'text' }],
+            zeilen: [],
+          },
+        ],
+      })),
+    ),
+
+  renameInfoTabelle: (abteilungId, tabelleId, name) =>
+    set((s) =>
+      patchInfo(s, abteilungId, (info) => ({
+        ...info,
+        tabellen: info.tabellen.map((t) => (t.id === tabelleId ? { ...t, name } : t)),
+      })),
+    ),
+
+  removeInfoTabelle: (abteilungId, tabelleId) =>
+    set((s) =>
+      patchInfo(s, abteilungId, (info) => ({
+        ...info,
+        tabellen: info.tabellen.filter((t) => t.id !== tabelleId),
+      })),
+    ),
+
+  addInfoSpalte: (abteilungId, tabelleId, name, type) =>
+    set((s) =>
+      patchInfo(s, abteilungId, (info) => ({
+        ...info,
+        tabellen: info.tabellen.map((t) =>
+          t.id === tabelleId ? { ...t, spalten: [...t.spalten, { id: nextId('ic'), name, type }] } : t,
+        ),
+      })),
+    ),
+
+  renameInfoSpalte: (abteilungId, tabelleId, spalteId, name) =>
+    set((s) =>
+      patchInfo(s, abteilungId, (info) => ({
+        ...info,
+        tabellen: info.tabellen.map((t) =>
+          t.id === tabelleId
+            ? { ...t, spalten: t.spalten.map((c) => (c.id === spalteId ? { ...c, name } : c)) }
+            : t,
+        ),
+      })),
+    ),
+
+  changeInfoSpalteType: (abteilungId, tabelleId, spalteId, type) =>
+    set((s) =>
+      patchInfo(s, abteilungId, (info) => ({
+        ...info,
+        tabellen: info.tabellen.map((t) =>
+          t.id === tabelleId
+            ? { ...t, spalten: t.spalten.map((c) => (c.id === spalteId ? { ...c, type } : c)) }
+            : t,
+        ),
+      })),
+    ),
+
+  removeInfoSpalte: (abteilungId, tabelleId, spalteId) =>
+    set((s) =>
+      patchInfo(s, abteilungId, (info) => ({
+        ...info,
+        tabellen: info.tabellen.map((t) =>
+          t.id === tabelleId
+            ? {
+                ...t,
+                spalten: t.spalten.filter((c) => c.id !== spalteId),
+                zeilen: t.zeilen.map((z) => {
+                  const next = { ...z }
+                  delete next[spalteId]
+                  return next
+                }),
+              }
+            : t,
+        ),
+      })),
+    ),
+
+  addInfoZeile: (abteilungId, tabelleId) =>
+    set((s) =>
+      patchInfo(s, abteilungId, (info) => ({
+        ...info,
+        tabellen: info.tabellen.map((t) => {
+          if (t.id !== tabelleId) return t
+          const zeile: TableRow = {}
+          for (const c of t.spalten) zeile[c.id] = ''
+          return { ...t, zeilen: [...t.zeilen, zeile] }
+        }),
+      })),
+    ),
+
+  setInfoZeile: (abteilungId, tabelleId, zeileIndex, spalteId, wert) =>
+    set((s) =>
+      patchInfo(s, abteilungId, (info) => ({
+        ...info,
+        tabellen: info.tabellen.map((t) =>
+          t.id === tabelleId
+            ? { ...t, zeilen: t.zeilen.map((z, i) => (i === zeileIndex ? { ...z, [spalteId]: wert } : z)) }
+            : t,
+        ),
+      })),
+    ),
+
+  removeInfoZeile: (abteilungId, tabelleId, zeileIndex) =>
+    set((s) =>
+      patchInfo(s, abteilungId, (info) => ({
+        ...info,
+        tabellen: info.tabellen.map((t) =>
+          t.id === tabelleId ? { ...t, zeilen: t.zeilen.filter((_, i) => i !== zeileIndex) } : t,
+        ),
+      })),
+    ),
 
   removeAbteilung: (id) =>
     set((s) => ({
@@ -709,7 +905,7 @@ setKeyLabelNeben: (tabelleId, spalteId, label) =>
   }),
     {
       name: 'digitale-produktakte',
-      version: 7,
+      version: 8,
       migrate: (persisted, version) => {
         let p = persisted as Partial<AppState> & {
           abteilungen?: (Abteilung & { chainId?: string; parentId?: string | null; sequence?: 'fixed' | 'variable' })[]
@@ -792,6 +988,15 @@ setKeyLabelNeben: (tabelleId, spalteId, label) =>
             abteilungen: (p.abteilungen ?? []).map((a) => ({
               ...a,
               chainId: renames.get(a.chainId) ?? a.chainId,
+            })),
+          } as typeof p
+        }
+        if (version < 8) {
+          p = {
+            ...p,
+            abteilungen: (p.abteilungen ?? []).map((a) => ({
+              ...a,
+              info: a.info ?? emptyInfo(),
             })),
           } as typeof p
         }

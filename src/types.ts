@@ -13,6 +13,8 @@ export interface Abteilung {
   name: string
   /** Übergeordnete Abteilung (für hierarchische Abteilungen) */
   parentId: string | null
+  /** Info-Bereich (CAD-Modell, Felder, Tabellen) – optional, ältere Daten haben keinen */
+  info?: AbteilungInfo
 }
 
 /** Variabler Bearbeitungsblock – Container mit Schritten in variabler Reihenfolge */
@@ -100,6 +102,41 @@ export interface Nebentabelle {
   columns: TableColumn[]
   rows: TableRow[]
   keys: TableKey[]
+}
+
+/** Info-Feld einer Abteilung (z. B. Gewicht, Anzahl Trauben) */
+export interface InfoFeld {
+  id: string
+  name: string
+  type: ColumnType
+  value: string
+}
+
+/** Spalte einer Info-Tabelle (z. B. Traube, Bezeichnung, Gewicht) */
+export interface InfoSpalte {
+  id: string
+  name: string
+  type: ColumnType
+}
+
+/** Info-Tabelle einer Abteilung für wiederholte Einträge (z. B. Trauben) */
+export interface InfoTabelle {
+  id: string
+  name: string
+  spalten: InfoSpalte[]
+  zeilen: TableRow[]
+}
+
+/** Info-Bereich einer Abteilung: CAD-Modell (GLB/glTF) + Felder + Tabellen */
+export interface AbteilungInfo {
+  modelUrl: string | null
+  modelName: string | null
+  felder: InfoFeld[]
+  tabellen: InfoTabelle[]
+}
+
+export function emptyInfo(): AbteilungInfo {
+  return { modelUrl: null, modelName: null, felder: [], tabellen: [] }
 }
 
 /** Zentraler Anwendungszustand */
