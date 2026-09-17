@@ -4,6 +4,8 @@
 export interface Chain {
   id: string
   name: string
+  /** Allgemeine Produktinfos (Produktinfo-Tab) */
+  info?: InfoBereich
 }
 
 /** Abteilung (z. B. „Wachs") – gruppiert Schritte und besitzt Nebentabellen */
@@ -13,8 +15,8 @@ export interface Abteilung {
   name: string
   /** Übergeordnete Abteilung (für hierarchische Abteilungen) */
   parentId: string | null
-  /** Info-Bereich (CAD-Modell, Felder, Tabellen) – optional, ältere Daten haben keinen */
-  info?: AbteilungInfo
+  /** Info-Bereich (CAD-Modell, Felder) – optional, ältere Daten haben keinen */
+  info?: InfoBereich
 }
 
 /** Variabler Bearbeitungsblock – Container mit Schritten in variabler Reihenfolge */
@@ -104,40 +106,34 @@ export interface Nebentabelle {
   keys: TableKey[]
 }
 
-/** Info-Feld einer Abteilung (z. B. Gewicht, Anzahl Trauben) */
+/** Info-Feld (Definition) – z. B. Gewicht, Anzahl Trauben */
 export interface InfoFeld {
   id: string
   name: string
   type: ColumnType
+  /** Wert – wird später je Fertigungsauftrag erfasst */
   value: string
+  /** Fest eingebaute Felder (Fertigungsauftrag, FN, Materialnummer) können nicht geändert werden */
+  fixed: boolean
 }
 
-/** Spalte einer Info-Tabelle (z. B. Traube, Bezeichnung, Gewicht) */
-export interface InfoSpalte {
-  id: string
-  name: string
-  type: ColumnType
-}
-
-/** Info-Tabelle einer Abteilung für wiederholte Einträge (z. B. Trauben) */
-export interface InfoTabelle {
-  id: string
-  name: string
-  spalten: InfoSpalte[]
-  zeilen: TableRow[]
-}
-
-/** Info-Bereich einer Abteilung: CAD-Modell (GLB/glTF) + Felder + Tabellen */
-export interface AbteilungInfo {
+/** Info-Bereich: CAD-Modell (GLB/glTF) + Feld-Definitionen */
+export interface InfoBereich {
   modelUrl: string | null
   modelName: string | null
   felder: InfoFeld[]
-  tabellen: InfoTabelle[]
 }
 
-export function emptyInfo(): AbteilungInfo {
-  return { modelUrl: null, modelName: null, felder: [], tabellen: [] }
+export function emptyInfo(): InfoBereich {
+  return { modelUrl: null, modelName: null, felder: [] }
 }
+
+/** Diese Felder sind in jeder Info immer enthalten. */
+export const INFO_STANDARD_FELDER: InfoFeld[] = [
+  { id: 'fertigungsauftrag', name: 'Fertigungsauftrag', type: 'text', value: '', fixed: true },
+  { id: 'fn', name: 'FN', type: 'text', value: '', fixed: true },
+  { id: 'materialnummer', name: 'Materialnummer', type: 'text', value: '', fixed: true },
+]
 
 /** Zentraler Anwendungszustand */
 export interface AppState {
@@ -157,6 +153,8 @@ export interface ChainData {
   schritte: Schritt[]
   produktionstabellen: Produktionstabelle[]
   nebentabellen: Nebentabelle[]
+  /** Allgemeine Produktinfos der Kette */
+  info?: InfoBereich
 }
 
 /** Standardspalten jeder Produktionstabelle (Auftragsnummer = Leitende Nummer) */

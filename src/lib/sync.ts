@@ -61,7 +61,8 @@ function extractChainData(chainId: string): ChainData {
   const schrittIds = new Set(schritte.map((st) => st.id))
   const produktionstabellen = s.produktionstabellen.filter((t) => schrittIds.has(t.schrittId))
   const nebentabellen = s.nebentabellen.filter((n) => abteilungIds.has(n.abteilungId))
-  return { abteilungen, bearbeitungsbloecke, schritte, produktionstabellen, nebentabellen }
+  const info = s.chains.find((c) => c.id === chainId)?.info
+  return { abteilungen, bearbeitungsbloecke, schritte, produktionstabellen, nebentabellen, info }
 }
 
 export function hasLocalData(): boolean {
@@ -106,7 +107,7 @@ export async function loadFromCloud(): Promise<boolean> {
       setStatus({ phase: 'idle' })
       return false
     }
-    const chains = records.map((r) => ({ id: r.id, name: r.name }))
+    const chains = records.map((r) => ({ id: r.id, name: r.name, info: r.data?.info }))
     const abteilungen: Abteilung[] = []
     const bearbeitungsbloecke: Bearbeitungsblock[] = []
     const schritte: Schritt[] = []

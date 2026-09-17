@@ -2,11 +2,12 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type {
   Abteilung,
-  AbteilungInfo,
   AppState,
   Bearbeitungsblock,
   Chain,
   ColumnType,
+  InfoBereich,
+  InfoFeld,
   KeyType,
   Nebentabelle,
   Produktionstabelle,
@@ -78,12 +79,23 @@ function maxChainPosition(s: AppState, abteilungId: string): number {
 function patchInfo(
   s: AppState,
   abteilungId: string,
-  fn: (info: AbteilungInfo) => AbteilungInfo,
+  fn: (info: InfoBereich) => InfoBereich,
 ): Partial<AppState> {
   return {
     abteilungen: s.abteilungen.map((a) =>
       a.id === abteilungId ? { ...a, info: fn(a.info ?? emptyInfo()) } : a,
     ),
+  }
+}
+
+/** Aktualisiert die allgemeinen Produktinfos einer Kette. */
+function patchChainInfo(
+  s: AppState,
+  chainId: string,
+  fn: (info: InfoBereich) => InfoBereich,
+): Partial<AppState> {
+  return {
+    chains: s.chains.map((c) => (c.id === chainId ? { ...c, info: fn(c.info ?? emptyInfo()) } : c)),
   }
 }
 
@@ -140,23 +152,17 @@ interface Store extends AppState {
   renameAbteilung: (id: string, name: string) => void
   removeAbteilung: (id: string) => void
   setAbteilungParent: (id: string, parentId: string | null) => void
-  // Info je Abteilung
+  // Info je Abteilung (Feld-Definitionen + CAD-Modell)
   setAbteilungModel: (abteilungId: string, modelUrl: string | null, modelName: string | null) => void
   addInfoFeld: (abteilungId: string) => void
   renameInfoFeld: (abteilungId: string, feldId: string, name: string) => void
   changeInfoFeldType: (abteilungId: string, feldId: string, type: ColumnType) => void
-  setInfoFeldValue: (abteilungId: string, feldId: string, value: string) => void
   removeInfoFeld: (abteilungId: string, feldId: string) => void
-  addInfoTabelle: (abteilungId: string) => void
-  renameInfoTabelle: (abteilungId: string, tabelleId: string, name: string) => void
-  removeInfoTabelle: (abteilungId: string, tabelleId: string) => void
-  addInfoSpalte: (abteilungId: string, tabelleId: string, name: string, type: ColumnType) => void
-  renameInfoSpalte: (abteilungId: string, tabelleId: string, spalteId: string, name: string) => void
-  changeInfoSpalteType: (abteilungId: string, tabelleId: string, spalteId: string, type: ColumnType) => void
-  removeInfoSpalte: (abteilungId: string, tabelleId: string, spalteId: string) => void
-  addInfoZeile: (abteilungId: string, tabelleId: string) => void
-  setInfoZeile: (abteilungId: string, tabelleId: string, zeileIndex: number, spalteId: string, wert: string) => void
-  removeInfoZeile: (abteilungId: string, tabelleId: string, zeileIndex: number) => void
+  // Allgemeine Produktinfos je Kette
+  addProduktFeld: (chainId: string) => void
+  renameProduktFeld: (chainId: string, feldId: string, name: string) => void
+  changeProduktFeldType: (chainId: string, feldId: string, type: ColumnType) => void
+  removeProduktFeld: (chainId: string, feldId: string) => void
 
   // Variable Bearbeitungsblöcke
   addBearbeitungsblock: (abteilungId: string, name?: string) => void
@@ -292,7 +298,7 @@ export const useStore = create<Store>()(
   setAbteilungParent: (id, parentId) =>
     set((s) => ({ abteilungen: s.abteilungen.map((a) => (a.id === id ? { ...a, parentId } : a)) })),
 
-  // --- Info je Abteilung (CAD-Modell, Felder, Tabellen) ---
+  // --- Info je Abteilung (Feld-Definitionen + CAD-Modell) ---
   setAbteilungModel: (abteilungId, modelUrl, modelName) =>
     set((s) => patchInfo(s, abteilungId, (info) => ({ ...info, modelUrl, modelName }))),
 
@@ -300,7 +306,7 @@ export const useStore = create<Store>()(
     set((s) =>
       patchInfo(s, abteilungId, (info) => ({
         ...info,
-        felder: [...info.felder, { id: nextId('f'), name: 'Neue Info', type: 'text', value: '' }],
+        felder: [...info.felder, { id: nextId('f'), name: 'Neues Feld', type: 'text', value: '', fixed: false }],
       })),
     ),
 
@@ -320,14 +326,6 @@ export const useStore = create<Store>()(
       })),
     ),
 
-  setInfoFeldValue: (abteilungId, feldId, value) =>
-    set((s) =>
-      patchInfo(s, abteilungId, (info) => ({
-        ...info,
-        felder: info.felder.map((f) => (f.id === feldId ? { ...f, value } : f)),
-      })),
-    ),
-
   removeInfoFeld: (abteilungId, feldId) =>
     set((s) =>
       patchInfo(s, abteilungId, (info) => ({
@@ -336,124 +334,36 @@ export const useStore = create<Store>()(
       })),
     ),
 
-  addInfoTabelle: (abteilungId) =>
+  // --- Allgemeine Produktinfos je Kette (Produktinfo) ---
+  addProduktFeld: (chainId) =>
     set((s) =>
-      patchInfo(s, abteilungId, (info) => ({
+      patchChainInfo(s, chainId, (info) => ({
         ...info,
-        tabellen: [
-          ...info.tabellen,
-          {
-            id: nextId('it'),
-            name: 'Neue Tabelle',
-            spalten: [{ id: nextId('ic'), name: 'Bezeichnung', type: 'text' }],
-            zeilen: [],
-          },
-        ],
+        felder: [...info.felder, { id: nextId('f'), name: 'Neues Feld', type: 'text', value: '', fixed: false }],
       })),
     ),
 
-  renameInfoTabelle: (abteilungId, tabelleId, name) =>
+  renameProduktFeld: (chainId, feldId, name) =>
     set((s) =>
-      patchInfo(s, abteilungId, (info) => ({
+      patchChainInfo(s, chainId, (info) => ({
         ...info,
-        tabellen: info.tabellen.map((t) => (t.id === tabelleId ? { ...t, name } : t)),
+        felder: info.felder.map((f) => (f.id === feldId ? { ...f, name } : f)),
       })),
     ),
 
-  removeInfoTabelle: (abteilungId, tabelleId) =>
+  changeProduktFeldType: (chainId, feldId, type) =>
     set((s) =>
-      patchInfo(s, abteilungId, (info) => ({
+      patchChainInfo(s, chainId, (info) => ({
         ...info,
-        tabellen: info.tabellen.filter((t) => t.id !== tabelleId),
+        felder: info.felder.map((f) => (f.id === feldId ? { ...f, type } : f)),
       })),
     ),
 
-  addInfoSpalte: (abteilungId, tabelleId, name, type) =>
+  removeProduktFeld: (chainId, feldId) =>
     set((s) =>
-      patchInfo(s, abteilungId, (info) => ({
+      patchChainInfo(s, chainId, (info) => ({
         ...info,
-        tabellen: info.tabellen.map((t) =>
-          t.id === tabelleId ? { ...t, spalten: [...t.spalten, { id: nextId('ic'), name, type }] } : t,
-        ),
-      })),
-    ),
-
-  renameInfoSpalte: (abteilungId, tabelleId, spalteId, name) =>
-    set((s) =>
-      patchInfo(s, abteilungId, (info) => ({
-        ...info,
-        tabellen: info.tabellen.map((t) =>
-          t.id === tabelleId
-            ? { ...t, spalten: t.spalten.map((c) => (c.id === spalteId ? { ...c, name } : c)) }
-            : t,
-        ),
-      })),
-    ),
-
-  changeInfoSpalteType: (abteilungId, tabelleId, spalteId, type) =>
-    set((s) =>
-      patchInfo(s, abteilungId, (info) => ({
-        ...info,
-        tabellen: info.tabellen.map((t) =>
-          t.id === tabelleId
-            ? { ...t, spalten: t.spalten.map((c) => (c.id === spalteId ? { ...c, type } : c)) }
-            : t,
-        ),
-      })),
-    ),
-
-  removeInfoSpalte: (abteilungId, tabelleId, spalteId) =>
-    set((s) =>
-      patchInfo(s, abteilungId, (info) => ({
-        ...info,
-        tabellen: info.tabellen.map((t) =>
-          t.id === tabelleId
-            ? {
-                ...t,
-                spalten: t.spalten.filter((c) => c.id !== spalteId),
-                zeilen: t.zeilen.map((z) => {
-                  const next = { ...z }
-                  delete next[spalteId]
-                  return next
-                }),
-              }
-            : t,
-        ),
-      })),
-    ),
-
-  addInfoZeile: (abteilungId, tabelleId) =>
-    set((s) =>
-      patchInfo(s, abteilungId, (info) => ({
-        ...info,
-        tabellen: info.tabellen.map((t) => {
-          if (t.id !== tabelleId) return t
-          const zeile: TableRow = {}
-          for (const c of t.spalten) zeile[c.id] = ''
-          return { ...t, zeilen: [...t.zeilen, zeile] }
-        }),
-      })),
-    ),
-
-  setInfoZeile: (abteilungId, tabelleId, zeileIndex, spalteId, wert) =>
-    set((s) =>
-      patchInfo(s, abteilungId, (info) => ({
-        ...info,
-        tabellen: info.tabellen.map((t) =>
-          t.id === tabelleId
-            ? { ...t, zeilen: t.zeilen.map((z, i) => (i === zeileIndex ? { ...z, [spalteId]: wert } : z)) }
-            : t,
-        ),
-      })),
-    ),
-
-  removeInfoZeile: (abteilungId, tabelleId, zeileIndex) =>
-    set((s) =>
-      patchInfo(s, abteilungId, (info) => ({
-        ...info,
-        tabellen: info.tabellen.map((t) =>
-          t.id === tabelleId ? { ...t, zeilen: t.zeilen.filter((_, i) => i !== zeileIndex) } : t,
-        ),
+        felder: info.felder.filter((f) => f.id !== feldId),
       })),
     ),
 
@@ -905,7 +815,7 @@ setKeyLabelNeben: (tabelleId, spalteId, label) =>
   }),
     {
       name: 'digitale-produktakte',
-      version: 8,
+      version: 9,
       migrate: (persisted, version) => {
         let p = persisted as Partial<AppState> & {
           abteilungen?: (Abteilung & { chainId?: string; parentId?: string | null; sequence?: 'fixed' | 'variable' })[]
@@ -998,6 +908,29 @@ setKeyLabelNeben: (tabelleId, spalteId, label) =>
               ...a,
               info: a.info ?? emptyInfo(),
             })),
+          } as typeof p
+        }
+        if (version < 9) {
+          // Mini-Tabellen entfernen; Felder bekommen "fixed"; Ketten bekommen allgemeine Produktinfos
+          type AlteInfo = { modelUrl?: string | null; modelName?: string | null; felder?: InfoFeld[] }
+          p = {
+            ...p,
+            abteilungen: (p.abteilungen ?? []).map((a) => {
+              const info = (a.info ?? {}) as AlteInfo
+              return {
+                ...a,
+                info: {
+                  modelUrl: info.modelUrl ?? null,
+                  modelName: info.modelName ?? null,
+                  felder: (info.felder ?? []).map((f) => ({
+                    ...f,
+                    value: f.value ?? '',
+                    fixed: f.fixed ?? false,
+                  })),
+                },
+              }
+            }),
+            chains: (p.chains ?? []).map((c) => ({ ...c, info: c.info ?? emptyInfo() })),
           } as typeof p
         }
         return p as AppState

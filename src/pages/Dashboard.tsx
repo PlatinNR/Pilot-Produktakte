@@ -8,6 +8,7 @@ import { FilterBar } from '../components/FilterBar'
 import { TraceView } from '../components/TraceView'
 import { AbteilungBlock } from '../components/AbteilungBlock'
 import { TabellenbezogenView } from '../components/TabellenbezogenView'
+import { ProduktinfoPanel } from '../components/ProduktinfoPanel'
 import { EditableName } from '../components/EditableName'
 
 type View = 'zusammen' | 'tabellen'
@@ -23,6 +24,7 @@ export function Dashboard() {
   const sync = useSyncStatus()
   const [filter, setFilter] = useState<Filter>(EMPTY_FILTER)
   const [view, setView] = useState<View>('zusammen')
+  const [produktinfoOffen, setProduktinfoOffen] = useState(false)
 
   const abteilungen = alleAbteilungen.filter((a) => a.chainId === activeChainId)
   const activeChain = chains.find((c) => c.id === activeChainId)
@@ -151,6 +153,22 @@ export function Dashboard() {
       </div>
 
       <FilterBar filter={filter} onChange={setFilter} onClear={() => setFilter(EMPTY_FILTER)} />
+
+      {/* Produktinfo – Tab direkt unter dem Suchblock */}
+      <div className="flex border-b border-slate-200">
+        <button
+          onClick={() => setProduktinfoOffen((o) => !o)}
+          className={`px-4 py-2 text-sm font-medium ${
+            produktinfoOffen
+              ? 'border-b-2 border-zollern-500 text-zollern-700'
+              : 'text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          Produktinfo
+        </button>
+      </div>
+
+      {produktinfoOffen && <ProduktinfoPanel chainId={activeChainId} />}
 
       {view === 'zusammen' ? (
         <>
