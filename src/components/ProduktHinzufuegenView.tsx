@@ -30,7 +30,15 @@ export function ProduktHinzufuegenView() {
 
   const abteilungen = alleAbteilungen.filter((a) => a.chainId === activeChainId)
   const gewaehlt = alleMaschinen.filter((m) => auswahl[m.id])
-  const kannSpeichern = auftragsnummer.trim().length > 0 && gewaehlt.length > 0
+  const fehlendeZeiten = gewaehlt.filter((m) => {
+    const n = durchlaeufe[m.id] ?? 1
+    for (let i = 0; i < n; i++) {
+      if (!zeiten[m.id]?.[i]?.zeit) return true
+    }
+    return false
+  })
+  const kannSpeichern =
+    auftragsnummer.trim().length > 0 && gewaehlt.length > 0 && fehlendeZeiten.length === 0
   const gesamtDurchlaeufe = gewaehlt.reduce((sum, m) => sum + (durchlaeufe[m.id] ?? 1), 0)
 
   const anzahl = (tabelleId: string) => Math.max(1, durchlaeufe[tabelleId] ?? 1)
@@ -155,6 +163,11 @@ export function ProduktHinzufuegenView() {
             <span className="text-xs text-slate-400">
               {gewaehlt.length} Maschine(n) · {gesamtDurchlaeufe} Durchlauf/Durchläufe
             </span>
+            {fehlendeZeiten.length > 0 && (
+              <span className="text-xs text-red-600">
+                Uhrzeit fehlt bei: {fehlendeZeiten.map((m) => m.name).join(', ')}
+              </span>
+            )}
           </section>
 
           {meldung && (
@@ -280,13 +293,17 @@ export function ProduktHinzufuegenView() {
                                           />
                                         </label>
                                         <label className="flex flex-col gap-0.5">
-                                          <span className="text-[10px] text-slate-500">Uhrzeit{durchlaufLabel}</span>
+                                          <span className="text-[10px] text-slate-500">
+                                            Uhrzeit{durchlaufLabel} *
+                                          </span>
                                           <input
                                             type="time"
                                             value={z.zeit}
                                             onChange={(e) => setZeit(m.id, d, { zeit: e.target.value })}
-                                            className={werteEingabe}
-                                            title="Uhrzeit des Ablaufs an dieser Maschine (für die Reihenfolge)"
+                                            className={`w-full rounded border bg-white px-1.5 py-1 text-xs text-slate-700 outline-none focus:border-zollern-400 ${
+                                              z.zeit ? 'border-slate-200' : 'border-red-300'
+                                            }`}
+                                            title="Pflicht: Uhrzeit des Ablaufs an dieser Maschine (für die Reihenfolge)"
                                           />
                                         </label>
                                       </div>

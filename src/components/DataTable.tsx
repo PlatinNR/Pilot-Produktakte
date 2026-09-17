@@ -180,7 +180,16 @@ export function DataTable({
                       type={inputType(c.type)}
                       value={row[c.id] ?? ''}
                       onChange={(e) => onUpdateCell(ri, c.id, e.target.value)}
-                      className="w-full min-w-[5rem] rounded border border-transparent bg-transparent px-1 py-0.5 text-xs text-slate-700 outline-none hover:border-slate-200 focus:border-zollern-400 focus:bg-white"
+                      className={`w-full min-w-[5rem] rounded border px-1 py-0.5 text-xs text-slate-700 outline-none focus:border-zollern-400 focus:bg-white ${
+                        c.id === 'zeit' && !row[c.id]
+                          ? 'border-red-300 bg-red-50/60'
+                          : 'border-transparent bg-transparent hover:border-slate-200'
+                      }`}
+                      title={
+                        c.id === 'zeit' && !row[c.id]
+                          ? 'Uhrzeit fehlt – jede angesetzte Maschine braucht eine Uhrzeit'
+                          : undefined
+                      }
                     />
                   </td>
                 ))}
