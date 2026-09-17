@@ -26,6 +26,8 @@ interface Props {
   /** Feste Arbeitsplatz-Nummer der Maschine (gleiche Nummer für alle Einträge) */
   arbeitsplatz?: string
   onArbeitsplatzChange?: (wert: string) => void
+  /** Prüft eine Arbeitsplatz-Nummer und liefert eine Fehlermeldung (null = ok) */
+  arbeitsplatzPruefen?: (wert: string) => string | null
   /** Zusätzlicher Block unter dem Kopf (z. B. Auswahl der Arbeitswiederholung) */
   kopfExtra?: ReactNode
 }
@@ -56,11 +58,28 @@ export function DataTable({
   onCycleKey,
   arbeitsplatz,
   onArbeitsplatzChange,
+  arbeitsplatzPruefen,
   kopfExtra,
 }: Props) {
   const [addingCol, setAddingCol] = useState(false)
   const [colName, setColName] = useState('')
   const [colType, setColType] = useState<ColumnType>('text')
+  const [arbeitsplatzDraft, setArbeitsplatzDraft] = useState(arbeitsplatz ?? '')
+  const [arbeitsplatzFehler, setArbeitsplatzFehler] = useState<string | null>(null)
+  const [letzterArbeitsplatz, setLetzterArbeitsplatz] = useState(arbeitsplatz)
+
+  // Prop-Änderung von außen übernehmen (ohne Effekt)
+  if (arbeitsplatz !== letzterArbeitsplatz) {
+    setLetzterArbeitsplatz(arbeitsplatz)
+    setArbeitsplatzDraft(arbeitsplatz ?? '')
+  }
+
+  const aendereArbeitsplatz = (wert: string) => {
+    setArbeitsplatzDraft(wert)
+    const fehler = arbeitsplatzPruefen?.(wert) ?? null
+    setArbeitsplatzFehler(fehler)
+    if (!fehler) onArbeitsplatzChange?.(wert)
+  }
 
   const submitColumn = () => {
     const trimmed = colName.trim()
@@ -103,17 +122,31 @@ export function DataTable({
       )}
 
       {onArbeitsplatzChange && (
-        <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50/60 px-3 py-1">
-          <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Arbeitsplatz</span>
-          <input
-            value={arbeitsplatz ?? ''}
-            onChange={(e) => onArbeitsplatzChange(e.target.value)}
-            placeholder="Nr. zuweisen"
-            className={`w-28 rounded border bg-white px-1.5 py-0.5 text-xs outline-none focus:border-zollern-400 ${
-              arbeitsplatz ? 'border-slate-200 text-slate-700' : 'border-red-300 text-slate-500'
-            }`}
-            title={arbeitsplatz ? 'Arbeitsplatz-Nummer (gilt für alle Einträge)' : 'Arbeitsplatz-Nummer fehlt'}
-          />
+        <div className="border-b border-slate-100 bg-slate-50/60">
+          <div className="flex items-center gap-2 px-3 py-1">
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Arbeitsplatz</span>
+            <input
+              value={arbeitsplatzDraft}
+              onChange={(e) => aendereArbeitsplatz(e.target.value)}
+              placeholder="Nr. zuweisen"
+              className={`w-28 rounded border bg-white px-1.5 py-0.5 text-xs outline-none focus:border-zollern-400 ${
+                arbeitsplatzFehler
+                  ? 'border-red-400 text-red-600'
+                  : arbeitsplatzDraft
+                    ? 'border-slate-200 text-slate-700'
+                    : 'border-red-300 text-slate-500'
+              }`}
+              title={
+                arbeitsplatzFehler ??
+                (arbeitsplatzDraft
+                  ? 'Arbeitsplatz-Nummer (gilt für alle Einträge)'
+                  : 'Arbeitsplatz-Nummer fehlt')
+              }
+            />
+          </div>
+          {arbeitsplatzFehler && (
+            <p className="px-3 pb-1 text-[10px] text-red-600">{arbeitsplatzFehler}</p>
+          )}
         </div>
       )}
 

@@ -230,6 +230,32 @@ interface Store extends AppState {
   setKeyLabelNeben: (tabelleId: string, spalteId: string, label: string) => void
 }
 
+/** Name der Tabelle (Maschine/Nebentabelle), die diese Arbeitsplatz-Nummer in der aktiven Kette schon nutzt. */
+export function arbeitsplatzBelegt(tabelleId: string, wert: string): string | null {
+  const s = useStore.getState()
+  const w = wert.trim()
+  if (!w) return null
+  const abteilungIds = new Set(s.abteilungen.filter((a) => a.chainId === s.activeChainId).map((a) => a.id))
+  const schrittIds = new Set(
+    s.schritte.filter((st) => abteilungIds.has(st.abteilungId)).map((st) => st.id),
+  )
+  const maschine = s.produktionstabellen.find(
+    (t) => t.id !== tabelleId && schrittIds.has(t.schrittId) && t.arbeitsplatz.trim() === w,
+  )
+  if (maschine) return maschine.name
+  const neben = s.nebentabellen.find(
+    (t) => t.id !== tabelleId && abteilungIds.has(t.abteilungId) && t.arbeitsplatz.trim() === w,
+  )
+  if (neben) return neben.name
+  return null
+}
+
+/** Fehlermeldung, wenn die Arbeitsplatz-Nummer bereits vergeben ist – sonst null. */
+export function arbeitsplatzFehlerText(tabelleId: string, wert: string): string | null {
+  const belegt = arbeitsplatzBelegt(tabelleId, wert)
+  return belegt ? `Arbeitsplatz „${wert.trim()}" ist bereits bei „${belegt}" vergeben.` : null
+}
+
 function addColumn(columns: TableColumn[], name: string, type: ColumnType): TableColumn[] {
   return [...columns, { id: nextId('c'), name, type, fixed: false }]
 }

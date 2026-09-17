@@ -1,5 +1,5 @@
 import type { Filter, Schritt } from '../types'
-import { useStore } from '../store'
+import { useStore, arbeitsplatzFehlerText } from '../store'
 import { aggregateSchritt, formatPercent, isAggregateMode, isTraceMode, MASCHINEN_FARBEN } from '../utils/aggregate'
 import { EditableName } from './EditableName'
 import { DataTable } from './DataTable'
@@ -141,6 +141,7 @@ export function SchrittRow({ schritt, filter }: Props) {
                 colorClass={MASCHINEN_FARBEN[i % MASCHINEN_FARBEN.length]}
                 arbeitsplatz={t.arbeitsplatz}
                 onArbeitsplatzChange={(wert) => setProduktionArbeitsplatz(t.id, wert)}
+                arbeitsplatzPruefen={(wert) => arbeitsplatzFehlerText(t.id, wert)}
                 kopfExtra={
                   hatEintrag ? <DurchlaufWahl tabelle={t} auftragsnummer={auftrag} kompakt /> : undefined
                 }

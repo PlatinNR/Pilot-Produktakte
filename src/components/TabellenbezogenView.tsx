@@ -6,7 +6,7 @@ import type {
   TableColumn,
 } from '../types'
 import { COLUMN_TYPE_LABELS, SCHRITT_TABELLE_SPALTEN } from '../types'
-import { useStore } from '../store'
+import { useStore, arbeitsplatzFehlerText } from '../store'
 import {
   aggregateSchritt,
   formatPercent,
@@ -331,18 +331,44 @@ function ArbeitsplatzZeile({
   wert?: string
   onChange: (id: string, wert: string) => void
 }) {
+  const [draft, setDraft] = useState(wert ?? '')
+  const [fehler, setFehler] = useState<string | null>(null)
+  const [letzterWert, setLetzterWert] = useState(wert)
+
+  // Prop-Änderung von außen übernehmen (ohne Effekt)
+  if (wert !== letzterWert) {
+    setLetzterWert(wert)
+    setDraft(wert ?? '')
+  }
+
+  const aendern = (v: string) => {
+    setDraft(v)
+    const f = arbeitsplatzFehlerText(tabelleId, v)
+    setFehler(f)
+    if (!f) onChange(tabelleId, v)
+  }
+
   return (
-    <div className="flex items-center gap-1 border-t border-slate-50 px-2 py-1">
-      <span className="min-w-0 flex-1 text-[10px] font-medium text-slate-700">Arbeitsplatz</span>
-      <input
-        value={wert ?? ''}
-        onChange={(e) => onChange(tabelleId, e.target.value)}
-        placeholder="Nr."
-        className={`w-20 shrink-0 rounded border px-1 py-0.5 text-[10px] outline-none focus:border-zollern-400 ${
-          wert ? 'border-slate-200 text-slate-700' : 'border-red-300 text-slate-500'
-        }`}
-        title={wert ? 'Arbeitsplatz-Nummer (gilt für alle Einträge)' : 'Arbeitsplatz-Nummer fehlt'}
-      />
+    <div className="border-t border-slate-50">
+      <div className="flex items-center gap-1 px-2 py-1">
+        <span className="min-w-0 flex-1 text-[10px] font-medium text-slate-700">Arbeitsplatz</span>
+        <input
+          value={draft}
+          onChange={(e) => aendern(e.target.value)}
+          placeholder="Nr."
+          className={`w-20 shrink-0 rounded border px-1 py-0.5 text-[10px] outline-none focus:border-zollern-400 ${
+            fehler
+              ? 'border-red-400 text-red-600'
+              : draft
+                ? 'border-slate-200 text-slate-700'
+                : 'border-red-300 text-slate-500'
+          }`}
+          title={
+            fehler ?? (draft ? 'Arbeitsplatz-Nummer (gilt für alle Einträge)' : 'Arbeitsplatz-Nummer fehlt')
+          }
+        />
+      </div>
+      {fehler && <p className="px-2 pb-1 text-[10px] text-red-600">{fehler}</p>}
     </div>
   )
 }

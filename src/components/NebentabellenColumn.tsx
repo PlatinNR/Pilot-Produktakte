@@ -1,4 +1,4 @@
-import { useStore } from '../store'
+import { useStore, arbeitsplatzFehlerText } from '../store'
 import { DataTable } from './DataTable'
 
 interface Props {
@@ -62,6 +62,7 @@ export function NebentabellenColumn({ abteilungId }: Props) {
             onRemoveRow={(ri) => removeRowNeben(t.id, ri)}
             arbeitsplatz={t.arbeitsplatz}
             onArbeitsplatzChange={(wert) => setNebenArbeitsplatz(t.id, wert)}
+            arbeitsplatzPruefen={(wert) => arbeitsplatzFehlerText(t.id, wert)}
           />
         ))}
       </div>
