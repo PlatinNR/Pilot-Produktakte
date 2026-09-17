@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import type { ReactNode } from 'react'
 import type { ColumnType, TableColumn, TableKey, TableRow } from '../types'
 import { COLUMN_TYPE_LABELS } from '../types'
 import { EditableName } from './EditableName'
@@ -25,6 +26,8 @@ interface Props {
   /** Feste Arbeitsplatz-Nummer der Maschine (gleiche Nummer für alle Einträge) */
   arbeitsplatz?: string
   onArbeitsplatzChange?: (wert: string) => void
+  /** Zusätzlicher Block unter dem Kopf (z. B. Auswahl der Arbeitswiederholung) */
+  kopfExtra?: ReactNode
 }
 
 function inputType(type: ColumnType): string {
@@ -52,6 +55,7 @@ export function DataTable({
   onCycleKey,
   arbeitsplatz,
   onArbeitsplatzChange,
+  kopfExtra,
 }: Props) {
   const [addingCol, setAddingCol] = useState(false)
   const [colName, setColName] = useState('')
@@ -111,6 +115,8 @@ export function DataTable({
           />
         </div>
       )}
+
+      {kopfExtra && <div className="border-b border-slate-100 px-2 py-1.5">{kopfExtra}</div>}
 
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-xs">
