@@ -1,8 +1,15 @@
+import { useEffect } from 'react'
 import { useSupabaseSync } from './lib/sync'
+import { initUndo, useUndoShortcut } from './lib/undo'
 import { Dashboard } from './pages/Dashboard'
 
 function AppShell() {
   useSupabaseSync()
+  useUndoShortcut()
+
+  useEffect(() => {
+    initUndo()
+  }, [])
 
   return (
     <div className="flex h-full flex-col">
@@ -16,7 +23,10 @@ function AppShell() {
             <div className="text-[11px] text-zo-muted">Digitale Produktakte</div>
           </div>
         </div>
-        <div className="hidden text-xs text-zo-muted sm:block">Produktions-Dashboard</div>
+        <div className="hidden text-right text-xs text-zo-muted sm:block">
+          <div>Produktions-Dashboard</div>
+          <div className="text-[11px] text-slate-400">Strg + Z: letzte Änderung rückgängig</div>
+        </div>
       </header>
 
       <main className="min-h-0 flex-1 bg-zo-bg-lighter">

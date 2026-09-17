@@ -1,6 +1,7 @@
 import { useEffect, useRef, useSyncExternalStore } from 'react'
 import { isSupabaseConfigured } from './supabase'
 import { listChains, saveChain } from './api'
+import { mitUnterdruecktemUndo } from './undo'
 import { useStore } from '../store'
 import type { Abteilung, Bearbeitungsblock, ChainData, Nebentabelle, Produktionstabelle, Schritt } from '../types'
 
@@ -133,20 +134,22 @@ export async function loadFromCloud(): Promise<boolean> {
       updatedAtMap.set(r.id, r.updated_at)
     }
     const state = useStore.getState()
-    useStore.setState({
-      chains,
-      activeChainId:
-        chains.length > 0
-          ? chains.some((c) => c.id === state.activeChainId)
-            ? state.activeChainId
-            : chains[0].id
-          : '',
-      abteilungen,
-      bearbeitungsbloecke,
-      schritte,
-      produktionstabellen,
-      nebentabellen,
-    })
+    mitUnterdruecktemUndo(() =>
+      useStore.setState({
+        chains,
+        activeChainId:
+          chains.length > 0
+            ? chains.some((c) => c.id === state.activeChainId)
+              ? state.activeChainId
+              : chains[0].id
+            : '',
+        abteilungen,
+        bearbeitungsbloecke,
+        schritte,
+        produktionstabellen,
+        nebentabellen,
+      }),
+    )
     setStatus({ phase: 'idle' })
     return true
   } catch (e) {
