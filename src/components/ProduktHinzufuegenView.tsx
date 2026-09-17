@@ -25,6 +25,7 @@ export function ProduktHinzufuegenView() {
   const [durchlaeufe, setDurchlaeufe] = useState<Record<string, number>>({})
   const [aktiverDurchlauf, setAktiverDurchlauf] = useState<Record<string, number>>({})
   const [werte, setWerte] = useState<Record<string, Record<string, string>[]>>({})
+  const [zeiten, setZeiten] = useState<Record<string, { datum: string; zeit: string }[]>>({})
   const [meldung, setMeldung] = useState<string | null>(null)
 
   const abteilungen = alleAbteilungen.filter((a) => a.chainId === activeChainId)
@@ -50,6 +51,17 @@ export function ProduktHinzufuegenView() {
       return { ...w, [tabelleId]: liste }
     })
 
+  const zeitFuer = (tabelleId: string, index: number) =>
+    zeiten[tabelleId]?.[index] ?? { datum: '', zeit: '' }
+
+  const setZeit = (tabelleId: string, index: number, patch: Partial<{ datum: string; zeit: string }>) =>
+    setZeiten((z) => {
+      const liste = [...(z[tabelleId] ?? [])]
+      while (liste.length <= index) liste.push({ datum: '', zeit: '' })
+      liste[index] = { ...liste[index], ...patch }
+      return { ...z, [tabelleId]: liste }
+    })
+
   const speichern = () => {
     if (!kannSpeichern) return
     const eintraege = gewaehlt.map((m) => {
@@ -60,7 +72,10 @@ export function ProduktHinzufuegenView() {
       const n = anzahl(m.id)
       return {
         tabelleId: m.id,
-        spalten: Array.from({ length: n }, (_, i) => werte[m.id]?.[i] ?? {}),
+        durchlaeufe: Array.from({ length: n }, (_, i) => {
+          const z = zeitFuer(m.id, i)
+          return { datum: z.datum || datum, zeit: z.zeit, spalten: werte[m.id]?.[i] ?? {} }
+        }),
         extraSpalten: extra.map((c) => ({ id: c.id, name: c.name, type: c.type })),
       }
     })
@@ -75,6 +90,7 @@ export function ProduktHinzufuegenView() {
     setDurchlaeufe({})
     setAktiverDurchlauf({})
     setWerte({})
+    setZeiten({})
   }
 
   return (
@@ -185,6 +201,8 @@ export function ProduktHinzufuegenView() {
                               const n = anzahl(m.id)
                               const d = aktiv(m.id)
                               const aktuelleWerte = werte[m.id]?.[d] ?? {}
+                              const z = zeitFuer(m.id, d)
+                              const durchlaufLabel = n > 1 ? ` (Durchlauf ${d + 1})` : ''
                               return (
                                 <div key={m.id} className="rounded-lg border border-slate-200 bg-white p-2">
                                   <label className="flex items-center gap-2 text-sm text-slate-700">
@@ -250,6 +268,27 @@ export function ProduktHinzufuegenView() {
                                             ))}
                                           </div>
                                         )}
+                                      </div>
+                                      <div className="mt-2 grid grid-cols-2 gap-2">
+                                        <label className="flex flex-col gap-0.5">
+                                          <span className="text-[10px] text-slate-500">Datum{durchlaufLabel}</span>
+                                          <input
+                                            type="date"
+                                            value={z.datum || datum}
+                                            onChange={(e) => setZeit(m.id, d, { datum: e.target.value })}
+                                            className={werteEingabe}
+                                          />
+                                        </label>
+                                        <label className="flex flex-col gap-0.5">
+                                          <span className="text-[10px] text-slate-500">Uhrzeit{durchlaufLabel}</span>
+                                          <input
+                                            type="time"
+                                            value={z.zeit}
+                                            onChange={(e) => setZeit(m.id, d, { zeit: e.target.value })}
+                                            className={werteEingabe}
+                                            title="Uhrzeit des Ablaufs an dieser Maschine (für die Reihenfolge)"
+                                          />
+                                        </label>
                                       </div>
                                       <div className="mt-2 grid grid-cols-2 gap-2">
                                         {eigeneSpalten.length === 0 && schrittFelder.length === 0 && (

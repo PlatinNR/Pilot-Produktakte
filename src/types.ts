@@ -50,12 +50,13 @@ export interface Schritt {
 }
 
 /** Spaltentyp einer Tabelle */
-export type ColumnType = 'text' | 'number' | 'date'
+export type ColumnType = 'text' | 'number' | 'date' | 'time'
 
 export const COLUMN_TYPE_LABELS: Record<ColumnType, string> = {
   text: 'Text',
   number: 'Zahl',
   date: 'Datum',
+  time: 'Uhrzeit',
 }
 
 /** Eine Spalte einer Tabelle */
@@ -166,6 +167,7 @@ export const PRODUKTION_SPALTEN: TableColumn[] = [
   { id: 'auftragsnummer', name: 'Fertigungsauftrag', type: 'text', fixed: true },
   { id: 'fn', name: 'FN', type: 'text', fixed: true },
   { id: 'datum', name: 'Datum', type: 'date', fixed: true },
+  { id: 'zeit', name: 'Uhrzeit', type: 'time', fixed: true },
 ]
 
 /** Standardspalte jeder Nebentabelle (zeitlicher Bezug) */

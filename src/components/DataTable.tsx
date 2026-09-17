@@ -33,6 +33,7 @@ interface Props {
 function inputType(type: ColumnType): string {
   if (type === 'number') return 'number'
   if (type === 'date') return 'date'
+  if (type === 'time') return 'time'
   return 'text'
 }
 

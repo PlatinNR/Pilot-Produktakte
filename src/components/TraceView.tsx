@@ -1,4 +1,5 @@
 import { useStore } from '../store'
+import type { Produktionstabelle } from '../types'
 import { traceAuftrag } from '../utils/aggregate'
 import { DurchlaufWahl } from './DurchlaufWahl'
 
@@ -19,12 +20,12 @@ export function TraceView({ auftragsnummer }: Props) {
   const produktionstabellen = alleMaschinen.filter((t) => schrittIds.has(t.schrittId))
   const nebentabellen = alleNeben.filter((n) => abteilungIds.has(n.abteilungId))
 
-  // Schritte in einem Variablen Bearbeitungsblock werden nach dem Datum des Eintrags geordnet
+  // Schritte in einem Variablen Bearbeitungsblock werden nach Datum + Uhrzeit des Eintrags geordnet
   const stepDatum = (stepId: string): string => {
     for (const m of alleMaschinen) {
       if (m.schrittId !== stepId) continue
       const row = m.rows.find((r) => r.auftragsnummer === auftragsnummer)
-      if (row) return row.datum ?? ''
+      if (row) return `${row.datum ?? ''}T${row.zeit ?? ''}`
     }
     return ''
   }
@@ -61,7 +62,16 @@ export function TraceView({ auftragsnummer }: Props) {
 
       <div className="flex flex-wrap items-stretch gap-2">
         {trace.stops.map((stop, i) => {
-          const tabellen = stop.tabellen ?? (stop.tabelle ? [stop.tabelle] : [])
+          const eintrag = (t: Produktionstabelle) =>
+            t.rows.find((r) => r.auftragsnummer === auftragsnummer)
+          // Mehrere Maschinen im selben Schritt: nach Datum + Uhrzeit sortieren
+          const tabellen = [...(stop.tabellen ?? (stop.tabelle ? [stop.tabelle] : []))].sort((a, b) => {
+            const ra = eintrag(a)
+            const rb = eintrag(b)
+            return `${ra?.datum ?? ''}T${ra?.zeit ?? ''}`.localeCompare(
+              `${rb?.datum ?? ''}T${rb?.zeit ?? ''}`,
+            )
+          })
           const skipped = tabellen.length === 0 && stop.schritt.optional
           return (
             <div key={stop.schritt.id} className="flex items-center gap-2">
@@ -79,14 +89,28 @@ export function TraceView({ auftragsnummer }: Props) {
                   {stop.schritt.optional && <span className="ml-1 text-slate-300">(opt.)</span>}
                 </div>
                 {tabellen.length > 0 ? (
-                  tabellen.map((t) => (
-                    <div key={t.id} className="mt-1">
-                      <div className="text-sm font-semibold text-zollern-800">{t.name}</div>
-                      <div className="mt-1.5">
-                        <DurchlaufWahl tabelle={t} auftragsnummer={auftragsnummer} kompakt />
+                  tabellen.map((t, ti) => {
+                    const r = eintrag(t)
+                    return (
+                      <div key={t.id} className="mt-1">
+                        <div className="flex items-baseline gap-1.5 text-sm font-semibold text-zollern-800">
+                          {tabellen.length > 1 && (
+                            <span className="text-[10px] font-bold text-zollern-500">{ti + 1}.</span>
+                          )}
+                          {t.name}
+                          {(r?.datum || r?.zeit) && (
+                            <span className="text-[10px] font-normal text-slate-400">
+                              {r?.datum}
+                              {r?.zeit ? ` · ${r.zeit}` : ''}
+                            </span>
+                          )}
+                        </div>
+                        <div className="mt-1.5">
+                          <DurchlaufWahl tabelle={t} auftragsnummer={auftragsnummer} kompakt />
+                        </div>
                       </div>
-                    </div>
-                  ))
+                    )
+                  })
                 ) : (
                   <div className={`text-sm font-semibold ${skipped ? 'text-slate-300 italic' : 'text-slate-400'}`}>
                     {skipped ? 'übersprungen' : '—'}

@@ -64,6 +64,7 @@ export function InfoFelderListe({ felder, bearbeiten, onAdd, onRename, onChangeT
                       <option value="text">Text</option>
                       <option value="number">Zahl</option>
                       <option value="date">Datum</option>
+                      <option value="time">Uhrzeit</option>
                     </select>
                   </td>
                   <td className="px-1 text-center">

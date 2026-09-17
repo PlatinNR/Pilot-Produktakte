@@ -202,8 +202,8 @@ interface Store extends AppState {
     datum: string,
     werte: {
       tabelleId: string
-      /** Werte je Durchlauf (Arbeitswiederholung) */
-      spalten: Record<string, string>[]
+      /** Je Durchlauf: Datum, Uhrzeit und benutzte Werte */
+      durchlaeufe: { datum: string; zeit: string; spalten: Record<string, string> }[]
       extraSpalten?: { id: string; name: string; type: ColumnType }[]
     }[],
   ) => void
@@ -656,12 +656,19 @@ export const useStore = create<Store>()(
           if (columns.some((c) => c.name.trim().toLowerCase() === extra.name.trim().toLowerCase())) continue
           columns.push({ id: extra.id, name: extra.name, type: extra.type, fixed: false })
         }
-        const durchlaeufe = eintrag.spalten.length > 0 ? eintrag.spalten : [{}]
-        const neueZeilen = durchlaeufe.map((sp) => {
-          const zeile: TableRow = { ...emptyRow(columns), auftragsnummer, fn, datum }
+        const durchlaeufe =
+          eintrag.durchlaeufe.length > 0 ? eintrag.durchlaeufe : [{ datum: '', zeit: '', spalten: {} }]
+        const neueZeilen = durchlaeufe.map((d) => {
+          const zeile: TableRow = {
+            ...emptyRow(columns),
+            auftragsnummer,
+            fn,
+            datum: d.datum || datum,
+            zeit: d.zeit,
+          }
           for (const c of columns) {
-            if (c.id === 'auftragsnummer' || c.id === 'fn' || c.id === 'datum') continue
-            zeile[c.id] = sp[c.id] ?? ''
+            if (c.id === 'auftragsnummer' || c.id === 'fn' || c.id === 'datum' || c.id === 'zeit') continue
+            zeile[c.id] = d.spalten[c.id] ?? ''
           }
           return zeile
         })
@@ -864,7 +871,7 @@ setKeyLabelNeben: (tabelleId, spalteId, label) =>
   }),
     {
       name: 'digitale-produktakte',
-      version: 11,
+      version: 12,
       migrate: (persisted, version) => {
         let p = persisted as Partial<AppState> & {
           abteilungen?: (Abteilung & { chainId?: string; parentId?: string | null; sequence?: 'fixed' | 'variable' })[]
@@ -1002,6 +1009,19 @@ setKeyLabelNeben: (tabelleId, spalteId, label) =>
             })),
           } as typeof p
         }
+        if (version < 12) {
+          // Jede Maschine bekommt die feste Spalte "Uhrzeit" (nach Datum)
+          p = {
+            ...p,
+            produktionstabellen: (p.produktionstabellen ?? []).map((t) => {
+              if (t.columns.some((c) => c.id === 'zeit')) return t
+              const columns = [...t.columns]
+              const datumIdx = columns.findIndex((c) => c.id === 'datum')
+              columns.splice(datumIdx + 1, 0, { id: 'zeit', name: 'Uhrzeit', type: 'time', fixed: true })
+              return { ...t, columns }
+            }),
+          } as typeof p
+        }
         return p as AppState
       },
       partialize: (s) => ({
@@ -1068,12 +1088,14 @@ function seed(): AppState {
     }
   }
 
-  // Vereinfachte, korrekte Zuordnung der Demo-Zeilen:
+  // Vereinfachte, korrekte Zuordnung der Demo-Zeilen (Uhrzeiten für die Reihenfolge)
+  const zeitVon = (minuten: number) =>
+    `${String(Math.floor(minuten / 60)).padStart(2, '0')}:${String(minuten % 60).padStart(2, '0')}`
   const assign = (schrittId: string, maschinenIndex: number, rows: TableRow[]) => {
     const t = produktionstabellen.find(
       (p) => p.schrittId === schrittId && p.id.endsWith(`-${maschinenIndex}`),
     )
-    if (t) t.rows = rows
+    if (t) t.rows = rows.map((r, ri) => ({ zeit: zeitVon(7 * 60 + ri * 20), ...r }))
   }
 
   assign('s-spritzen', 1, [
