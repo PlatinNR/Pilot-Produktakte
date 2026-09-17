@@ -165,8 +165,8 @@ export function Dashboard() {
                 + Erste Abteilung hinzufügen
               </button>
             )}
-            {abteilungen.map((a) => (
-              <AbteilungBlock key={a.id} abteilung={a} filter={filter} />
+            {abteilungen.map((a, i) => (
+              <AbteilungBlock key={a.id} abteilung={a} filter={filter} index={i} />
             ))}
           </div>
         </>

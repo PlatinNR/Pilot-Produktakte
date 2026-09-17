@@ -3,13 +3,15 @@ import { useStore } from '../store'
 import { EditableName } from './EditableName'
 import { SchrittRow } from './SchrittRow'
 import { NebentabellenColumn } from './NebentabellenColumn'
+import { abteilungFarbe } from '../utils/colors'
 
 interface Props {
   abteilung: Abteilung
   filter: Filter
+  index: number
 }
 
-export function AbteilungBlock({ abteilung, filter }: Props) {
+export function AbteilungBlock({ abteilung, filter, index }: Props) {
   const alleSchritte = useStore((s) => s.schritte)
   const alleBloecke = useStore((s) => s.bearbeitungsbloecke)
   const schritte = alleSchritte.filter((st) => st.abteilungId === abteilung.id)
@@ -37,9 +39,16 @@ export function AbteilungBlock({ abteilung, filter }: Props) {
   })
 
   return (
-    <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
+    <section className={`rounded-xl border shadow-sm ${abteilungFarbe(index)}`}>
       <header className="flex items-center gap-3 border-b border-slate-100 px-4 py-3">
         <span className="h-3 w-1 rounded-full bg-zollern-700" />
+        <button
+          onClick={() => {}}
+          className="rounded border border-slate-300 bg-white/70 px-2 py-0.5 text-[11px] text-slate-600 hover:bg-white"
+          title="Modell anzeigen"
+        >
+          Modell anzeigen
+        </button>
         <EditableName
           value={abteilung.name}
           onCommit={(name) => renameAbteilung(abteilung.id, name)}

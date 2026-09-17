@@ -17,6 +17,7 @@ import {
 import { EditableName } from './EditableName'
 import { KeyBadge } from './KeyBadge'
 import { keyTypeOf, nextKey } from '../utils/keys'
+import { abteilungFarbe } from '../utils/colors'
 
 interface Props {
   filter: Filter
@@ -629,7 +630,7 @@ export function TabellenbezogenView({ filter }: Props) {
       </svg>
 
       <div className="relative z-10 flex flex-col gap-6">
-        {abteilungen.map((a) => {
+        {abteilungen.map((a, abtIndex) => {
           const schritte = alleSchritte.filter((st) => st.abteilungId === a.id)
           const neben = alleNeben.filter((n) => n.abteilungId === a.id)
           const bloecke = alleBloecke.filter((b) => b.abteilungId === a.id)
@@ -648,9 +649,16 @@ export function TabellenbezogenView({ filter }: Props) {
           })
 
           return (
-            <section key={a.id} className="rounded-xl border border-slate-200 p-4">
+            <section key={a.id} className={`rounded-xl border p-4 ${abteilungFarbe(abtIndex)}`}>
               <div className="mb-3 flex items-center gap-2">
                 <span className="h-3 w-1 rounded-full bg-zollern-500" />
+                <button
+                  onClick={() => {}}
+                  className="rounded border border-slate-300 bg-white/70 px-2 py-0.5 text-[11px] text-slate-600 hover:bg-white"
+                  title="Modell anzeigen"
+                >
+                  Modell anzeigen
+                </button>
                 <EditableName
                   value={a.name}
                   onCommit={(name) => renameAbteilung(a.id, name)}
