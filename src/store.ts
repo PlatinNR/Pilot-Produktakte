@@ -202,7 +202,8 @@ interface Store extends AppState {
     datum: string,
     werte: {
       tabelleId: string
-      spalten: Record<string, string>
+      /** Werte je Durchlauf (Arbeitswiederholung) */
+      spalten: Record<string, string>[]
       extraSpalten?: { id: string; name: string; type: ColumnType }[]
     }[],
   ) => void
@@ -655,12 +656,16 @@ export const useStore = create<Store>()(
           if (columns.some((c) => c.name.trim().toLowerCase() === extra.name.trim().toLowerCase())) continue
           columns.push({ id: extra.id, name: extra.name, type: extra.type, fixed: false })
         }
-        const zeile: TableRow = { ...emptyRow(columns), auftragsnummer, fn, datum }
-        for (const c of columns) {
-          if (c.id === 'auftragsnummer' || c.id === 'fn' || c.id === 'datum') continue
-          zeile[c.id] = eintrag.spalten[c.id] ?? ''
-        }
-        return { ...t, columns, rows: [...t.rows, zeile] }
+        const durchlaeufe = eintrag.spalten.length > 0 ? eintrag.spalten : [{}]
+        const neueZeilen = durchlaeufe.map((sp) => {
+          const zeile: TableRow = { ...emptyRow(columns), auftragsnummer, fn, datum }
+          for (const c of columns) {
+            if (c.id === 'auftragsnummer' || c.id === 'fn' || c.id === 'datum') continue
+            zeile[c.id] = sp[c.id] ?? ''
+          }
+          return zeile
+        })
+        return { ...t, columns, rows: [...t.rows, ...neueZeilen] }
       }),
     })),
 

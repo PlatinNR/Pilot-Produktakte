@@ -16,6 +16,7 @@ import {
 } from '../utils/aggregate'
 import { EditableName } from './EditableName'
 import { InfoModal } from './InfoModal'
+import { DurchlaufWahl } from './DurchlaufWahl'
 import { KeyBadge } from './KeyBadge'
 import { keyTypeOf, nextKey } from '../utils/keys'
 import { abteilungFarbe } from '../utils/colors'
@@ -974,6 +975,15 @@ export function TabellenbezogenView({ filter }: Props) {
                                                     onStartDrag={startDrag('m', m.id, c.id, keyTypeOf(m.keys, c.id))}
                                                   />
                                                 ))}
+                                                {trace && used && (
+                                                  <div className="px-2 py-1.5">
+                                                    <DurchlaufWahl
+                                                      tabelle={m}
+                                                      auftragsnummer={auftrag}
+                                                      kompakt
+                                                    />
+                                                  </div>
+                                                )}
                                               </EntityCard>
                                             </div>
                                           )
@@ -1056,6 +1066,11 @@ export function TabellenbezogenView({ filter }: Props) {
                                         onStartDrag={startDrag('m', m.id, c.id, keyTypeOf(m.keys, c.id))}
                                       />
                                     ))}
+                                    {trace && used && (
+                                      <div className="px-2 py-1.5">
+                                        <DurchlaufWahl tabelle={m} auftragsnummer={auftrag} kompakt />
+                                      </div>
+                                    )}
                                   </EntityCard>
                                 </div>
                               )

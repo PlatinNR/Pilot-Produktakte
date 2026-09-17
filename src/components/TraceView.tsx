@@ -1,5 +1,6 @@
 import { useStore } from '../store'
 import { traceAuftrag } from '../utils/aggregate'
+import { DurchlaufWahl } from './DurchlaufWahl'
 
 interface Props {
   auftragsnummer: string
@@ -83,6 +84,11 @@ export function TraceView({ auftragsnummer }: Props) {
                 >
                   {stop.tabelle ? stop.tabelle.name : skipped ? 'übersprungen' : '—'}
                 </div>
+                {stop.tabelle && (
+                  <div className="mt-1.5">
+                    <DurchlaufWahl tabelle={stop.tabelle} auftragsnummer={auftragsnummer} kompakt />
+                  </div>
+                )}
               </div>
               {i < trace.stops.length - 1 && <span className="text-lg font-bold text-zollern-400">→</span>}
             </div>

@@ -9,7 +9,7 @@ const eingabe =
 const werteEingabe =
   'w-full rounded border border-slate-200 bg-white px-1.5 py-1 text-xs text-slate-700 outline-none focus:border-zollern-400'
 
-/** Produkt hinzufügen: Fertigungsauftrag manuell anlegen oder Maschinendaten importieren. */
+/** Produkt hinzufügen: Fertigungsauftrag manuell anlegen (auch mehrere Durchläufe) oder Maschinendaten importieren. */
 export function ProduktHinzufuegenView() {
   const activeChainId = useStore((s) => s.activeChainId)
   const alleAbteilungen = useStore((s) => s.abteilungen)
@@ -22,12 +22,33 @@ export function ProduktHinzufuegenView() {
   const [fn, setFn] = useState('')
   const [datum, setDatum] = useState('')
   const [auswahl, setAuswahl] = useState<Record<string, boolean>>({})
-  const [werte, setWerte] = useState<Record<string, Record<string, string>>>({})
+  const [durchlaeufe, setDurchlaeufe] = useState<Record<string, number>>({})
+  const [aktiverDurchlauf, setAktiverDurchlauf] = useState<Record<string, number>>({})
+  const [werte, setWerte] = useState<Record<string, Record<string, string>[]>>({})
   const [meldung, setMeldung] = useState<string | null>(null)
 
   const abteilungen = alleAbteilungen.filter((a) => a.chainId === activeChainId)
   const gewaehlt = alleMaschinen.filter((m) => auswahl[m.id])
   const kannSpeichern = auftragsnummer.trim().length > 0 && gewaehlt.length > 0
+  const gesamtDurchlaeufe = gewaehlt.reduce((sum, m) => sum + (durchlaeufe[m.id] ?? 1), 0)
+
+  const anzahl = (tabelleId: string) => Math.max(1, durchlaeufe[tabelleId] ?? 1)
+  const aktiv = (tabelleId: string) =>
+    Math.min(aktiverDurchlauf[tabelleId] ?? 0, anzahl(tabelleId) - 1)
+
+  const setAnzahl = (tabelleId: string, n: number) => {
+    const v = Math.max(1, Math.min(10, Math.floor(n) || 1))
+    setDurchlaeufe((d) => ({ ...d, [tabelleId]: v }))
+    setAktiverDurchlauf((a) => ({ ...a, [tabelleId]: Math.min(a[tabelleId] ?? 0, v - 1) }))
+  }
+
+  const setWert = (tabelleId: string, index: number, spalteId: string, value: string) =>
+    setWerte((w) => {
+      const liste = [...(w[tabelleId] ?? [])]
+      while (liste.length <= index) liste.push({})
+      liste[index] = { ...liste[index], [spalteId]: value }
+      return { ...w, [tabelleId]: liste }
+    })
 
   const speichern = () => {
     if (!kannSpeichern) return
@@ -36,23 +57,25 @@ export function ProduktHinzufuegenView() {
       const eigene = m.columns.filter((c) => !c.fixed)
       const namen = new Set(eigene.map((c) => c.name.trim().toLowerCase()))
       const extra = (st?.columns ?? []).filter((c) => !namen.has(c.name.trim().toLowerCase()))
+      const n = anzahl(m.id)
       return {
         tabelleId: m.id,
-        spalten: werte[m.id] ?? {},
+        spalten: Array.from({ length: n }, (_, i) => werte[m.id]?.[i] ?? {}),
         extraSpalten: extra.map((c) => ({ id: c.id, name: c.name, type: c.type })),
       }
     })
     addProdukt(auftragsnummer.trim(), fn.trim(), datum, eintraege)
-    setMeldung(`„${auftragsnummer.trim()}" wurde bei ${gewaehlt.length} Maschine(n) eingetragen.`)
+    setMeldung(
+      `„${auftragsnummer.trim()}" wurde bei ${gewaehlt.length} Maschine(n) mit ${gesamtDurchlaeufe} Durchlauf/Durchläufen eingetragen.`,
+    )
     setAuftragsnummer('')
     setFn('')
     setDatum('')
     setAuswahl({})
+    setDurchlaeufe({})
+    setAktiverDurchlauf({})
     setWerte({})
   }
-
-  const setWert = (tabelleId: string, spalteId: string, value: string) =>
-    setWerte((w) => ({ ...w, [tabelleId]: { ...(w[tabelleId] ?? {}), [spalteId]: value } }))
 
   return (
     <div className="flex flex-col gap-4">
@@ -114,7 +137,7 @@ export function ProduktHinzufuegenView() {
               Produkt hinzufügen
             </button>
             <span className="text-xs text-slate-400">
-              {gewaehlt.length} Maschine(n) ausgewählt
+              {gewaehlt.length} Maschine(n) · {gesamtDurchlaeufe} Durchlauf/Durchläufe
             </span>
           </section>
 
@@ -126,7 +149,7 @@ export function ProduktHinzufuegenView() {
 
           <section className="flex flex-col gap-3">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Maschinen auswählen und benutzte Werte eintragen
+              Maschinen auswählen, Durchläufe und benutzte Werte eintragen
             </h3>
             {abteilungen.length === 0 && (
               <div className="rounded-xl border-2 border-dashed border-slate-200 px-3 py-6 text-center text-sm text-slate-400">
@@ -159,6 +182,9 @@ export function ProduktHinzufuegenView() {
                               const bereitsVorhanden =
                                 auftragsnummer.trim().length > 0 &&
                                 m.rows.some((r) => r.auftragsnummer === auftragsnummer.trim())
+                              const n = anzahl(m.id)
+                              const d = aktiv(m.id)
+                              const aktuelleWerte = werte[m.id]?.[d] ?? {}
                               return (
                                 <div key={m.id} className="rounded-lg border border-slate-200 bg-white p-2">
                                   <label className="flex items-center gap-2 text-sm text-slate-700">
@@ -188,48 +214,85 @@ export function ProduktHinzufuegenView() {
                                       </span>
                                     )}
                                   </label>
+
                                   {auswahl[m.id] && (
-                                    <div className="mt-2 grid grid-cols-2 gap-2">
-                                      {eigeneSpalten.length === 0 && schrittFelder.length === 0 && (
-                                        <p className="col-span-2 text-[11px] text-slate-400">
-                                          Keine eigenen Wertspalten an dieser Maschine.
-                                        </p>
-                                      )}
-                                      {eigeneSpalten.map((c) => (
-                                        <label key={c.id} className="flex flex-col gap-0.5">
-                                          <span className="text-[10px] text-slate-500">{c.name}</span>
-                                          <input
-                                            value={werte[m.id]?.[c.id] ?? ''}
-                                            onChange={(e) => setWert(m.id, c.id, e.target.value)}
-                                            type={
-                                              c.type === 'number' ? 'number' : c.type === 'date' ? 'date' : 'text'
-                                            }
-                                            className={werteEingabe}
-                                          />
-                                        </label>
-                                      ))}
-                                      {schrittFelder.map((c) => (
-                                        <label key={c.id} className="flex flex-col gap-0.5">
-                                          <span className="flex items-center gap-1 text-[10px] text-slate-500">
-                                            {c.name}
-                                            <span
-                                              className="rounded bg-sky-100 px-1 text-[9px] text-sky-700"
-                                              title="Feld ist im Schritt definiert und wird beim Speichern an der Maschine ergänzt"
-                                            >
-                                              aus Schritt
+                                    <>
+                                      <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-2">
+                                        <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                                          Durchläufe
+                                        </span>
+                                        <input
+                                          type="number"
+                                          min={1}
+                                          max={10}
+                                          value={n}
+                                          onChange={(e) => setAnzahl(m.id, Number(e.target.value))}
+                                          className="w-14 rounded border border-slate-200 bg-white px-1.5 py-0.5 text-xs text-slate-700 outline-none focus:border-zollern-400"
+                                          title="Anzahl der Durchläufe (Arbeitswiederholungen) an dieser Maschine"
+                                        />
+                                        {n > 1 && (
+                                          <div className="flex items-center gap-1">
+                                            <span className="text-[10px] text-slate-400">Werte für:</span>
+                                            {Array.from({ length: n }, (_, i) => (
+                                              <button
+                                                key={i}
+                                                onClick={() =>
+                                                  setAktiverDurchlauf((a2) => ({ ...a2, [m.id]: i }))
+                                                }
+                                                className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                                                  d === i
+                                                    ? 'bg-zollern-700 text-white'
+                                                    : 'border border-slate-300 text-slate-600 hover:bg-slate-100'
+                                                }`}
+                                              >
+                                                Durchlauf {i + 1}
+                                              </button>
+                                            ))}
+                                          </div>
+                                        )}
+                                      </div>
+                                      <div className="mt-2 grid grid-cols-2 gap-2">
+                                        {eigeneSpalten.length === 0 && schrittFelder.length === 0 && (
+                                          <p className="col-span-2 text-[11px] text-slate-400">
+                                            Keine eigenen Wertspalten an dieser Maschine.
+                                          </p>
+                                        )}
+                                        {eigeneSpalten.map((c) => (
+                                          <label key={c.id} className="flex flex-col gap-0.5">
+                                            <span className="text-[10px] text-slate-500">{c.name}</span>
+                                            <input
+                                              value={aktuelleWerte[c.id] ?? ''}
+                                              onChange={(e) => setWert(m.id, d, c.id, e.target.value)}
+                                              type={
+                                                c.type === 'number' ? 'number' : c.type === 'date' ? 'date' : 'text'
+                                              }
+                                              className={werteEingabe}
+                                            />
+                                          </label>
+                                        ))}
+                                        {schrittFelder.map((c) => (
+                                          <label key={c.id} className="flex flex-col gap-0.5">
+                                            <span className="flex items-center gap-1 text-[10px] text-slate-500">
+                                              {c.name}
+                                              <span
+                                                className="rounded bg-sky-100 px-1 text-[9px] text-sky-700"
+                                                title="Feld ist im Schritt definiert und wird beim Speichern an der Maschine ergänzt"
+                                              >
+                                                aus Schritt
+                                              </span>
                                             </span>
-                                          </span>
-                                          <input
-                                            value={werte[m.id]?.[c.id] ?? ''}
-                                            onChange={(e) => setWert(m.id, c.id, e.target.value)}
-                                            type={
-                                              c.type === 'number' ? 'number' : c.type === 'date' ? 'date' : 'text'
-                                            }
-                                            className={werteEingabe}
-                                          />
-                                        </label>
-                                      ))}
-                                    </div>
+                                            <input
+                                              value={aktuelleWerte[c.id] ?? ''}
+                                              onChange={(e) => setWert(m.id, d, c.id, e.target.value)}
+                                              type={
+                                                c.type === 'number' ? 'number' : c.type === 'date' ? 'date' : 'text'
+                                              }
+                                              className={werteEingabe}
+                                            />
+                                          </label>
+                                        ))}
+                                      </div>
+                                    </>
                                   )}
                                 </div>
                               )
