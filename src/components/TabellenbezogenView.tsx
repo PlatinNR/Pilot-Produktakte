@@ -888,7 +888,7 @@ export function TabellenbezogenView({ filter }: Props) {
                 </button>
               </div>
 
-              <div className="flex items-start gap-10">
+              <div className="flex items-start gap-6">
                 {/* Produktionsstellen + Produktionskette als Schritt-Zeilen */}
                 <div className="min-w-0 flex-1">
                   <div className="grid grid-cols-[minmax(0,1fr)_20rem] items-start gap-x-6 gap-y-5">
@@ -1420,12 +1420,12 @@ export function TabellenbezogenView({ filter }: Props) {
                 </div>
 
                 {/* Prozessunterstützung */}
-                <div className="w-60 shrink-0">
-                  <div className="mb-2 flex items-center justify-between border-b border-slate-200 pb-1">
-                    <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                <div className="w-80 shrink-0 xl:w-96">
+                  <div className="mb-2 border-b border-slate-200 pb-1">
+                    <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                       Prozessunterstützung
-                    </span>
-                    <div className="flex items-center gap-1">
+                    </div>
+                    <div className="mt-1 flex flex-wrap items-center gap-1">
                       <button
                         onClick={() => einfuegenNebentabelle(a.id)}
                         className="rounded border border-slate-300 px-2 py-0.5 text-[11px] text-slate-500 hover:bg-slate-100"

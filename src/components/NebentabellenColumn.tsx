@@ -24,10 +24,10 @@ export function NebentabellenColumn({ abteilungId }: Props) {
   } = useStore()
 
   return (
-    <aside className="flex w-full shrink-0 flex-col gap-2 lg:w-80">
-      <div className="flex items-center justify-between">
+    <aside className="flex w-full shrink-0 flex-col gap-2 lg:w-96">
+      <div>
         <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Nebentabellen</h2>
-        <div className="flex items-center gap-1">
+        <div className="mt-1 flex flex-wrap items-center gap-1">
           <button
             onClick={() => einfuegenNebentabelle(abteilungId)}
             className="rounded border border-slate-300 px-2 py-0.5 text-xs text-slate-500 hover:bg-slate-100"
