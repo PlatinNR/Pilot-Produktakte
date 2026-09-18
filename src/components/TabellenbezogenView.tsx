@@ -51,6 +51,22 @@ function orthogonalPath(x1: number, y1: number, x2: number, y2: number): string 
   return `M ${x1} ${y1} H ${midX} V ${y2} H ${x2}`
 }
 
+/** Nächstgelegenes scrollbares Element (für Auto-Scroll beim Ziehen). */
+function findeScroller(el: HTMLElement | null): HTMLElement | null {
+  let cur = el?.parentElement ?? null
+  while (cur) {
+    const style = getComputedStyle(cur)
+    if (
+      (style.overflowY === 'auto' || style.overflowY === 'scroll') &&
+      cur.scrollHeight > cur.clientHeight
+    ) {
+      return cur
+    }
+    cur = cur.parentElement
+  }
+  return (document.scrollingElement as HTMLElement | null) ?? null
+}
+
 function findColumnNode(x: number, y: number): string | null {
   const el = document.elementFromPoint(x, y)
   const node = el?.closest?.('[data-column-node]') as HTMLElement | null
@@ -533,12 +549,49 @@ export function TabellenbezogenView({ filter }: Props) {
       e.preventDefault()
       e.stopPropagation()
       const sourceKey = `${kind}:${tableId}:${columnId}`
+
+      // Ursprung aktualisieren (falls vorher gescrollt wurde)
+      const c0 = containerRef.current
+      if (c0) {
+        const cr0 = c0.getBoundingClientRect()
+        setOrigin({ left: cr0.left, top: cr0.top })
+      }
       setDragPos({ x: e.clientX, y: e.clientY, sourceKey })
 
-      const move = (ev: PointerEvent) => setDragPos({ x: ev.clientX, y: ev.clientY, sourceKey })
+      // Auto-Scroll beim Ziehen an den oberen/unteren Rand
+      const scroller = findeScroller(e.currentTarget as HTMLElement)
+      let letzteY = e.clientY
+      let raf = 0
+      const rand = 80
+      const tick = () => {
+        raf = requestAnimationFrame(tick)
+        if (!scroller) return
+        const r = scroller.getBoundingClientRect()
+        let delta = 0
+        if (letzteY < r.top + rand) delta = -Math.ceil((r.top + rand - letzteY) / 4)
+        else if (letzteY > r.bottom - rand) delta = Math.ceil((letzteY - (r.bottom - rand)) / 4)
+        if (delta !== 0) {
+          const vorher = scroller.scrollTop
+          scroller.scrollTop = vorher + delta
+          if (scroller.scrollTop !== vorher) {
+            const c = containerRef.current
+            if (c) {
+              const cr = c.getBoundingClientRect()
+              setOrigin({ left: cr.left, top: cr.top })
+            }
+          }
+        }
+      }
+      raf = requestAnimationFrame(tick)
+
+      const move = (ev: PointerEvent) => {
+        letzteY = ev.clientY
+        setDragPos({ x: ev.clientX, y: ev.clientY, sourceKey })
+      }
       const up = (ev: PointerEvent) => {
         window.removeEventListener('pointermove', move)
         window.removeEventListener('pointerup', up)
+        cancelAnimationFrame(raf)
         setDragPos(null)
         const target = findColumnNode(ev.clientX, ev.clientY)
         if (!target) return
