@@ -183,6 +183,7 @@ interface Store extends AppState {
   linkSchrittFK: (schrittId: string, spalteId: string, refTableId: string, refColumnId: string) => void
   setKeyLabelSchritt: (schrittId: string, spalteId: string, label: string) => void
   setSchrittLoop: (schrittId: string, loopTargetId: string | null, loopCondition: string | null) => void
+  setSchrittWiederholungen: (schrittId: string, anzahl: number | null) => void
   setSchrittOptional: (schrittId: string, optional: boolean) => void
   setSchrittBlock: (schrittId: string, blockId: string | null) => void
 
@@ -202,8 +203,8 @@ interface Store extends AppState {
     datum: string,
     werte: {
       tabelleId: string
-      /** Je Durchlauf: Datum, Uhrzeit und benutzte Werte */
-      durchlaeufe: { datum: string; zeit: string; spalten: Record<string, string> }[]
+      /** Je Durchlauf: Datum, Uhrzeit, Wiederholung und benutzte Werte */
+      durchlaeufe: { datum: string; zeit: string; wiederholung?: string; spalten: Record<string, string> }[]
       extraSpalten?: { id: string; name: string; type: ColumnType }[]
     }[],
   ) => void
@@ -469,6 +470,7 @@ export const useStore = create<Store>()(
           keys: [],
           loopCondition: null,
           loopTargetId: null,
+          loopWiederholungen: null,
           optional: false,
         },
       ],
@@ -562,6 +564,13 @@ export const useStore = create<Store>()(
     set((s) => ({
       schritte: s.schritte.map((st) =>
         st.id === schrittId ? { ...st, loopTargetId, loopCondition } : st,
+      ),
+    })),
+
+  setSchrittWiederholungen: (schrittId, anzahl) =>
+    set((s) => ({
+      schritte: s.schritte.map((st) =>
+        st.id === schrittId ? { ...st, loopWiederholungen: anzahl } : st,
       ),
     })),
 
@@ -691,9 +700,18 @@ export const useStore = create<Store>()(
             fn,
             datum: d.datum || datum,
             zeit: d.zeit,
+            wdh: d.wiederholung ?? '',
           }
           for (const c of columns) {
-            if (c.id === 'auftragsnummer' || c.id === 'fn' || c.id === 'datum' || c.id === 'zeit') continue
+            if (
+              c.id === 'auftragsnummer' ||
+              c.id === 'fn' ||
+              c.id === 'datum' ||
+              c.id === 'zeit' ||
+              c.id === 'wdh'
+            ) {
+              continue
+            }
             zeile[c.id] = d.spalten[c.id] ?? ''
           }
           return zeile
@@ -897,7 +915,7 @@ setKeyLabelNeben: (tabelleId, spalteId, label) =>
   }),
     {
       name: 'digitale-produktakte',
-      version: 12,
+      version: 13,
       migrate: (persisted, version) => {
         let p = persisted as Partial<AppState> & {
           abteilungen?: (Abteilung & { chainId?: string; parentId?: string | null; sequence?: 'fixed' | 'variable' })[]
@@ -1048,6 +1066,23 @@ setKeyLabelNeben: (tabelleId, spalteId, label) =>
             }),
           } as typeof p
         }
+        if (version < 13) {
+          // Schleifen: Wiederholungsanzahl statt Bedingung; Spalte "Wiederholung" in jeder Maschine
+          p = {
+            ...p,
+            schritte: (p.schritte ?? []).map((st) => ({
+              ...st,
+              loopWiederholungen: st.loopWiederholungen ?? null,
+            })),
+            produktionstabellen: (p.produktionstabellen ?? []).map((t) => {
+              if (t.columns.some((c) => c.id === 'wdh')) return t
+              const columns = [...t.columns]
+              const zeitIdx = columns.findIndex((c) => c.id === 'zeit')
+              columns.splice(zeitIdx + 1, 0, { id: 'wdh', name: 'Wiederholung', type: 'text', fixed: true })
+              return { ...t, columns }
+            }),
+          } as typeof p
+        }
         return p as AppState
       },
       partialize: (s) => ({
@@ -1075,9 +1110,9 @@ function seed(): AppState {
   const bearbeitungsbloecke: Bearbeitungsblock[] = []
 
   const schritte: Schritt[] = [
-    { id: 's-spritzen', abteilungId: 'abt-wachs', blockId: null, name: '1. Spritzen', position: 1, columns: [], keys: [], loopCondition: null, loopTargetId: null, optional: false },
-    { id: 's-modellieren', abteilungId: 'abt-wachs', blockId: null, name: '2. Modellieren', position: 2, columns: [], keys: [], loopCondition: null, loopTargetId: null, optional: false },
-    { id: 's-reinigen', abteilungId: 'abt-wachs', blockId: null, name: '3. Reinigen', position: 3, columns: [], keys: [], loopCondition: null, loopTargetId: null, optional: false },
+    { id: 's-spritzen', abteilungId: 'abt-wachs', blockId: null, name: '1. Spritzen', position: 1, columns: [], keys: [], loopCondition: null, loopTargetId: null, loopWiederholungen: null, optional: false },
+    { id: 's-modellieren', abteilungId: 'abt-wachs', blockId: null, name: '2. Modellieren', position: 2, columns: [], keys: [], loopCondition: null, loopTargetId: null, loopWiederholungen: null, optional: false },
+    { id: 's-reinigen', abteilungId: 'abt-wachs', blockId: null, name: '3. Reinigen', position: 3, columns: [], keys: [], loopCondition: null, loopTargetId: null, loopWiederholungen: null, optional: false },
   ]
 
   const druckSpalte: TableColumn = { id: 'c-druck', name: 'Druck (bar)', type: 'number', fixed: false }

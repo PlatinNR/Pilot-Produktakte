@@ -1,6 +1,7 @@
 import { useStore } from '../store'
 import type { Produktionstabelle } from '../types'
 import { traceAuftrag } from '../utils/aggregate'
+import { wiederholungenFuerSchritt } from '../utils/schleifen'
 import { DurchlaufWahl } from './DurchlaufWahl'
 
 interface Props {
@@ -13,6 +14,7 @@ export function TraceView({ auftragsnummer }: Props) {
   const alleSchritte = useStore((s) => s.schritte)
   const alleMaschinen = useStore((s) => s.produktionstabellen)
   const alleNeben = useStore((s) => s.nebentabellen)
+  const alleBloecke = useStore((s) => s.bearbeitungsbloecke)
 
   const abteilungIds = new Set(abteilungen.filter((a) => a.chainId === activeChainId).map((a) => a.id))
   const schritte = alleSchritte.filter((st) => abteilungIds.has(st.abteilungId))
@@ -87,6 +89,14 @@ export function TraceView({ auftragsnummer }: Props) {
                 <div className="text-[11px] uppercase tracking-wide text-slate-400">
                   {stop.schritt.name}
                   {stop.schritt.optional && <span className="ml-1 text-slate-300">(opt.)</span>}
+                  {(() => {
+                    const wdh = wiederholungenFuerSchritt(stop.schritt.id, alleSchritte, alleBloecke)
+                    return wdh && wdh >= 2 ? (
+                      <span className="ml-1 text-zollern-600" title="Schleifen-Wiederholungen">
+                        ⟲ {wdh} Wdh.
+                      </span>
+                    ) : null
+                  })()}
                 </div>
                 {tabellen.length > 0 ? (
                   tabellen.map((t, ti) => {

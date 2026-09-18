@@ -306,7 +306,7 @@ function RelationshipLine({ geo, n1 }: { geo: Geo; n1: boolean }) {
   )
 }
 
-function LoopLine({ from, to, condition }: { from: Rect; to: Rect; condition: string }) {
+function LoopLine({ from, to, label }: { from: Rect; to: Rect; label: string }) {
   const x1 = from.x
   const y1 = from.y + from.h / 2
   const x2 = to.x
@@ -319,9 +319,9 @@ function LoopLine({ from, to, condition }: { from: Rect; to: Rect; condition: st
   return (
     <g>
       <path d={path} stroke="#c45004" strokeWidth={1.5} fill="none" strokeDasharray="5 4" markerEnd="url(#er-loop-arrow)" />
-      {condition && (
+      {label && (
         <text x={labelX} y={labelY} textAnchor="end" fontSize={9} fill="#c45004" style={halo}>
-          {condition}
+          {label}
         </text>
       )}
     </g>
@@ -402,6 +402,7 @@ export function TabellenbezogenView({ filter }: Props) {
     setColumnKeySchritt,
     linkSchrittFK,
     setSchrittLoop,
+    setSchrittWiederholungen,
     setSchrittOptional,
     setSchrittBlock,
     renameAbteilung,
@@ -643,7 +644,7 @@ export function TabellenbezogenView({ filter }: Props) {
     }
   }
   // Schleifen (Rücksprünge mit Bedingung) – Ziel kann ein Schritt oder ein variabler Block sein
-  const loops: { sourceKey: string; targetKey: string; condition: string }[] = []
+  const loops: { sourceKey: string; targetKey: string; label: string }[] = []
   const blockIds = new Set(alleBloecke.map((b) => b.id))
   for (const st of alleSchritte) {
     if (!st.loopTargetId) continue
@@ -652,7 +653,9 @@ export function TabellenbezogenView({ filter }: Props) {
       targetKey: blockIds.has(st.loopTargetId)
         ? `b:${st.loopTargetId}`
         : `s:${st.loopTargetId}:auftragsnummer`,
-      condition: st.loopCondition ?? '',
+      label: st.loopWiederholungen
+        ? `⟲ ×${st.loopWiederholungen}`
+        : (st.loopCondition ?? ''),
     })
   }
 
@@ -702,7 +705,7 @@ export function TabellenbezogenView({ filter }: Props) {
           const from = boxes[lp.sourceKey]
           const to = boxes[lp.targetKey]
           if (!from || !to) return null
-          return <LoopLine key={`loop-${i}`} from={from} to={to} condition={lp.condition} />
+          return <LoopLine key={`loop-${i}`} from={from} to={to} label={lp.label} />
         })}
         {dragLine && (
           <path d={dragLine} stroke="#c45004" strokeWidth={2} fill="none" strokeDasharray="4 3" />
@@ -971,14 +974,21 @@ export function TabellenbezogenView({ filter }: Props) {
                                             )}
                                           </div>
                                           {bst.loopTargetId && (
-                                            <label className="mt-1 flex flex-col gap-0.5">
-                                              <span className="text-[9px] text-slate-400">Bedingung</span>
+                                            <label className="mt-1 flex items-center gap-1">
+                                              <span className="text-[9px] text-slate-400">Wiederholungen</span>
                                               <input
-                                                value={bst.loopCondition ?? ''}
+                                                type="number"
+                                                min={1}
+                                                max={20}
+                                                value={bst.loopWiederholungen ?? ''}
                                                 onChange={(e) =>
-                                                  setSchrittLoop(bst.id, bst.loopTargetId, e.target.value || null)
+                                                  setSchrittWiederholungen(
+                                                    bst.id,
+                                                    e.target.value ? Math.max(1, Number(e.target.value)) : null,
+                                                  )
                                                 }
-                                                className="w-full rounded border border-slate-200 bg-white px-2 py-0.5 text-[10px] text-slate-700 outline-none focus:border-zollern-400"
+                                                className="w-16 rounded border border-slate-200 bg-white px-2 py-0.5 text-[10px] text-slate-700 outline-none focus:border-zollern-400"
+                                                title="Wie oft diese Schleife wiederholt wird (Auswahl beim Produkt-Hinzufügen)"
                                               />
                                             </label>
                                           )}
@@ -1290,14 +1300,21 @@ export function TabellenbezogenView({ filter }: Props) {
                                 )}
                               </div>
                               {st.loopTargetId && (
-                                <label className="mt-1 flex flex-col gap-0.5">
-                                  <span className="text-[9px] text-slate-400">Bedingung</span>
+                                <label className="mt-1 flex items-center gap-1">
+                                  <span className="text-[9px] text-slate-400">Wiederholungen</span>
                                   <input
-                                    value={st.loopCondition ?? ''}
+                                    type="number"
+                                    min={1}
+                                    max={20}
+                                    value={st.loopWiederholungen ?? ''}
                                     onChange={(e) =>
-                                      setSchrittLoop(st.id, st.loopTargetId, e.target.value || null)
+                                      setSchrittWiederholungen(
+                                        st.id,
+                                        e.target.value ? Math.max(1, Number(e.target.value)) : null,
+                                      )
                                     }
-                                    className="w-full rounded border border-slate-200 bg-white px-2 py-0.5 text-[10px] text-slate-700 outline-none focus:border-zollern-400"
+                                    className="w-16 rounded border border-slate-200 bg-white px-2 py-0.5 text-[10px] text-slate-700 outline-none focus:border-zollern-400"
+                                    title="Wie oft diese Schleife wiederholt wird (Auswahl beim Produkt-Hinzufügen)"
                                   />
                                 </label>
                               )}

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useStore } from '../store'
 import { abteilungFarbe } from '../utils/colors'
+import { wiederholungenFuerSchritt } from '../utils/schleifen'
 
 type Modus = 'manuell' | 'import'
 
@@ -15,6 +16,7 @@ export function ProduktHinzufuegenView() {
   const alleAbteilungen = useStore((s) => s.abteilungen)
   const alleSchritte = useStore((s) => s.schritte)
   const alleMaschinen = useStore((s) => s.produktionstabellen)
+  const alleBloecke = useStore((s) => s.bearbeitungsbloecke)
   const addProdukt = useStore((s) => s.addProdukt)
 
   const [modus, setModus] = useState<Modus>('manuell')
@@ -26,6 +28,7 @@ export function ProduktHinzufuegenView() {
   const [aktiverDurchlauf, setAktiverDurchlauf] = useState<Record<string, number>>({})
   const [werte, setWerte] = useState<Record<string, Record<string, string>[]>>({})
   const [zeiten, setZeiten] = useState<Record<string, { datum: string; zeit: string }[]>>({})
+  const [wiederholungen, setWiederholungen] = useState<Record<string, string[]>>({})
   const [meldung, setMeldung] = useState<string | null>(null)
 
   const abteilungen = alleAbteilungen.filter((a) => a.chainId === activeChainId)
@@ -70,6 +73,16 @@ export function ProduktHinzufuegenView() {
       return { ...z, [tabelleId]: liste }
     })
 
+  const wdhFuer = (tabelleId: string, index: number) => wiederholungen[tabelleId]?.[index] ?? '1'
+
+  const setWdh = (tabelleId: string, index: number, wert: string) =>
+    setWiederholungen((w) => {
+      const liste = [...(w[tabelleId] ?? [])]
+      while (liste.length <= index) liste.push('1')
+      liste[index] = wert
+      return { ...w, [tabelleId]: liste }
+    })
+
   const speichern = () => {
     if (!kannSpeichern) return
     const eintraege = gewaehlt.map((m) => {
@@ -82,7 +95,12 @@ export function ProduktHinzufuegenView() {
         tabelleId: m.id,
         durchlaeufe: Array.from({ length: n }, (_, i) => {
           const z = zeitFuer(m.id, i)
-          return { datum: z.datum || datum, zeit: z.zeit, spalten: werte[m.id]?.[i] ?? {} }
+          return {
+            datum: z.datum || datum,
+            zeit: z.zeit,
+            wiederholung: wdhFuer(m.id, i),
+            spalten: werte[m.id]?.[i] ?? {},
+          }
         }),
         extraSpalten: extra.map((c) => ({ id: c.id, name: c.name, type: c.type })),
       }
@@ -99,6 +117,7 @@ export function ProduktHinzufuegenView() {
     setAktiverDurchlauf({})
     setWerte({})
     setZeiten({})
+    setWiederholungen({})
   }
 
   return (
@@ -198,6 +217,7 @@ export function ProduktHinzufuegenView() {
                     {schritteDerAbt.map((st) => {
                       const maschinen = alleMaschinen.filter((m) => m.schrittId === st.id)
                       if (maschinen.length === 0) return null
+                      const wdh = wiederholungenFuerSchritt(st.id, alleSchritte, alleBloecke)
                       return (
                         <div key={st.id}>
                           <p className="mb-1 text-xs font-semibold text-slate-600">{st.name}</p>
@@ -261,6 +281,25 @@ export function ProduktHinzufuegenView() {
                                           className="w-14 rounded border border-slate-200 bg-white px-1.5 py-0.5 text-xs text-slate-700 outline-none focus:border-zollern-400"
                                           title="Anzahl der Durchläufe (Arbeitswiederholungen) an dieser Maschine"
                                         />
+                                        {wdh && wdh >= 2 && (
+                                          <label className="flex items-center gap-1">
+                                            <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                                              Wiederholung
+                                            </span>
+                                            <select
+                                              value={wdhFuer(m.id, d)}
+                                              onChange={(e) => setWdh(m.id, d, e.target.value)}
+                                              className="rounded border border-slate-200 bg-white px-1.5 py-0.5 text-xs text-slate-700"
+                                              title="Welche Wiederholung der Schleife ist dieser Eintrag?"
+                                            >
+                                              {Array.from({ length: wdh }, (_, i) => (
+                                                <option key={i} value={String(i + 1)}>
+                                                  {i + 1} von {wdh}
+                                                </option>
+                                              ))}
+                                            </select>
+                                          </label>
+                                        )}
                                         {n > 1 && (
                                           <div className="flex items-center gap-1">
                                             <span className="text-[10px] text-slate-400">Werte für:</span>

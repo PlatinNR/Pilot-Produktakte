@@ -9,14 +9,23 @@ interface Props {
 
 /**
  * Zeigt die Werte eines Auftrags an einer Maschine.
- * Wurde die Maschine mehrfach durchlaufen (Arbeitswiederholung), kann der Durchlauf gewählt werden.
+ * - Schleifen-Wiederholungen (Spalte „Wiederholung") sind wählbar
+ * - Mehrere Durchläufe an derselben Maschine sind wählbar
  */
 export function DurchlaufWahl({ tabelle, auftragsnummer, kompakt = false }: Props) {
-  const [index, setIndex] = useState(0)
+  const [wdhIndex, setWdhIndex] = useState(0)
+  const [runIndex, setRunIndex] = useState(0)
+
   const runs = tabelle.rows.filter((r) => r.auftragsnummer === auftragsnummer)
   if (runs.length === 0) return null
 
-  const aktiv = runs[Math.min(index, runs.length - 1)]
+  const wdhWerte = Array.from(
+    new Set(runs.map((r) => (r.wdh ?? '').trim()).filter((w) => w.length > 0)),
+  )
+  const aktiveWdh = wdhWerte.length > 0 ? wdhWerte[Math.min(wdhIndex, wdhWerte.length - 1)] : null
+  const gefiltert = aktiveWdh ? runs.filter((r) => (r.wdh ?? '').trim() === aktiveWdh) : runs
+  const aktiverIndex = Math.min(runIndex, gefiltert.length - 1)
+  const aktiv = gefiltert[aktiverIndex]
   const spalten = tabelle.columns.filter((c) => c.id !== 'auftragsnummer')
 
   return (
@@ -29,21 +38,41 @@ export function DurchlaufWahl({ tabelle, auftragsnummer, kompakt = false }: Prop
         <span className="text-[9px] font-semibold uppercase tracking-wide text-slate-500">
           Werte des Auftrags
         </span>
-        {runs.length > 1 && (
+        {wdhWerte.length > 1 && aktiveWdh && (
           <label className="flex items-center gap-1">
             <select
-              value={index}
-              onChange={(e) => setIndex(Number(e.target.value))}
+              value={aktiveWdh}
+              onChange={(e) => {
+                setWdhIndex(Math.max(0, wdhWerte.indexOf(e.target.value)))
+                setRunIndex(0)
+              }}
+              className="rounded border border-slate-200 bg-white px-1 py-0.5 text-[10px] text-slate-700"
+              title="Wiederholung der Schleife wählen"
+            >
+              {wdhWerte.map((w) => (
+                <option key={w} value={w}>
+                  Wiederholung {w}
+                </option>
+              ))}
+            </select>
+            <span className="text-[10px] text-slate-400">von {wdhWerte.length}</span>
+          </label>
+        )}
+        {gefiltert.length > 1 && (
+          <label className="flex items-center gap-1">
+            <select
+              value={aktiverIndex}
+              onChange={(e) => setRunIndex(Number(e.target.value))}
               className="rounded border border-slate-200 bg-white px-1 py-0.5 text-[10px] text-slate-700"
               title="Werte eines anderen Durchlaufs anzeigen"
             >
-              {runs.map((_, i) => (
+              {gefiltert.map((_, i) => (
                 <option key={i} value={i}>
                   Durchlauf {i + 1}
                 </option>
               ))}
             </select>
-            <span className="text-[10px] text-slate-400">von {runs.length} Durchläufen</span>
+            <span className="text-[10px] text-slate-400">von {gefiltert.length}</span>
           </label>
         )}
       </div>

@@ -43,8 +43,10 @@ export interface Schritt {
   keys: TableKey[]
   /** Schleifen-Bedingung (z. B. „Schichtdicke < Soll") – wenn erfüllt, wird zurückgesprungen */
   loopCondition: string | null
-  /** Schritt-ID, zu der zurückgesprungen wird (Schleife) */
+  /** Schritt-ID, zu der zurückgesprungen wird (Schleife) – kann auch ein Variabler Block sein */
   loopTargetId: string | null
+  /** Anzahl der Wiederholungen der Schleife (statt Bedingung) */
+  loopWiederholungen: number | null
   /** Optionaler Schritt – kann übersprungen werden, wenn für ein Teil kein Eintrag besteht */
   optional: boolean
 }
@@ -168,6 +170,7 @@ export const PRODUKTION_SPALTEN: TableColumn[] = [
   { id: 'fn', name: 'FN', type: 'text', fixed: true },
   { id: 'datum', name: 'Datum', type: 'date', fixed: true },
   { id: 'zeit', name: 'Uhrzeit', type: 'time', fixed: true },
+  { id: 'wdh', name: 'Wiederholung', type: 'text', fixed: true },
 ]
 
 /** Standardspalte jeder Nebentabelle (zeitlicher Bezug) */
