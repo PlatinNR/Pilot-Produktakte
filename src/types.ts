@@ -142,6 +142,20 @@ export const INFO_STANDARD_FELDER: InfoFeld[] = [
   { id: 'materialnummer', name: 'Materialnummer', type: 'text', value: '', fixed: true },
 ]
 
+/** Kopie einer Tabelle (System-Zwischenablage, JSON) */
+export interface TabellenKopie {
+  typ: 'produktakte-tabelle'
+  version: 1
+  art: 'maschine' | 'nebentabelle'
+  name: string
+  arbeitsplatz: string
+  columns: TableColumn[]
+  rows: TableRow[]
+  keys: TableKey[]
+  /** Ursprung – dient zum Umbiegen der Fremdschlüssel beim Einfügen */
+  quelle: { schrittId?: string; abteilungId?: string }
+}
+
 /** Zentraler Anwendungszustand */
 export interface AppState {
   chains: Chain[]

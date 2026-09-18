@@ -1,5 +1,6 @@
 import { useStore, arbeitsplatzFehlerText } from '../store'
 import { DataTable } from './DataTable'
+import { einfuegenNebentabelle, kopiereNebentabelle } from '../lib/tabellenKopie'
 
 interface Props {
   abteilungId: string
@@ -26,12 +27,21 @@ export function NebentabellenColumn({ abteilungId }: Props) {
     <aside className="flex w-full shrink-0 flex-col gap-2 lg:w-80">
       <div className="flex items-center justify-between">
         <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Nebentabellen</h2>
-        <button
-          onClick={() => addNebentabelle(abteilungId)}
-          className="rounded border border-slate-300 px-2 py-0.5 text-xs text-slate-600 hover:bg-slate-100"
-        >
-          + Nebentabelle
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => einfuegenNebentabelle(abteilungId)}
+            className="rounded border border-slate-300 px-2 py-0.5 text-xs text-slate-500 hover:bg-slate-100"
+            title="Kopierte Nebentabelle hier einfügen"
+          >
+            ⧉ Einfügen
+          </button>
+          <button
+            onClick={() => addNebentabelle(abteilungId)}
+            className="rounded border border-slate-300 px-2 py-0.5 text-xs text-slate-600 hover:bg-slate-100"
+          >
+            + Nebentabelle
+          </button>
+        </div>
       </div>
       <p className="text-[11px] text-slate-400">Zeitbezogene Daten der Abteilung (z. B. Wachsqualität).</p>
 
@@ -63,6 +73,7 @@ export function NebentabellenColumn({ abteilungId }: Props) {
             arbeitsplatz={t.arbeitsplatz}
             onArbeitsplatzChange={(wert) => setNebenArbeitsplatz(t.id, wert)}
             arbeitsplatzPruefen={(wert) => arbeitsplatzFehlerText(t.id, wert)}
+            onKopieren={() => kopiereNebentabelle(t.id)}
           />
         ))}
       </div>

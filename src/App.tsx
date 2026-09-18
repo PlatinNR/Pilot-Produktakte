@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useSupabaseSync } from './lib/sync'
 import { initUndo, useUndoShortcut } from './lib/undo'
+import { KopierToast } from './components/KopierToast'
 import { Dashboard } from './pages/Dashboard'
 
 function AppShell() {
@@ -32,6 +33,8 @@ function AppShell() {
       <main className="min-h-0 flex-1 bg-zo-bg-lighter">
         <Dashboard />
       </main>
+
+      <KopierToast />
     </div>
   )
 }

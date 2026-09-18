@@ -30,6 +30,8 @@ interface Props {
   arbeitsplatzPruefen?: (wert: string) => string | null
   /** Zusätzlicher Block unter dem Kopf (z. B. Auswahl der Arbeitswiederholung) */
   kopfExtra?: ReactNode
+  /** Tabelle kopieren */
+  onKopieren?: () => void
 }
 
 function inputType(type: ColumnType): string {
@@ -60,6 +62,7 @@ export function DataTable({
   onArbeitsplatzChange,
   arbeitsplatzPruefen,
   kopfExtra,
+  onKopieren,
 }: Props) {
   const [addingCol, setAddingCol] = useState(false)
   const [colName, setColName] = useState('')
@@ -105,6 +108,15 @@ export function DataTable({
           <span className="shrink-0 rounded-full bg-zollern-50 px-2 py-0.5 text-xs font-bold text-zollern-700">
             {Math.round(percent * 10) / 10} %
           </span>
+        )}
+        {onKopieren && (
+          <button
+            onClick={onKopieren}
+            className="shrink-0 rounded px-1 text-xs text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+            title="Tabelle kopieren (Spalten + Zeilen)"
+          >
+            ⧉
+          </button>
         )}
         <button
           onClick={onRemove}

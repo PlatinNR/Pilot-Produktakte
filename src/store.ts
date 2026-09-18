@@ -14,6 +14,7 @@ import type {
   Schritt,
   TableColumn,
   TableKey,
+  TabellenKopie,
   TableRow,
 } from './types'
 import { NEBEN_SPALTEN, PRODUKTION_SPALTEN, emptyInfo } from './types'
@@ -228,6 +229,12 @@ interface Store extends AppState {
   setColumnKeyNeben: (tabelleId: string, spalteId: string, keyType: KeyType | null) => void
   linkNebenFK: (tabelleId: string, spalteId: string, refTableId: string, refColumnId: string) => void
   setKeyLabelNeben: (tabelleId: string, spalteId: string, label: string) => void
+
+  // Kopieren / Einfügen
+  einfuegenTabelle: (
+    kopie: TabellenKopie,
+    ziel: { art: 'maschine'; schrittId: string } | { art: 'nebentabelle'; abteilungId: string },
+  ) => { arbeitsplatzGeleert: boolean }
 }
 
 /** Name der Tabelle (Maschine/Nebentabelle), die diese Arbeitsplatz-Nummer in der aktiven Kette schon nutzt. */
@@ -896,14 +903,98 @@ export const useStore = create<Store>()(
       }),
     })),
 
-setKeyLabelNeben: (tabelleId, spalteId, label) =>
+  setKeyLabelNeben: (tabelleId, spalteId, label) =>
     set((s) => ({
       nebentabellen: s.nebentabellen.map((t: Nebentabelle) =>
         t.id === tabelleId
           ? { ...t, keys: t.keys.map((k: TableKey) => (k.columnId === spalteId ? { ...k, label } : k)) }
-        : t,
+          : t,
       ),
     })),
+
+  // Kopierte Tabelle am Zielort einfügen (Schritt = Maschine, Abteilung = Nebentabelle)
+  einfuegenTabelle: (kopie, ziel) => {
+    const s = useStore.getState()
+    const zielAbteilungId =
+      ziel.art === 'maschine'
+        ? (s.schritte.find((st) => st.id === ziel.schrittId)?.abteilungId ?? '')
+        : ziel.abteilungId
+    const chainId = s.abteilungen.find((a) => a.id === zielAbteilungId)?.chainId ?? s.activeChainId
+
+    // Arbeitsplatz-Nummer prüfen (darf in der Kette nur einmal vergeben sein)
+    const abteilungIds = new Set(s.abteilungen.filter((a) => a.chainId === chainId).map((a) => a.id))
+    const schrittIds = new Set(
+      s.schritte.filter((st) => abteilungIds.has(st.abteilungId)).map((st) => st.id),
+    )
+    const vergeben = new Set<string>()
+    for (const t of s.produktionstabellen) {
+      if (schrittIds.has(t.schrittId) && t.arbeitsplatz.trim()) vergeben.add(t.arbeitsplatz.trim())
+    }
+    for (const n of s.nebentabellen) {
+      if (abteilungIds.has(n.abteilungId) && n.arbeitsplatz.trim()) vergeben.add(n.arbeitsplatz.trim())
+    }
+    const arbeitsplatzGeleert =
+      kopie.arbeitsplatz.trim().length > 0 && vergeben.has(kopie.arbeitsplatz.trim())
+    const arbeitsplatz = arbeitsplatzGeleert ? '' : kopie.arbeitsplatz
+
+    // Standardspalten sicherstellen
+    const standard = kopie.art === 'maschine' ? PRODUKTION_SPALTEN : NEBEN_SPALTEN
+    const columns = [...kopie.columns.map((c) => ({ ...c }))]
+    for (const std of standard) {
+      if (!columns.some((c) => c.id === std.id)) columns.push({ ...std })
+    }
+
+    // Fremdschlüssel: auf den neuen Schritt umbiegen, ungültige entfernen
+    const existiert = (id: string) =>
+      s.produktionstabellen.some((t) => t.id === id) ||
+      s.nebentabellen.some((n) => n.id === id) ||
+      s.schritte.some((st) => st.id === id)
+    const keys = kopie.keys
+      .filter((k) => k.type !== 'fk' || !k.refTableId || existiert(k.refTableId))
+      .map((k) =>
+        k.type === 'fk' &&
+        kopie.quelle.schrittId &&
+        k.refTableId === kopie.quelle.schrittId &&
+        ziel.art === 'maschine'
+          ? { ...k, refTableId: ziel.schrittId }
+          : k,
+      )
+
+    const name = `${kopie.name} (Kopie)`
+    if (kopie.art === 'maschine' && ziel.art === 'maschine') {
+      set((st) => ({
+        produktionstabellen: [
+          ...st.produktionstabellen,
+          {
+            id: nextId('p'),
+            schrittId: ziel.schrittId,
+            name,
+            arbeitsplatz,
+            columns,
+            rows: kopie.rows.map((r) => ({ ...r })),
+            keys,
+          },
+        ],
+      }))
+    } else if (kopie.art === 'nebentabelle' && ziel.art === 'nebentabelle') {
+      set((st) => ({
+        nebentabellen: [
+          ...st.nebentabellen,
+          {
+            id: nextId('n'),
+            abteilungId: ziel.abteilungId,
+            name,
+            arbeitsplatz,
+            columns,
+            rows: kopie.rows.map((r) => ({ ...r })),
+            keys,
+          },
+        ],
+      }))
+    }
+
+    return { arbeitsplatzGeleert }
+  },
   }),
     {
       name: 'digitale-produktakte',

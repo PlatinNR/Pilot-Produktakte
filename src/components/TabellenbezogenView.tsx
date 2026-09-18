@@ -17,6 +17,7 @@ import {
 import { EditableName } from './EditableName'
 import { InfoModal } from './InfoModal'
 import { DurchlaufWahl } from './DurchlaufWahl'
+import { einfuegenMaschine, einfuegenNebentabelle, kopiereMaschine, kopiereNebentabelle } from '../lib/tabellenKopie'
 import { KeyBadge } from './KeyBadge'
 import { keyTypeOf, nextKey } from '../utils/keys'
 import { abteilungFarbe } from '../utils/colors'
@@ -144,6 +145,8 @@ interface EntityProps {
   rahmen?: 'normal' | 'extern'
   /** Betonte Darstellung (der Schritt ist leitend) */
   betont?: boolean
+  /** Tabelle kopieren */
+  onKopieren?: () => void
 }
 
 function EntityCard({
@@ -158,6 +161,7 @@ function EntityCard({
   onAddColumn,
   rahmen = 'normal',
   betont = false,
+  onKopieren,
 }: EntityProps) {
   const [addingCol, setAddingCol] = useState(false)
   const [colName, setColName] = useState('')
@@ -195,6 +199,15 @@ function EntityCard({
           <span className="shrink-0 rounded-full bg-zollern-50 px-1.5 py-0.5 text-[10px] font-bold text-zollern-700">
             {formatPercent(percent)}
           </span>
+        )}
+        {onKopieren && (
+          <button
+            onClick={onKopieren}
+            className="shrink-0 rounded px-1 text-xs text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+            title="Tabelle kopieren (Spalten + Zeilen)"
+          >
+            ⧉
+          </button>
         )}
         <button
           onClick={onRemove}
@@ -1089,9 +1102,10 @@ export function TabellenbezogenView({ filter }: Props) {
                                                 onRemove={() => removeProduktionstabelle(m.id)}
                                                 percent={aggregate && agg ? (anteil?.percent ?? 0) : null}
                                                 colorClass={MASCHINEN_FARBEN[mi % MASCHINEN_FARBEN.length]}
-                                                onAddColumn={(name, type) => addColumnProduktion(m.id, name, type)}
-                                              >
-                                                <ArbeitsplatzZeile
+                                        onAddColumn={(name, type) => addColumnProduktion(m.id, name, type)}
+                                        onKopieren={() => kopiereMaschine(m.id)}
+                                      >
+                                        <ArbeitsplatzZeile
                                                   tabelleId={m.id}
                                                   wert={m.arbeitsplatz}
                                                   onChange={setProduktionArbeitsplatz}
@@ -1126,12 +1140,21 @@ export function TabellenbezogenView({ filter }: Props) {
                                             </div>
                                           )
                                         })}
-                                        <button
-                                          onClick={() => addProduktionstabelle(bst.id)}
-                                          className="flex min-h-[2.5rem] items-center justify-center rounded-lg border-2 border-dashed border-slate-200 text-[11px] text-slate-400 hover:border-zollern-400 hover:text-zollern-600"
-                                        >
-                                          + Maschine
-                                        </button>
+                                        <div className="flex min-h-[2.5rem] flex-col items-center justify-center gap-0.5 rounded-lg border-2 border-dashed border-slate-200">
+                                          <button
+                                            onClick={() => addProduktionstabelle(bst.id)}
+                                            className="text-[11px] text-slate-400 hover:text-zollern-600"
+                                          >
+                                            + Maschine
+                                          </button>
+                                          <button
+                                            onClick={() => einfuegenMaschine(bst.id)}
+                                            className="text-[10px] text-slate-400 hover:text-zollern-600"
+                                            title="Kopierte Maschinentabelle hier einfügen"
+                                          >
+                                            ⧉ Einfügen
+                                          </button>
+                                        </div>
                                       </div>
                                     </div>
                                   )
@@ -1187,6 +1210,7 @@ export function TabellenbezogenView({ filter }: Props) {
                                     percent={aggregate && agg ? (anteil?.percent ?? 0) : null}
                                     colorClass={MASCHINEN_FARBEN[mi % MASCHINEN_FARBEN.length]}
                                     onAddColumn={(name, type) => addColumnProduktion(m.id, name, type)}
+                                    onKopieren={() => kopiereMaschine(m.id)}
                                   >
                                     <ArbeitsplatzZeile
                                       tabelleId={m.id}
@@ -1232,12 +1256,21 @@ export function TabellenbezogenView({ filter }: Props) {
                             betont
                             footer={
                               <div className="flex items-center justify-between gap-1 border-t border-slate-100 px-2 py-1">
-                                <button
-                                  onClick={() => addProduktionstabelle(st.id)}
-                                  className="rounded border border-slate-300 px-2 py-0.5 text-[11px] text-slate-600 hover:bg-slate-100"
-                                >
-                                  + Maschine
-                                </button>
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    onClick={() => addProduktionstabelle(st.id)}
+                                    className="rounded border border-slate-300 px-2 py-0.5 text-[11px] text-slate-600 hover:bg-slate-100"
+                                  >
+                                    + Maschine
+                                  </button>
+                                  <button
+                                    onClick={() => einfuegenMaschine(st.id)}
+                                    className="rounded border border-slate-300 px-2 py-0.5 text-[11px] text-slate-500 hover:bg-slate-100"
+                                    title="Kopierte Maschinentabelle hier einfügen"
+                                  >
+                                    ⧉ Einfügen
+                                  </button>
+                                </div>
                                 <div className="flex items-center gap-1">
                                   <button
                                     onClick={() => moveSchritt(st.id, 'up')}
@@ -1392,12 +1425,21 @@ export function TabellenbezogenView({ filter }: Props) {
                     <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                       Prozessunterstützung
                     </span>
-                    <button
-                      onClick={() => addNebentabelle(a.id)}
-                      className="rounded border border-slate-300 px-2 py-0.5 text-[11px] text-slate-600 hover:bg-slate-100"
-                    >
-                      + Nebentabelle
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => einfuegenNebentabelle(a.id)}
+                        className="rounded border border-slate-300 px-2 py-0.5 text-[11px] text-slate-500 hover:bg-slate-100"
+                        title="Kopierte Nebentabelle hier einfügen"
+                      >
+                        ⧉ Einfügen
+                      </button>
+                      <button
+                        onClick={() => addNebentabelle(a.id)}
+                        className="rounded border border-slate-300 px-2 py-0.5 text-[11px] text-slate-600 hover:bg-slate-100"
+                      >
+                        + Nebentabelle
+                      </button>
+                    </div>
                   </div>
                   <div className="flex flex-col gap-3">
                     {neben.length === 0 && (
@@ -1412,6 +1454,7 @@ export function TabellenbezogenView({ filter }: Props) {
                         onRename={(name) => renameNebentabelle(n.id, name)}
                         onRemove={() => removeNebentabelle(n.id)}
                         onAddColumn={(name, type) => addColumnNeben(n.id, name, type)}
+                        onKopieren={() => kopiereNebentabelle(n.id)}
                       >
                         <ArbeitsplatzZeile
                           tabelleId={n.id}

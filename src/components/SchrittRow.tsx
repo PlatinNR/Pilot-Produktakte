@@ -4,6 +4,7 @@ import { aggregateSchritt, formatPercent, isAggregateMode, isTraceMode, MASCHINE
 import { EditableName } from './EditableName'
 import { DataTable } from './DataTable'
 import { DurchlaufWahl } from './DurchlaufWahl'
+import { einfuegenMaschine, kopiereMaschine } from '../lib/tabellenKopie'
 
 interface Props {
   schritt: Schritt
@@ -145,17 +146,27 @@ export function SchrittRow({ schritt, filter }: Props) {
                 kopfExtra={
                   hatEintrag ? <DurchlaufWahl tabelle={t} auftragsnummer={auftrag} kompakt /> : undefined
                 }
+                onKopieren={() => kopiereMaschine(t.id)}
               />
             </div>
           )
         })}
 
-        <button
-          onClick={() => addProduktionstabelle(schritt.id)}
-          className="flex min-h-[6rem] items-center justify-center rounded-lg border-2 border-dashed border-slate-300 text-sm text-slate-400 hover:border-zollern-400 hover:bg-zollern-50 hover:text-zollern-700"
-        >
-          + Maschine
-        </button>
+        <div className="flex min-h-[6rem] flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-slate-300">
+          <button
+            onClick={() => addProduktionstabelle(schritt.id)}
+            className="text-sm text-slate-400 hover:text-zollern-700"
+          >
+            + Maschine
+          </button>
+          <button
+            onClick={() => einfuegenMaschine(schritt.id)}
+            className="text-[11px] text-slate-400 hover:text-zollern-700"
+            title="Kopierte Maschinentabelle hier einfügen"
+          >
+            ⧉ Einfügen
+          </button>
+        </div>
       </div>
     </div>
   )
