@@ -142,6 +142,8 @@ interface EntityProps {
   onAddColumn?: (name: string, type: ColumnType) => void
   /** 'extern' = Schritt wurde extern bearbeitet (lila Markierung) */
   rahmen?: 'normal' | 'extern'
+  /** Betonte Darstellung (der Schritt ist leitend) */
+  betont?: boolean
 }
 
 function EntityCard({
@@ -155,6 +157,7 @@ function EntityCard({
   compact,
   onAddColumn,
   rahmen = 'normal',
+  betont = false,
 }: EntityProps) {
   const [addingCol, setAddingCol] = useState(false)
   const [colName, setColName] = useState('')
@@ -168,18 +171,25 @@ function EntityCard({
     setColType('text')
     setAddingCol(false)
   }
+  const rahmenKlasse =
+    rahmen === 'extern'
+      ? 'border-purple-400 bg-purple-50 ring-2 ring-purple-300'
+      : betont
+        ? 'border-zollern-300 bg-white shadow-md'
+        : 'border-slate-200 bg-white'
+  const titelKlasse = betont
+    ? 'text-sm font-bold text-zollern-800'
+    : compact
+      ? 'text-[11px] font-semibold text-slate-700'
+      : 'text-xs font-semibold text-slate-700'
   return (
-    <div
-      className={`overflow-hidden rounded-lg border shadow-sm ${
-        rahmen === 'extern' ? 'border-purple-400 bg-purple-50 ring-2 ring-purple-300' : 'border-slate-200 bg-white'
-      }`}
-    >
+    <div className={`overflow-hidden rounded-lg border shadow-sm ${rahmenKlasse}`}>
       <div className={`flex items-center gap-1.5 border-b border-slate-100 ${compact ? 'px-1.5 py-0.5' : 'px-2 py-1.5'}`}>
-        <span className="h-2 w-2 shrink-0 rounded-full bg-zollern-500" />
+        <span className={`shrink-0 rounded-full bg-zollern-500 ${betont ? 'h-2.5 w-2.5' : 'h-2 w-2'}`} />
         <EditableName
           value={title}
           onCommit={onRename}
-          className={`min-w-0 flex-1 bg-transparent font-semibold text-slate-700 outline-none ${compact ? 'text-[11px]' : 'text-xs'}`}
+          className={`min-w-0 flex-1 bg-transparent outline-none ${titelKlasse}`}
         />
         {typeof percent === 'number' && percent >= 0 && (
           <span className="shrink-0 rounded-full bg-zollern-50 px-1.5 py-0.5 text-[10px] font-bold text-zollern-700">
@@ -287,11 +297,26 @@ function computeLine(from: Rect, to: Rect): Geo {
   return { path, x1, y1, x2, y2, labelX, labelY }
 }
 
-function RelationshipLine({ geo, n1 }: { geo: Geo; n1: boolean }) {
+function RelationshipLine({
+  geo,
+  n1,
+  variante = 'normal',
+}: {
+  geo: Geo
+  n1: boolean
+  variante?: 'normal' | 'prozess'
+}) {
+  const prozess = variante === 'prozess'
   const halo = { paintOrder: 'stroke' as const, stroke: '#ffffff', strokeWidth: 3 }
   return (
     <g>
-      <path d={geo.path} stroke="#94a3b8" strokeWidth={1.5} fill="none" markerEnd="url(#er-arrow)" />
+      <path
+        d={geo.path}
+        stroke={prozess ? '#F56405' : '#94a3b8'}
+        strokeWidth={prozess ? 2.5 : 1.5}
+        fill="none"
+        markerEnd={prozess ? 'url(#er-prozess-arrow)' : 'url(#er-arrow)'}
+      />
       {n1 && (
         <text x={geo.x1 < geo.x2 ? geo.x1 + 8 : geo.x1 - 8} y={geo.y1 - 5} textAnchor="middle" fontSize={10} fontWeight={700} fill="#c45004" style={halo}>
           n
@@ -656,6 +681,55 @@ export function TabellenbezogenView({ filter }: Props) {
     })
   }
 
+  // Prozessfolge der Maschinen für den verfolgten Auftrag (Kette → Schritte → Maschinen nach Datum/Uhrzeit)
+  const prozessFolge: string[] = []
+  if (trace) {
+    const eintragVon = (m: (typeof alleMaschinen)[number]) =>
+      m.rows.find((r) => r.auftragsnummer === auftrag)
+    const zeitVonSchritt = (schrittId: string): string => {
+      for (const m of alleMaschinen) {
+        if (m.schrittId !== schrittId) continue
+        const r = eintragVon(m)
+        if (r) return `${r.datum ?? ''}T${r.zeit ?? ''}`
+      }
+      return '9999'
+    }
+    for (const a of abteilungen) {
+      const knoten: { id: string; istBlock: boolean; pos: number }[] = []
+      for (const st of alleSchritte.filter((s) => s.abteilungId === a.id && !s.blockId)) {
+        knoten.push({ id: st.id, istBlock: false, pos: st.position })
+      }
+      for (const b of alleBloecke.filter((x) => x.abteilungId === a.id)) {
+        knoten.push({ id: b.id, istBlock: true, pos: b.position })
+      }
+      knoten.sort((x, y) => x.pos - y.pos)
+
+      const schrittIds: string[] = []
+      for (const k of knoten) {
+        if (k.istBlock) {
+          const blockSchritte = alleSchritte
+            .filter((s) => s.blockId === k.id)
+            .sort((x, y) => zeitVonSchritt(x.id).localeCompare(zeitVonSchritt(y.id)))
+          for (const s of blockSchritte) schrittIds.push(s.id)
+        } else {
+          schrittIds.push(k.id)
+        }
+      }
+      for (const sid of schrittIds) {
+        const ms = alleMaschinen
+          .filter((m) => m.schrittId === sid && m.rows.some((r) => r.auftragsnummer === auftrag))
+          .sort((x, y) => {
+            const rx = eintragVon(x)
+            const ry = eintragVon(y)
+            return `${rx?.datum ?? ''}T${rx?.zeit ?? ''}`.localeCompare(
+              `${ry?.datum ?? ''}T${ry?.zeit ?? ''}`,
+            )
+          })
+        for (const m of ms) prozessFolge.push(`mc:${m.id}`)
+      }
+    }
+  }
+
   const dragSource = dragPos ? boxes[dragPos.sourceKey] : undefined
   const dragLine =
     dragPos && dragSource
@@ -691,6 +765,9 @@ export function TabellenbezogenView({ filter }: Props) {
           <marker id="er-loop-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
             <path d="M0,0 L8,4 L0,8 z" fill="#c45004" />
           </marker>
+          <marker id="er-prozess-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+            <path d="M0,0 L8,4 L0,8 z" fill="#F56405" />
+          </marker>
         </defs>
         {lines.map((ln, i) => {
           const from = boxes[ln.sourceKey]
@@ -703,6 +780,20 @@ export function TabellenbezogenView({ filter }: Props) {
           const to = boxes[lp.targetKey]
           if (!from || !to) return null
           return <LoopLine key={`loop-${i}`} from={from} to={to} label={lp.label} />
+        })}
+        {/* Prozesspfeile: Maschine → nächste Maschine (nach Datum/Uhrzeit), prägnant orange */}
+        {prozessFolge.slice(0, -1).map((key, i) => {
+          const from = boxes[key]
+          const to = boxes[prozessFolge[i + 1]]
+          if (!from || !to) return null
+          return (
+            <RelationshipLine
+              key={`prozess-${i}`}
+              geo={computeLine(from, to)}
+              n1={false}
+              variante="prozess"
+            />
+          )
         })}
         {dragLine && (
           <path d={dragLine} stroke="#c45004" strokeWidth={2} fill="none" strokeDasharray="4 3" />
@@ -787,7 +878,7 @@ export function TabellenbezogenView({ filter }: Props) {
               <div className="flex items-start gap-10">
                 {/* Produktionsstellen + Produktionskette als Schritt-Zeilen */}
                 <div className="min-w-0 flex-1">
-                  <div className="grid grid-cols-[minmax(0,1fr)_16rem] items-start gap-x-10 gap-y-5">
+                  <div className="grid grid-cols-[minmax(0,1fr)_20rem] items-start gap-x-6 gap-y-5">
                     <ColumnLabel>Produktionsstellen</ColumnLabel>
                     <ColumnLabel>Produktionskette</ColumnLabel>
 
@@ -856,6 +947,7 @@ export function TabellenbezogenView({ filter }: Props) {
                                         onRemove={() => removeSchritt(bst.id)}
                                         onAddColumn={(name, type) => addColumnSchritt(bst.id, name, type)}
                                         rahmen={extern ? 'extern' : 'normal'}
+                                        betont
                                       >
                                         {extern && (
                                           <div className="border-t border-purple-100 bg-purple-100/70 px-2 py-0.5 text-[10px] font-semibold text-purple-700">
@@ -982,6 +1074,7 @@ export function TabellenbezogenView({ filter }: Props) {
                                           return (
                                             <div
                                               key={m.id}
+                                              ref={registerRef(`mc:${m.id}`)}
                                               className="rounded-lg"
                                               style={{
                                                 opacity,
@@ -1068,7 +1161,7 @@ export function TabellenbezogenView({ filter }: Props) {
                       return (
                         <Fragment key={st.id}>
                           {/* Maschinen dieses Schritts */}
-                          <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 2xl:grid-cols-4">
+                          <div className="grid grid-cols-2 content-start items-start gap-4 self-start lg:grid-cols-3 2xl:grid-cols-4">
                             {stepMaschinen.map((m, mi) => {
                               const anteil = agg?.entries.find((e) => e.tabelle.id === m.id)
                               const used = m.rows.some((r) => r.auftragsnummer === auftrag)
@@ -1078,6 +1171,7 @@ export function TabellenbezogenView({ filter }: Props) {
                               return (
                                 <div
                                   key={m.id}
+                                  ref={registerRef(`mc:${m.id}`)}
                                   className="rounded-lg"
                                   style={{
                                     opacity,
@@ -1135,6 +1229,7 @@ export function TabellenbezogenView({ filter }: Props) {
                             percent={aggregate && matchedRows.length > 0 ? (matched / matchedRows.length) * 100 : null}
                             onAddColumn={(name, type) => addColumnSchritt(st.id, name, type)}
                             rahmen={extern ? 'extern' : 'normal'}
+                            betont
                             footer={
                               <div className="flex items-center justify-between gap-1 border-t border-slate-100 px-2 py-1">
                                 <button
