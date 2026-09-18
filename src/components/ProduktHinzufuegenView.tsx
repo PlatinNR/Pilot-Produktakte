@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useStore } from '../store'
 import { abteilungFarbe } from '../utils/colors'
-import { wiederholungenFuerSchritt } from '../utils/schleifen'
+import { schleifenInfoFuerSchritt } from '../utils/schleifen'
 
 type Modus = 'manuell' | 'import'
 
@@ -217,7 +217,7 @@ export function ProduktHinzufuegenView() {
                     {schritteDerAbt.map((st) => {
                       const maschinen = alleMaschinen.filter((m) => m.schrittId === st.id)
                       if (maschinen.length === 0) return null
-                      const wdh = wiederholungenFuerSchritt(st.id, alleSchritte, alleBloecke)
+                      const inSchleife = schleifenInfoFuerSchritt(st.id, alleSchritte, alleBloecke).inSchleife
                       return (
                         <div key={st.id}>
                           <p className="mb-1 text-xs font-semibold text-slate-600">{st.name}</p>
@@ -281,7 +281,7 @@ export function ProduktHinzufuegenView() {
                                           className="w-14 rounded border border-slate-200 bg-white px-1.5 py-0.5 text-xs text-slate-700 outline-none focus:border-zollern-400"
                                           title="Anzahl der Durchläufe (Arbeitswiederholungen) an dieser Maschine"
                                         />
-                                        {wdh && wdh >= 2 && (
+                                        {inSchleife && (
                                           <label className="flex items-center gap-1">
                                             <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
                                               Wiederholung
@@ -292,9 +292,9 @@ export function ProduktHinzufuegenView() {
                                               className="rounded border border-slate-200 bg-white px-1.5 py-0.5 text-xs text-slate-700"
                                               title="Welche Wiederholung der Schleife ist dieser Eintrag?"
                                             >
-                                              {Array.from({ length: wdh }, (_, i) => (
+                                              {Array.from({ length: 10 }, (_, i) => (
                                                 <option key={i} value={String(i + 1)}>
-                                                  {i + 1} von {wdh}
+                                                  {i + 1}
                                                 </option>
                                               ))}
                                             </select>

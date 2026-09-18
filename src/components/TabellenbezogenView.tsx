@@ -402,7 +402,6 @@ export function TabellenbezogenView({ filter }: Props) {
     setColumnKeySchritt,
     linkSchrittFK,
     setSchrittLoop,
-    setSchrittWiederholungen,
     setSchrittOptional,
     setSchrittBlock,
     renameAbteilung,
@@ -653,9 +652,7 @@ export function TabellenbezogenView({ filter }: Props) {
       targetKey: blockIds.has(st.loopTargetId)
         ? `b:${st.loopTargetId}`
         : `s:${st.loopTargetId}:auftragsnummer`,
-      label: st.loopWiederholungen
-        ? `⟲ ×${st.loopWiederholungen}`
-        : (st.loopCondition ?? ''),
+      label: st.loopWiederholungen ? `⟲ ×${st.loopWiederholungen}` : '⟲ Schleife',
     })
   }
 
@@ -970,30 +967,11 @@ export function TabellenbezogenView({ filter }: Props) {
                                                 title="Schleife entfernen"
                                               >
                                                 ✕
-                                              </button>
-                                            )}
-                                          </div>
-                                          {bst.loopTargetId && (
-                                            <label className="mt-1 flex items-center gap-1">
-                                              <span className="text-[9px] text-slate-400">Wiederholungen</span>
-                                              <input
-                                                type="number"
-                                                min={1}
-                                                max={20}
-                                                value={bst.loopWiederholungen ?? ''}
-                                                onChange={(e) =>
-                                                  setSchrittWiederholungen(
-                                                    bst.id,
-                                                    e.target.value ? Math.max(1, Number(e.target.value)) : null,
-                                                  )
-                                                }
-                                                className="w-16 rounded border border-slate-200 bg-white px-2 py-0.5 text-[10px] text-slate-700 outline-none focus:border-zollern-400"
-                                                title="Wie oft diese Schleife wiederholt wird (Auswahl beim Produkt-Hinzufügen)"
-                                              />
-                                            </label>
-                                          )}
-                                        </div>
-                                      </EntityCard>
+                                                        </button>
+                                                      )}
+                                                    </div>
+                                                  </div>
+                                                </EntityCard>
                                       <div className="flex flex-col gap-2">
                                         {bstepMaschinen.map((m, mi) => {
                                           const anteil = agg?.entries.find((e) => e.tabelle.id === m.id)
@@ -1299,25 +1277,6 @@ export function TabellenbezogenView({ filter }: Props) {
                                   </button>
                                 )}
                               </div>
-                              {st.loopTargetId && (
-                                <label className="mt-1 flex items-center gap-1">
-                                  <span className="text-[9px] text-slate-400">Wiederholungen</span>
-                                  <input
-                                    type="number"
-                                    min={1}
-                                    max={20}
-                                    value={st.loopWiederholungen ?? ''}
-                                    onChange={(e) =>
-                                      setSchrittWiederholungen(
-                                        st.id,
-                                        e.target.value ? Math.max(1, Number(e.target.value)) : null,
-                                      )
-                                    }
-                                    className="w-16 rounded border border-slate-200 bg-white px-2 py-0.5 text-[10px] text-slate-700 outline-none focus:border-zollern-400"
-                                    title="Wie oft diese Schleife wiederholt wird (Auswahl beim Produkt-Hinzufügen)"
-                                  />
-                                </label>
-                              )}
                             </div>
                           </EntityCard>
                         </Fragment>

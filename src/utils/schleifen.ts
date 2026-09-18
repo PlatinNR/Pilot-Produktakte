@@ -1,18 +1,25 @@
 import type { Bearbeitungsblock, Schritt } from '../types'
 
+export interface SchleifenInfo {
+  /** Schritt liegt im Körper einer Schleife (Rücksprung definiert) */
+  inSchleife: boolean
+  /** Anzahl der Wiederholungen, falls an der Schleife definiert (Altbestand) */
+  anzahl: number | null
+}
+
 /**
- * Anzahl der Schleifen-Wiederholungen für einen Schritt.
- * Eine Schleife endet an einem Schritt (loopTargetId + loopWiederholungen) und umfasst
- * alle Kettenknoten zwischen Ziel und Ende. Ein Variabler Block zählt als ein Knoten;
- * seine Schritte gehören zur Schleife.
+ * Ermittelt, ob ein Schritt in einer Schleife liegt.
+ * Eine Schleife endet an einem Schritt (loopTargetId) und umfasst alle Kettenknoten
+ * zwischen Ziel und Ende. Ein Variabler Block zählt als ein Knoten; seine Schritte gehören dazu.
  */
-export function wiederholungenFuerSchritt(
+export function schleifenInfoFuerSchritt(
   schrittId: string,
   schritte: Schritt[],
   bloecke: Bearbeitungsblock[],
-): number | null {
+): SchleifenInfo {
+  const leer: SchleifenInfo = { inSchleife: false, anzahl: null }
   const schritt = schritte.find((s) => s.id === schrittId)
-  if (!schritt) return null
+  if (!schritt) return leer
   const abteilungId = schritt.abteilungId
 
   const knoten: { id: string; istBlock: boolean; pos: number }[] = []
@@ -37,18 +44,19 @@ export function wiederholungenFuerSchritt(
   }
 
   const meinIndex = knotenIndex(schrittId)
-  if (meinIndex < 0) return null
+  if (meinIndex < 0) return leer
 
-  let max: number | null = null
+  let inSchleife = false
+  let anzahl: number | null = null
   for (const ende of schritte.filter((s) => s.abteilungId === abteilungId && s.loopTargetId)) {
-    const anzahl = ende.loopWiederholungen ?? 0
-    if (anzahl < 2) continue
     const endeIdx = knotenIndex(ende.id)
     const zielIdx = knotenIndex(ende.loopTargetId ?? '')
     if (endeIdx < 0 || zielIdx < 0 || zielIdx > endeIdx) continue
     if (meinIndex >= zielIdx && meinIndex <= endeIdx) {
-      max = max === null ? anzahl : Math.max(max, anzahl)
+      inSchleife = true
+      const n = ende.loopWiederholungen ?? 0
+      if (n >= 2) anzahl = anzahl === null ? n : Math.max(anzahl, n)
     }
   }
-  return max
+  return { inSchleife, anzahl }
 }

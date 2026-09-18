@@ -1,7 +1,7 @@
 import { useStore } from '../store'
 import type { Produktionstabelle } from '../types'
 import { traceAuftrag } from '../utils/aggregate'
-import { wiederholungenFuerSchritt } from '../utils/schleifen'
+import { schleifenInfoFuerSchritt } from '../utils/schleifen'
 import { DurchlaufWahl } from './DurchlaufWahl'
 
 interface Props {
@@ -90,12 +90,13 @@ export function TraceView({ auftragsnummer }: Props) {
                   {stop.schritt.name}
                   {stop.schritt.optional && <span className="ml-1 text-slate-300">(opt.)</span>}
                   {(() => {
-                    const wdh = wiederholungenFuerSchritt(stop.schritt.id, alleSchritte, alleBloecke)
-                    return wdh && wdh >= 2 ? (
-                      <span className="ml-1 text-zollern-600" title="Schleifen-Wiederholungen">
-                        ⟲ {wdh} Wdh.
+                    const info = schleifenInfoFuerSchritt(stop.schritt.id, alleSchritte, alleBloecke)
+                    if (!info.inSchleife) return null
+                    return (
+                      <span className="ml-1 text-zollern-600" title="Schritt liegt in einer Schleife">
+                        ⟲ Schleife{info.anzahl ? ` ×${info.anzahl}` : ''}
                       </span>
-                    ) : null
+                    )
                   })()}
                 </div>
                 {tabellen.length > 0 ? (
