@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useStore } from '../store'
 import { abteilungFarbe } from '../utils/colors'
-import { schleifenInfoFuerSchritt } from '../utils/schleifen'
+import { istInSchleife } from '../utils/schleifen'
 
 type Modus = 'manuell' | 'import'
 
@@ -217,7 +217,7 @@ export function ProduktHinzufuegenView() {
                     {schritteDerAbt.map((st) => {
                       const maschinen = alleMaschinen.filter((m) => m.schrittId === st.id)
                       if (maschinen.length === 0) return null
-                      const inSchleife = schleifenInfoFuerSchritt(st.id, alleSchritte, alleBloecke).inSchleife
+                      const inSchleife = istInSchleife(st.id, alleSchritte, alleBloecke)
                       return (
                         <div key={st.id}>
                           <p className="mb-1 text-xs font-semibold text-slate-600">{st.name}</p>

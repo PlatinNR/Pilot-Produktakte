@@ -1,25 +1,17 @@
 import type { Bearbeitungsblock, Schritt } from '../types'
 
-export interface SchleifenInfo {
-  /** Schritt liegt im Körper einer Schleife (Rücksprung definiert) */
-  inSchleife: boolean
-  /** Anzahl der Wiederholungen, falls an der Schleife definiert (Altbestand) */
-  anzahl: number | null
-}
-
 /**
- * Ermittelt, ob ein Schritt in einer Schleife liegt.
+ * Prüft, ob ein Schritt im Körper einer Schleife liegt.
  * Eine Schleife endet an einem Schritt (loopTargetId) und umfasst alle Kettenknoten
  * zwischen Ziel und Ende. Ein Variabler Block zählt als ein Knoten; seine Schritte gehören dazu.
  */
-export function schleifenInfoFuerSchritt(
+export function istInSchleife(
   schrittId: string,
   schritte: Schritt[],
   bloecke: Bearbeitungsblock[],
-): SchleifenInfo {
-  const leer: SchleifenInfo = { inSchleife: false, anzahl: null }
+): boolean {
   const schritt = schritte.find((s) => s.id === schrittId)
-  if (!schritt) return leer
+  if (!schritt) return false
   const abteilungId = schritt.abteilungId
 
   const knoten: { id: string; istBlock: boolean; pos: number }[] = []
@@ -44,19 +36,13 @@ export function schleifenInfoFuerSchritt(
   }
 
   const meinIndex = knotenIndex(schrittId)
-  if (meinIndex < 0) return leer
+  if (meinIndex < 0) return false
 
-  let inSchleife = false
-  let anzahl: number | null = null
   for (const ende of schritte.filter((s) => s.abteilungId === abteilungId && s.loopTargetId)) {
     const endeIdx = knotenIndex(ende.id)
     const zielIdx = knotenIndex(ende.loopTargetId ?? '')
     if (endeIdx < 0 || zielIdx < 0 || zielIdx > endeIdx) continue
-    if (meinIndex >= zielIdx && meinIndex <= endeIdx) {
-      inSchleife = true
-      const n = ende.loopWiederholungen ?? 0
-      if (n >= 2) anzahl = anzahl === null ? n : Math.max(anzahl, n)
-    }
+    if (meinIndex >= zielIdx && meinIndex <= endeIdx) return true
   }
-  return { inSchleife, anzahl }
+  return false
 }

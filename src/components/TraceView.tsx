@@ -1,7 +1,7 @@
 import { useStore } from '../store'
 import type { Produktionstabelle } from '../types'
 import { traceAuftrag } from '../utils/aggregate'
-import { schleifenInfoFuerSchritt } from '../utils/schleifen'
+import { istInSchleife } from '../utils/schleifen'
 import { DurchlaufWahl } from './DurchlaufWahl'
 
 interface Props {
@@ -89,15 +89,11 @@ export function TraceView({ auftragsnummer }: Props) {
                 <div className="text-[11px] uppercase tracking-wide text-slate-400">
                   {stop.schritt.name}
                   {stop.schritt.optional && <span className="ml-1 text-slate-300">(opt.)</span>}
-                  {(() => {
-                    const info = schleifenInfoFuerSchritt(stop.schritt.id, alleSchritte, alleBloecke)
-                    if (!info.inSchleife) return null
-                    return (
-                      <span className="ml-1 text-zollern-600" title="Schritt liegt in einer Schleife">
-                        ⟲ Schleife{info.anzahl ? ` ×${info.anzahl}` : ''}
-                      </span>
-                    )
-                  })()}
+                  {istInSchleife(stop.schritt.id, alleSchritte, alleBloecke) && (
+                    <span className="ml-1 text-zollern-600" title="Schritt liegt in einer Schleife">
+                      ⟲ Schleife
+                    </span>
+                  )}
                 </div>
                 {tabellen.length > 0 ? (
                   tabellen.map((t, ti) => {

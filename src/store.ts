@@ -183,7 +183,6 @@ interface Store extends AppState {
   linkSchrittFK: (schrittId: string, spalteId: string, refTableId: string, refColumnId: string) => void
   setKeyLabelSchritt: (schrittId: string, spalteId: string, label: string) => void
   setSchrittLoop: (schrittId: string, loopTargetId: string | null, loopCondition: string | null) => void
-  setSchrittWiederholungen: (schrittId: string, anzahl: number | null) => void
   setSchrittOptional: (schrittId: string, optional: boolean) => void
   setSchrittBlock: (schrittId: string, blockId: string | null) => void
 
@@ -564,13 +563,6 @@ export const useStore = create<Store>()(
     set((s) => ({
       schritte: s.schritte.map((st) =>
         st.id === schrittId ? { ...st, loopTargetId, loopCondition } : st,
-      ),
-    })),
-
-  setSchrittWiederholungen: (schrittId, anzahl) =>
-    set((s) => ({
-      schritte: s.schritte.map((st) =>
-        st.id === schrittId ? { ...st, loopWiederholungen: anzahl } : st,
       ),
     })),
 

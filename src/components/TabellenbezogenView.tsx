@@ -652,7 +652,7 @@ export function TabellenbezogenView({ filter }: Props) {
       targetKey: blockIds.has(st.loopTargetId)
         ? `b:${st.loopTargetId}`
         : `s:${st.loopTargetId}:auftragsnummer`,
-      label: st.loopWiederholungen ? `⟲ ×${st.loopWiederholungen}` : '⟲ Schleife',
+      label: '⟲ Schleife',
     })
   }
 
