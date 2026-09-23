@@ -4,6 +4,8 @@ import { listChains, saveChain } from './api'
 import { mitUnterdruecktemUndo } from './undo'
 import { useStore } from '../store'
 import type { Abteilung, Bearbeitungsblock, ChainData, Nebentabelle, Produktionstabelle, Schritt } from '../types'
+import { WIEDERHOLUNG_SPALTE } from '../types'
+import { istInSchleife } from '../utils/schleifen'
 
 export interface SyncStatus {
   phase: 'idle' | 'loading' | 'saving'
@@ -151,6 +153,18 @@ export async function loadFromCloud(): Promise<boolean> {
         if (einmalig(n.id)) nebentabellen.push({ ...n, arbeitsplatz: n.arbeitsplatz ?? '' })
       }
     }
+    // Spalte „Wdh" an allen Arbeitsplätzen von Schleifen-Schritten sicherstellen (und umbenennen)
+    const loopSchrittIds = new Set(
+      schritte.filter((st) => istInSchleife(st.id, schritte, bearbeitungsbloecke)).map((st) => st.id),
+    )
+    const produktionstabellenNorm = produktionstabellen.map((t) => {
+      let columns = t.columns.map((c) => (c.id === 'wdh' ? { ...c, name: 'Wdh', fixed: false } : c))
+      if (loopSchrittIds.has(t.schrittId) && !columns.some((c) => c.id === 'wdh')) {
+        columns = [...columns, { ...WIEDERHOLUNG_SPALTE }]
+      }
+      return { ...t, columns }
+    })
+
     const state = useStore.getState()
     mitUnterdruecktemUndo(() =>
       useStore.setState({
@@ -164,7 +178,7 @@ export async function loadFromCloud(): Promise<boolean> {
         abteilungen,
         bearbeitungsbloecke,
         schritte,
-        produktionstabellen,
+        produktionstabellen: produktionstabellenNorm,
         nebentabellen,
       }),
     )

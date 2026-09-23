@@ -198,10 +198,10 @@ export const PRODUKTION_SPALTEN: TableColumn[] = [
   { id: 'zeit', name: 'Uhrzeit', type: 'time', fixed: true },
 ]
 
-/** „Wiederholung" – wird nur bei Schritten in einer Schleife ergänzt (entfernbar). */
+/** „Wdh" – wird nur bei Schritten in einer Schleife ergänzt (entfernbar). */
 export const WIEDERHOLUNG_SPALTE: TableColumn = {
   id: 'wdh',
-  name: 'Wiederholung',
+  name: 'Wdh',
   type: 'text',
   fixed: false,
 }

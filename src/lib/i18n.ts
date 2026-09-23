@@ -251,7 +251,7 @@ export const FESTE_SPALTEN: Record<string, { de: string; en: string }> = {
   datum: { de: 'Datum', en: 'Date' },
   zeit: { de: 'Uhrzeit', en: 'Time' },
   produktion: { de: 'Produktion', en: 'Production' },
-  wdh: { de: 'Wiederholung', en: 'Repetition' },
+  wdh: { de: 'Wdh', en: 'Rep.' },
 }
 
 /** Anzeigename einer Spalte – feste Systemspalten werden übersetzt, eigene bleiben unverändert. */

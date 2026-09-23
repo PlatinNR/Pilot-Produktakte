@@ -278,6 +278,20 @@ export function arbeitsplatzFehlerText(tabelleId: string, wert: string): string 
   })
 }
 
+/** Stellt sicher, dass alle Arbeitsplätze der Schleifen-Schritte die Spalte „Wdh" haben. */
+function stelleWdhSicher(s: AppState, abteilungId: string): Produktionstabelle[] {
+  const schrittIds = new Set<string>()
+  for (const st of s.schritte) {
+    if (st.abteilungId !== abteilungId) continue
+    if (istInSchleife(st.id, s.schritte, s.bearbeitungsbloecke)) schrittIds.add(st.id)
+  }
+  return s.produktionstabellen.map((t) =>
+    schrittIds.has(t.schrittId) && !t.columns.some((c) => c.id === 'wdh')
+      ? { ...t, columns: [...t.columns, { ...WIEDERHOLUNG_SPALTE }] }
+      : t,
+  )
+}
+
 /** Alle bereits vergebenen Arbeitsplatz-Nummern einer Kette. */
 function arbeitsplatzVergeben(s: AppState, chainId: string): Set<string> {
   const abteilungIds = new Set(s.abteilungen.filter((a) => a.chainId === chainId).map((a) => a.id))
@@ -629,27 +643,10 @@ export const useStore = create<Store>()(
       const schritte = s.schritte.map((st) =>
         st.id === schrittId ? { ...st, loopTargetId, loopCondition } : st,
       )
-      let produktionstabellen = s.produktionstabellen
-      if (loopTargetId) {
-        // "Wiederholung"-Spalte (entfernbar) an den Maschinen der Schleifen-Schritte ergänzen
-        const ende = schritte.find((st) => st.id === schrittId)
-        if (ende) {
-          const betroffen = new Set<string>()
-          for (const st of schritte) {
-            if (
-              st.abteilungId === ende.abteilungId &&
-              istInSchleife(st.id, schritte, s.bearbeitungsbloecke)
-            ) {
-              betroffen.add(st.id)
-            }
-          }
-          produktionstabellen = s.produktionstabellen.map((t) =>
-            betroffen.has(t.schrittId) && !t.columns.some((c) => c.id === 'wdh')
-              ? { ...t, columns: [...t.columns, { ...WIEDERHOLUNG_SPALTE }] }
-              : t,
-          )
-        }
-      }
+      const ende = schritte.find((st) => st.id === schrittId)
+      const produktionstabellen = ende
+        ? stelleWdhSicher({ ...s, schritte }, ende.abteilungId)
+        : s.produktionstabellen
       return { schritte, produktionstabellen }
     }),
 
@@ -663,10 +660,12 @@ export const useStore = create<Store>()(
       const st = s.schritte.find((x) => x.id === schrittId)
       if (!st) return s
       const position = blockId ? 0 : maxChainPosition(s, st.abteilungId) + 1
+      const schritte = s.schritte.map((x) =>
+        x.id === schrittId ? { ...x, blockId, position } : x,
+      )
       return {
-        schritte: s.schritte.map((x) =>
-          x.id === schrittId ? { ...x, blockId, position } : x,
-        ),
+        schritte,
+        produktionstabellen: stelleWdhSicher({ ...s, schritte }, st.abteilungId),
       }
     }),
 
@@ -1173,7 +1172,7 @@ export const useStore = create<Store>()(
   }),
     {
       name: 'digitale-produktakte',
-      version: 16,
+      version: 17,
       migrate: (persisted, version) => {
         let p = persisted as Partial<AppState> & {
           abteilungen?: (Abteilung & { chainId?: string; parentId?: string | null; sequence?: 'fixed' | 'variable' })[]
@@ -1410,6 +1409,28 @@ export const useStore = create<Store>()(
             return { ...st, position: naechste }
           })
           p = { ...p, schritte: schritte16 } as typeof p
+        }
+        if (version < 17) {
+          // Spalte „Wdh" heißt jetzt kurz „Wdh" und liegt in ALLEN Arbeitsplätzen von Schleifen-Schritten
+          const bloecke17 = p.bearbeitungsbloecke ?? []
+          const schritte17 = p.schritte ?? []
+          const loopSchrittIds = new Set(
+            schritte17
+              .filter((st) => istInSchleife(st.id, schritte17, bloecke17))
+              .map((st) => st.id),
+          )
+          p = {
+            ...p,
+            produktionstabellen: (p.produktionstabellen ?? []).map((t) => {
+              let columns = t.columns.map((c) =>
+                c.id === 'wdh' ? { ...c, name: 'Wdh', fixed: false } : c,
+              )
+              if (loopSchrittIds.has(t.schrittId) && !columns.some((c) => c.id === 'wdh')) {
+                columns = [...columns, { ...WIEDERHOLUNG_SPALTE }]
+              }
+              return { ...t, columns }
+            }),
+          } as typeof p
         }
         return p as AppState
       },
