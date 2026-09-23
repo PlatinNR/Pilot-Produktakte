@@ -986,6 +986,34 @@ export function TabellenbezogenView({ filter }: Props) {
         })()
       : undefined
 
+  // Fremdschlüssel je Ziel bündeln (Kabelkanal/Bus) – Linien bleiben unter den Karten,
+  // nur die Greifpunkte werden darüber gezeichnet.
+  const busGruppen = (() => {
+    const gruppen = new Map<string, BusMitglied[]>()
+    for (const ln of lines) {
+      const from = boxes[ln.sourceKey]
+      const to = boxes[ln.targetKey]
+      if (!from || !to) continue
+      const liste = gruppen.get(ln.targetKey) ?? []
+      liste.push({
+        from,
+        to,
+        n1: ln.n1,
+        offset: ln.offset,
+        keyKind: ln.keyKind,
+        keyTableId: ln.keyTableId,
+        keyColumnId: ln.keyColumnId,
+      })
+      gruppen.set(ln.targetKey, liste)
+    }
+    let gruppe = 0
+    return [...gruppen.entries()].map(([key, mitglieder]) => {
+      const bus = computeBus(mitglieder, gruppe)
+      gruppe += 1
+      return { key, mitglieder, bus }
+    })
+  })()
+
   return (
     <div ref={containerRef} className="relative flex flex-col gap-6" onContextMenu={onKontextMenue}>
       {/* Abteilungsfarben – liegen hinter den Beziehungslinien */}
@@ -1014,33 +1042,11 @@ export function TabellenbezogenView({ filter }: Props) {
           </marker>
         </defs>
         {(() => {
-          // Fremdschlüssel je Ziel bündeln (Kabelkanal/Bus)
-          const gruppen = new Map<string, BusMitglied[]>()
-          for (const ln of lines) {
-            const from = boxes[ln.sourceKey]
-            const to = boxes[ln.targetKey]
-            if (!from || !to) continue
-            const liste = gruppen.get(ln.targetKey) ?? []
-            liste.push({
-              from,
-              to,
-              n1: ln.n1,
-              offset: ln.offset,
-              keyKind: ln.keyKind,
-              keyTableId: ln.keyTableId,
-              keyColumnId: ln.keyColumnId,
-            })
-            gruppen.set(ln.targetKey, liste)
-          }
           const halo = { paintOrder: 'stroke' as const, stroke: '#ffffff', strokeWidth: 3 }
-          const ergebnis: React.ReactNode[] = []
-          let gruppe = 0
-          for (const [key, mitglieder] of gruppen) {
-            const bus = computeBus(mitglieder, gruppe)
-            gruppe += 1
+          return busGruppen.map(({ key, mitglieder, bus }) => {
             const to = mitglieder[0].to
             const alleLinks = mitglieder.every((m) => m.from.x + m.from.w <= to.x + 1)
-            ergebnis.push(
+            return (
               <g key={key}>
                 {bus.pfade.map((d, i) => (
                   <path key={`p${i}`} d={d} stroke="#94a3b8" strokeWidth={1.5} fill="none" />
@@ -1048,22 +1054,6 @@ export function TabellenbezogenView({ filter }: Props) {
                 {bus.bus && <path d={bus.bus} stroke="#94a3b8" strokeWidth={1.5} fill="none" />}
                 {bus.taps.map((tp, i) => (
                   <circle key={`t${i}`} cx={tp.x} cy={tp.y} r={2.5} fill="#94a3b8" />
-                ))}
-                {bus.handles.map((h, i) => (
-                  <g key={`h${i}`}>
-                    <circle
-                      cx={h.x}
-                      cy={h.y}
-                      r={10}
-                      fill="transparent"
-                      pointerEvents="all"
-                      style={{ cursor: 'ew-resize' }}
-                      onPointerDown={startLinienDrag(h.mitglied)}
-                    >
-                      <title>Linie ziehen: Beziehung verschieben</title>
-                    </circle>
-                    <circle cx={h.x} cy={h.y} r={3.5} fill="#64748b" pointerEvents="none" />
-                  </g>
                 ))}
                 {mitglieder.map((m, i) =>
                   m.n1 ? (
@@ -1094,10 +1084,9 @@ export function TabellenbezogenView({ filter }: Props) {
                     1
                   </text>
                 )}
-              </g>,
+              </g>
             )
-          }
-          return ergebnis
+          })
         })()}
 
         {/* Prozesskette: mittig unten vom Schritt zum mittig oben des nächsten Schritts (nur abwärts) */}
@@ -1145,6 +1134,28 @@ export function TabellenbezogenView({ filter }: Props) {
         })}
         {dragLine && (
           <path d={dragLine} stroke="#c45004" strokeWidth={2} fill="none" strokeDasharray="4 3" />
+        )}
+      </svg>
+
+      {/* Greifpunkte der Beziehungslinien – über den Karten, damit sie immer erreichbar sind */}
+      <svg className="pointer-events-none absolute inset-0 z-30 h-full w-full">
+        {busGruppen.map(({ key, bus }) =>
+          bus.handles.map((h, i) => (
+            <g key={`${key}-h${i}`}>
+              <circle
+                cx={h.x}
+                cy={h.y}
+                r={10}
+                fill="transparent"
+                pointerEvents="all"
+                style={{ cursor: 'ew-resize' }}
+                onPointerDown={startLinienDrag(h.mitglied)}
+              >
+                <title>Linie ziehen: Beziehung verschieben</title>
+              </circle>
+              <circle cx={h.x} cy={h.y} r={3.5} fill="#64748b" pointerEvents="none" />
+            </g>
+          )),
         )}
       </svg>
 
