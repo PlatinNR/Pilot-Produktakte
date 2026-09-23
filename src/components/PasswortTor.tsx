@@ -3,14 +3,11 @@ import type { FormEvent, ReactNode } from 'react'
 import { useT } from '../lib/sprache'
 
 const PASSWORT = 'Zollern26Pilot'
-const SCHLUESSEL = 'produktakte-freigeschaltet'
 
-/** Einfaches Passwort-Tor (nur clientseitig, kein echter Schutz). */
+/** Einfaches Passwort-Tor (nur clientseitig, kein echter Schutz). Fragt bei jedem Laden neu. */
 export function PasswortTor({ children }: { children: ReactNode }) {
   const t = useT()
-  const [freigeschaltet, setFreigeschaltet] = useState(
-    () => sessionStorage.getItem(SCHLUESSEL) === 'ja',
-  )
+  const [freigeschaltet, setFreigeschaltet] = useState(false)
   const [eingabe, setEingabe] = useState('')
   const [fehler, setFehler] = useState(false)
 
@@ -19,7 +16,6 @@ export function PasswortTor({ children }: { children: ReactNode }) {
   const pruefen = (e: FormEvent) => {
     e.preventDefault()
     if (eingabe === PASSWORT) {
-      sessionStorage.setItem(SCHLUESSEL, 'ja')
       setFreigeschaltet(true)
     } else {
       setFehler(true)
