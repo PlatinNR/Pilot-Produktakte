@@ -224,7 +224,22 @@ export function ProduktHinzufuegenView() {
               </div>
             )}
             {abteilungen.map((a, index) => {
-              const schritteDerAbt = alleSchritte.filter((st) => st.abteilungId === a.id)
+              // Schritte in Ketten-Reihenfolge: feste Schritte und Blöcke nach Position, Block-Schritte beim Block
+              const knoten: { pos: number; art: 'schritt' | 'block'; id: string }[] = [
+                ...alleSchritte
+                  .filter((st) => st.abteilungId === a.id && !st.blockId)
+                  .map((st) => ({ pos: st.position, art: 'schritt' as const, id: st.id })),
+                ...alleBloecke
+                  .filter((b) => b.abteilungId === a.id)
+                  .map((b) => ({ pos: b.position, art: 'block' as const, id: b.id })),
+              ].sort((x, y) => x.pos - y.pos)
+              const schritteDerAbt = knoten.flatMap((k) =>
+                k.art === 'schritt'
+                  ? alleSchritte.filter((st) => st.id === k.id)
+                  : alleSchritte
+                      .filter((st) => st.blockId === k.id)
+                      .sort((x, y) => x.position - y.position),
+              )
               const hatMaschinen = schritteDerAbt.some((st) =>
                 alleMaschinen.some((m) => m.schrittId === st.id),
               )
