@@ -345,14 +345,8 @@ function computeBus(
 ): { pfade: string[]; bus: string | null; taps: { x: number; y: number }[] } {
   if (mitglieder.length === 0) return { pfade: [], bus: null, taps: [] }
   if (mitglieder.length === 1) {
-    // Einzelne Verbindung: direkt ohne Knick
-    const m = mitglieder[0]
-    const ltr = m.from.x + m.from.w <= m.to.x + 1
-    const x1 = ltr ? m.from.x + m.from.w : m.from.x
-    const y1 = m.from.y + m.from.h / 2
-    const x2 = ltr ? m.to.x : m.to.x + m.to.w
-    const y2 = m.to.y + m.to.h / 2
-    return { pfade: [`M ${x1} ${y1} L ${x2} ${y2}`], bus: null, taps: [] }
+    // Einzelne Verbindung: rechtwinklig (90°) wie bisher, ohne schräge Linie
+    return { pfade: [computeLine(mitglieder[0].from, mitglieder[0].to).path], bus: null, taps: [] }
   }
   const to = mitglieder[0].to
   const alleLinks = mitglieder.every((m) => m.from.x + m.from.w <= to.x + 1)
