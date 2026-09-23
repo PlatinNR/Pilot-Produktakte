@@ -78,71 +78,84 @@ export function Dashboard() {
             Fertigungsauftrag als Leitende Nummer – Trace oder Verteilung je Maschine.
           </p>
         </div>
-        <div className="flex flex-col items-end gap-2">
-          <div className="flex items-center gap-2">
+        <div className="flex flex-col items-end gap-0.5">
+          {/* Zeile 1: Kette */}
+          <div className="flex items-center gap-1">
+            <span className="w-16 text-right text-[10px] uppercase tracking-wide text-slate-300">Kette</span>
             <select
               value={activeChainId}
-            onChange={(e) => setActiveChain(e.target.value)}
-            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-zollern-500"
-            title="Prozesskette wechseln"
-          >
-            {chains.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-          <EditableName
-            iconOnly
-            value={activeChain?.name ?? ''}
-            onCommit={(name) => renameChain(activeChainId, name)}
-          />
-          <button
-            onClick={() => addChain()}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-600 hover:bg-slate-100"
-            title="Neue Prozesskette"
-          >
-            + Kette
-          </button>
-          <button
-            onClick={handleKetteLoeschen}
-            disabled={!activeChain}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
-            title="Aktuelle Prozesskette löschen (mit Sicherheitsabfrage)"
-          >
-            Kette löschen
-          </button>
-          <button
-            onClick={handleUpload}
-            disabled={busy}
-            className="rounded-lg bg-zollern-700 px-4 py-2 text-sm font-medium text-white hover:bg-zollern-800 disabled:opacity-60"
-            title="Lokale Daten in die Cloud hochladen"
-          >
-            {sync.phase === 'saving' ? 'Speichert…' : 'In Cloud speichern'}
-          </button>
-          <button
-            onClick={handleDownload}
-            disabled={busy}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-600 hover:bg-slate-100 disabled:opacity-60"
-            title="Stand aus der Cloud laden (ersetzt lokale Daten)"
-          >
-            {sync.phase === 'loading' ? 'Lädt…' : 'Aus Cloud laden'}
-          </button>
-        </div>
-        <div className="mt-2 flex items-center justify-end gap-2">
-          <button
-            onClick={() => addAbteilung()}
-            className="rounded-lg border border-zollern-700 px-4 py-2 text-sm font-medium text-zollern-700 hover:bg-zollern-50"
-          >
-            + Abteilung
-          </button>
-          <button
-            onClick={() => fuegeAbteilungEin(activeChainId)}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-600 hover:bg-slate-100"
-            title="Kopierte Abteilung in die aktive Kette einfügen"
-          >
-            ⧉ Abteilung einfügen
-          </button>
+              onChange={(e) => setActiveChain(e.target.value)}
+              className="max-w-[14rem] rounded border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-600 outline-none focus:border-zollern-400"
+              title="Prozesskette wechseln"
+            >
+              {chains.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+            <EditableName
+              iconOnly
+              value={activeChain?.name ?? ''}
+              onCommit={(name) => renameChain(activeChainId, name)}
+            />
+            <button
+              onClick={() => addChain()}
+              className="rounded px-1.5 py-0.5 text-xs text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+              title="Neue Prozesskette"
+            >
+              + Kette
+            </button>
+            <button
+              onClick={handleKetteLoeschen}
+              disabled={!activeChain}
+              className="rounded px-1.5 py-0.5 text-xs text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
+              title="Aktuelle Prozesskette löschen (mit Sicherheitsabfrage)"
+            >
+              löschen
+            </button>
+          </div>
+
+          {/* Zeile 2: Cloud / Einstellungen */}
+          <div className="flex items-center gap-1">
+            <span className="w-16 text-right text-[10px] uppercase tracking-wide text-slate-300">Cloud</span>
+            <button
+              onClick={handleUpload}
+              disabled={busy}
+              className="rounded px-1.5 py-0.5 text-xs text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-40"
+              title="Lokale Daten in die Cloud hochladen"
+            >
+              {sync.phase === 'saving' ? 'speichert…' : 'speichern'}
+            </button>
+            <button
+              onClick={handleDownload}
+              disabled={busy}
+              className="rounded px-1.5 py-0.5 text-xs text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-40"
+              title="Stand aus der Cloud laden (ersetzt lokale Daten)"
+            >
+              {sync.phase === 'loading' ? 'lädt…' : 'laden'}
+            </button>
+          </div>
+
+          {/* Zeile 3: Abteilung */}
+          <div className="flex items-center gap-1">
+            <span className="w-16 text-right text-[10px] uppercase tracking-wide text-slate-300">
+              Abteilung
+            </span>
+            <button
+              onClick={() => addAbteilung()}
+              className="rounded px-1.5 py-0.5 text-xs text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+              title="Neue Abteilung anlegen"
+            >
+              + Abteilung
+            </button>
+            <button
+              onClick={() => fuegeAbteilungEin(activeChainId)}
+              className="rounded px-1.5 py-0.5 text-xs text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+              title="Kopierte Abteilung in die aktive Kette einfügen"
+            >
+              ⧉ einfügen
+            </button>
           </div>
         </div>
       </header>
