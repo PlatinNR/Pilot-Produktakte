@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useSupabaseSync } from './lib/sync'
 import { initUndo, useUndoShortcut } from './lib/undo'
 import { KopierToast } from './components/KopierToast'
+import { PasswortTor } from './components/PasswortTor'
 import { Dashboard } from './pages/Dashboard'
 
 function AppShell() {
@@ -40,7 +41,11 @@ function AppShell() {
 }
 
 function App() {
-  return <AppShell />
+  return (
+    <PasswortTor>
+      <AppShell />
+    </PasswortTor>
+  )
 }
 
 export default App

@@ -326,46 +326,6 @@ function computeLine(from: Rect, to: Rect): Geo {
   return { path, x1, y1, x2, y2, labelX, labelY }
 }
 
-const MERGE_ABSTAND = 38 // ~1 cm vor dem Ziel zusammenlaufen
-const LANE_ABSTAND = 7
-
-/**
- * Bündelt mehrere Verbindungen auf dasselbe Ziel wie in einem Kabelkanal:
- * parallele Bahnen (kein Überlappen), die erst kurz vor dem Ziel zu einer Linie zusammenlaufen.
- */
-function computeBuendel(mitglieder: { from: Rect; to: Rect }[]): { pfade: string[]; stamm: string | null } {
-  if (mitglieder.length === 0) return { pfade: [], stamm: null }
-  if (mitglieder.length === 1) {
-    const g = computeLine(mitglieder[0].from, mitglieder[0].to)
-    return { pfade: [g.path], stamm: null }
-  }
-  const to = mitglieder[0].to
-  const sortiert = [...mitglieder].sort((a, b) => a.from.y - b.from.y)
-  const n = sortiert.length
-  const y2 = to.y + to.h / 2
-  const alleLinks = sortiert.every((m) => m.from.x + m.from.w <= to.x + 1)
-  const alleRechts = sortiert.every((m) => m.from.x >= to.x + to.w - 1)
-  if (!alleLinks && !alleRechts) {
-    return { pfade: sortiert.map((m) => computeLine(m.from, m.to).path), stamm: null }
-  }
-  const zielX = alleLinks ? to.x : to.x + to.w
-  const stammX = alleLinks ? zielX - MERGE_ABSTAND : zielX + MERGE_ABSTAND
-  const pfade: string[] = []
-  for (let i = 0; i < n; i++) {
-    const m = sortiert[i]
-    const x1 = alleLinks ? m.from.x + m.from.w : m.from.x
-    const y1 = m.from.y + m.from.h / 2
-    const mitte = (x1 + zielX) / 2
-    const laneX = mitte + (i - (n - 1) / 2) * LANE_ABSTAND
-    const jy = y2 + (i - (n - 1) / 2) * LANE_ABSTAND
-    pfade.push(`M ${x1} ${y1} H ${laneX} V ${jy} H ${stammX}`)
-  }
-  const ober = y2 - ((n - 1) / 2) * LANE_ABSTAND
-  const unter = y2 + ((n - 1) / 2) * LANE_ABSTAND
-  const stamm = `M ${stammX} ${ober} V ${unter} M ${stammX} ${y2} H ${zielX}`
-  return { pfade, stamm }
-}
-
 function RelationshipLine({
   geo,
   n1,
@@ -875,66 +835,12 @@ export function TabellenbezogenView({ filter }: Props) {
             <path d="M0,0 L8,4 L0,8 z" fill="#F56405" />
           </marker>
         </defs>
-        {(() => {
-          // Verbindungen nach Ziel bündeln (Kabelkanal: parallel, kurz vor dem Ziel zusammen)
-          const gruppen = new Map<string, { from: Rect; to: Rect; n1: boolean }[]>()
-          for (const ln of lines) {
-            const from = boxes[ln.sourceKey]
-            const to = boxes[ln.targetKey]
-            if (!from || !to) continue
-            const liste = gruppen.get(ln.targetKey) ?? []
-            liste.push({ from, to, n1: ln.n1 })
-            gruppen.set(ln.targetKey, liste)
-          }
-          const halo = { paintOrder: 'stroke' as const, stroke: '#ffffff', strokeWidth: 3 }
-          const ergebnis: React.ReactNode[] = []
-          for (const [key, mitglieder] of gruppen) {
-            const buendel = computeBuendel(mitglieder)
-            const to = mitglieder[0].to
-            const y2 = to.y + to.h / 2
-            const alleLinks = mitglieder.every((m) => m.from.x + m.from.w <= to.x + 1)
-            ergebnis.push(
-              <g key={key}>
-                {buendel.pfade.map((d, i) => (
-                  <path key={`p${i}`} d={d} stroke="#94a3b8" strokeWidth={1.5} fill="none" />
-                ))}
-                {buendel.stamm && (
-                  <path d={buendel.stamm} stroke="#94a3b8" strokeWidth={1.5} fill="none" />
-                )}
-                {mitglieder.map((m, i) =>
-                  m.n1 ? (
-                    <text
-                      key={`n${i}`}
-                      x={alleLinks ? m.from.x + m.from.w + 5 : m.from.x - 5}
-                      y={m.from.y + m.from.h / 2 - 4}
-                      textAnchor={alleLinks ? 'start' : 'end'}
-                      fontSize={10}
-                      fontWeight={700}
-                      fill="#c45004"
-                      style={halo}
-                    >
-                      n
-                    </text>
-                  ) : null,
-                )}
-                {mitglieder.some((m) => m.n1) && (
-                  <text
-                    x={alleLinks ? to.x - 5 : to.x + to.w + 5}
-                    y={y2 - 4}
-                    textAnchor={alleLinks ? 'end' : 'start'}
-                    fontSize={10}
-                    fontWeight={700}
-                    fill="#c45004"
-                    style={halo}
-                  >
-                    1
-                  </text>
-                )}
-              </g>,
-            )
-          }
-          return ergebnis
-        })()}
+        {lines.map((ln, i) => {
+          const from = boxes[ln.sourceKey]
+          const to = boxes[ln.targetKey]
+          if (!from || !to) return null
+          return <RelationshipLine key={i} geo={computeLine(from, to)} n1={ln.n1} />
+        })}
         {loops.map((lp, i) => {
           const from = boxes[lp.sourceKey]
           const to = boxes[lp.targetKey]
