@@ -240,6 +240,10 @@ interface Store extends AppState {
   linkNebenFK: (tabelleId: string, spalteId: string, refTableId: string, refColumnId: string) => void
   setKeyLabelNeben: (tabelleId: string, spalteId: string, label: string) => void
 
+  // Beziehungen
+  loescheBeziehung: (kind: 'm' | 'n' | 's', tableId: string, columnId: string) => void
+  setBeziehungOffset: (kind: 'm' | 'n' | 's', tableId: string, columnId: string, offset: number) => void
+
   // Kopieren / Einfügen
   einfuegenTabelle: (
     kopie: TabellenKopie,
@@ -1169,7 +1173,34 @@ export const useStore = create<Store>()(
     }))
     return { arbeitsplatzGeleert }
   },
-  }),
+  // Beziehungen: FK-Schlüssel löschen bzw. Linien-Versatz setzen
+  loescheBeziehung: (kind, tableId, columnId) =>
+    set((s) => {
+      const entferne = <T extends { id: string; keys: TableKey[] }>(liste: T[]): T[] =>
+        liste.map((t) =>
+          t.id === tableId ? { ...t, keys: t.keys.filter((k) => k.columnId !== columnId) } : t,
+        )
+      if (kind === 'm') return { produktionstabellen: entferne(s.produktionstabellen) }
+      if (kind === 'n') return { nebentabellen: entferne(s.nebentabellen) }
+      return { schritte: entferne(s.schritte) }
+    }),
+
+  setBeziehungOffset: (kind, tableId, columnId, offset) =>
+    set((s) => {
+      const setze = <T extends { id: string; keys: TableKey[] }>(liste: T[]): T[] =>
+        liste.map((t) =>
+          t.id === tableId
+            ? {
+                ...t,
+                keys: t.keys.map((k) => (k.columnId === columnId ? { ...k, offset } : k)),
+              }
+            : t,
+        )
+      if (kind === 'm') return { produktionstabellen: setze(s.produktionstabellen) }
+      if (kind === 'n') return { nebentabellen: setze(s.nebentabellen) }
+      return { schritte: setze(s.schritte) }
+    }),
+    }),
     {
       name: 'digitale-produktakte',
       version: 17,

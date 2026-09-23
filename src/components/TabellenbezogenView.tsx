@@ -5,6 +5,7 @@ import type {
   KeyType,
   Produktionstabelle,
   TableColumn,
+  TableKey,
 } from '../types'
 import { COLUMN_TYPE_LABELS, SCHRITT_TABELLE_SPALTEN } from '../types'
 import { useStore, arbeitsplatzFehlerText } from '../store'
@@ -135,7 +136,7 @@ function ColumnRow({
           ))}
         </select>
       )}
-      <KeyBadge type={keyType} onClick={onCycleKey} />
+      <KeyBadge type={keyType} onClick={onCycleKey} info={nodeKey} />
       {keyType === 'pk' && (
         <span
           onPointerDown={onStartDrag}
@@ -303,7 +304,7 @@ interface Geo {
   labelY: number
 }
 
-function computeLine(from: Rect, to: Rect): Geo {
+function computeLine(from: Rect, to: Rect, versatz = 0): Geo {
   const sameColumn = Math.abs(from.x - to.x) < 24
   let x1: number
   let y1: number
@@ -313,7 +314,7 @@ function computeLine(from: Rect, to: Rect): Geo {
   let labelX: number
   let labelY: number
   if (sameColumn) {
-    const channel = Math.min(from.x, to.x) - 16
+    const channel = Math.min(from.x, to.x) - 16 + versatz
     x1 = from.x
     y1 = from.y + from.h / 2
     x2 = to.x
@@ -327,10 +328,10 @@ function computeLine(from: Rect, to: Rect): Geo {
     y1 = from.y + from.h / 2
     x2 = ltr ? to.x : to.x + to.w
     y2 = to.y + to.h / 2
-    const midX = (x1 + x2) / 2
+    const midX = (x1 + x2) / 2 + versatz
     path = `M ${x1} ${y1} H ${midX} V ${y2} H ${x2}`
     labelX = midX
-    labelY = Math.min(y1, y2) - 8
+    labelY = (y1 + y2) / 2
   }
   return { path, x1, y1, x2, y2, labelX, labelY }
 }
@@ -344,20 +345,49 @@ const TAP_MIN = 14
  * Linie (Bus) gebündelt. Jede Quelle mündet auf ihrer eigenen Höhe (nicht überlappend) ein;
  * zu nahe Abzweige werden entzerrt. Kreuzen anderer Linien ist erlaubt, Überlappen nicht.
  */
+interface BusMitglied {
+  from: Rect
+  to: Rect
+  offset: number
+  n1: boolean
+  keyKind: 'm' | 'n' | 's' | null
+  keyTableId: string | null
+  keyColumnId: string | null
+}
+
 function computeBus(
-  mitglieder: { from: Rect; to: Rect }[],
+  mitglieder: BusMitglied[],
   gruppe: number,
-): { pfade: string[]; bus: string | null; taps: { x: number; y: number }[] } {
-  if (mitglieder.length === 0) return { pfade: [], bus: null, taps: [] }
+): {
+  pfade: string[]
+  bus: string | null
+  taps: { x: number; y: number }[]
+  handles: { x: number; y: number; mitglied: BusMitglied }[]
+} {
+  if (mitglieder.length === 0) return { pfade: [], bus: null, taps: [], handles: [] }
   if (mitglieder.length === 1) {
-    // Einzelne Verbindung: rechtwinklig (90°) wie bisher, ohne schräge Linie
-    return { pfade: [computeLine(mitglieder[0].from, mitglieder[0].to).path], bus: null, taps: [] }
+    // Einzelne Verbindung: rechtwinklig (90°), Versatz per Ziehen möglich
+    const g = computeLine(mitglieder[0].from, mitglieder[0].to, mitglieder[0].offset)
+    return {
+      pfade: [g.path],
+      bus: null,
+      taps: [],
+      handles: [{ x: g.labelX, y: g.labelY, mitglied: mitglieder[0] }],
+    }
   }
   const to = mitglieder[0].to
   const alleLinks = mitglieder.every((m) => m.from.x + m.from.w <= to.x + 1)
   const alleRechts = mitglieder.every((m) => m.from.x >= to.x + to.w - 1)
   if (!alleLinks && !alleRechts) {
-    return { pfade: mitglieder.map((m) => computeLine(m.from, m.to).path), bus: null, taps: [] }
+    return {
+      pfade: mitglieder.map((m) => computeLine(m.from, m.to, m.offset).path),
+      bus: null,
+      taps: [],
+      handles: mitglieder.map((m) => {
+        const g = computeLine(m.from, m.to, m.offset)
+        return { x: g.labelX, y: g.labelY, mitglied: m }
+      }),
+    }
   }
   const ltr = alleLinks
   const quellenRand = ltr
@@ -386,19 +416,21 @@ function computeBus(
   const tapsVerschoben = taps.map((y) => y + versatz)
 
   const pfade: string[] = []
+  const handles: { x: number; y: number; mitglied: BusMitglied }[] = []
   for (let i = 0; i < sortiert.length; i++) {
     const m = sortiert[i]
     const sx = ltr ? m.from.x + m.from.w : m.from.x
     const sy = m.from.y + m.from.h / 2
     const ty = tapsVerschoben[i]
-    // kleine Versätze, damit die Verbindungsstücke nicht übereinander liegen
-    const naeherXI = ltr ? naeherX - (i % 3) * 3 : naeherX + (i % 3) * 3
+    // kleine Versätze, damit die Verbindungsstücke nicht übereinander liegen (+ manueller Versatz)
+    const naeherXI = (ltr ? naeherX - (i % 3) * 3 : naeherX + (i % 3) * 3) + m.offset
     pfade.push(`M ${sx} ${sy} H ${naeherXI} V ${ty} H ${busX}`)
+    handles.push({ x: naeherXI, y: (sy + ty) / 2, mitglied: m })
   }
   const oben = Math.min(...tapsVerschoben, zielY)
   const unten = Math.max(...tapsVerschoben, zielY)
   const bus = `M ${busX} ${oben} V ${unten} M ${busX} ${zielY} H ${zielRand}`
-  return { pfade, bus, taps: tapsVerschoben.map((y) => ({ x: busX, y })) }
+  return { pfade, bus, taps: tapsVerschoben.map((y) => ({ x: busX, y })), handles }
 }
 
 /** Kürzeste rechtwinklige Prozessverbindung: normal unten → oben, sonst Seite → Seite. */
@@ -559,6 +591,8 @@ export function TabellenbezogenView({ filter }: Props) {
     renameNebentabelle,
     removeNebentabelle,
     setNebenArbeitsplatz,
+    loescheBeziehung,
+    setBeziehungOffset,
     addColumnNeben,
     renameColumnNeben,
     changeColumnTypeNeben,
@@ -577,6 +611,66 @@ export function TabellenbezogenView({ filter }: Props) {
   const [origin, setOrigin] = useState({ left: 0, top: 0 })
   const [dragPos, setDragPos] = useState<{ x: number; y: number; sourceKey: string } | null>(null)
   const [infoAbt, setInfoAbt] = useState<string | null>(null)
+  const [menue, setMenue] = useState<{
+    x: number
+    y: number
+    eintraege: { text: string; kind: 'm' | 'n' | 's'; tableId: string; columnId: string }[]
+  } | null>(null)
+
+  /** Rechtsklick auf ein PK/FK-Badge: Beziehungen dieser Spalte anzeigen/entfernen. */
+  const onKontextMenue = (e: React.MouseEvent) => {
+    const el = (e.target as HTMLElement).closest('[data-key-node]') as HTMLElement | null
+    const knoten = el?.getAttribute('data-key-node')
+    if (!knoten) return
+    const [kind, tableId, columnId] = knoten.split(':') as ['m' | 'n' | 's', string, string]
+    const s = useStore.getState()
+    const tabelle =
+      kind === 'm'
+        ? s.produktionstabellen.find((t) => t.id === tableId)
+        : kind === 'n'
+          ? s.nebentabellen.find((t) => t.id === tableId)
+          : s.schritte.find((t) => t.id === tableId)
+    if (!tabelle) return
+    e.preventDefault()
+    e.stopPropagation()
+    const eintraege: { text: string; kind: 'm' | 'n' | 's'; tableId: string; columnId: string }[] = []
+    const spaltenName = tabelle.columns.find((c) => c.id === columnId)?.name ?? columnId
+    // eigene FK-Beziehung dieser Spalte
+    if (tabelle.keys.some((k) => k.columnId === columnId && k.type === 'fk')) {
+      eintraege.push({
+        text: `Diese Beziehung entfernen (${spaltenName})`,
+        kind,
+        tableId,
+        columnId,
+      })
+    }
+    // Fremdschlüssel, die auf diese PK-Spalte zeigen
+    if (tabelle.keys.some((k) => k.columnId === columnId && k.type === 'pk')) {
+      const sammle = (
+        k2: 'm' | 'n' | 's',
+        liste: { id: string; name: string; keys: TableKey[]; columns: TableColumn[] }[],
+      ) => {
+        for (const t of liste) {
+          for (const k of t.keys) {
+            if (k.type === 'fk' && k.refTableId === tableId && k.refColumnId === columnId) {
+              const sp = t.columns.find((c) => c.id === k.columnId)?.name ?? k.columnId
+              eintraege.push({
+                text: `Beziehung von ${t.name}.${sp} lösen`,
+                kind: k2,
+                tableId: t.id,
+                columnId: k.columnId,
+              })
+            }
+          }
+        }
+      }
+      sammle('m', s.produktionstabellen)
+      sammle('n', s.nebentabellen)
+      sammle('s', s.schritte)
+    }
+    if (eintraege.length === 0) return
+    setMenue({ x: e.clientX, y: e.clientY, eintraege })
+  }
 
   const registerRef = (nodeKey: string) => (el: HTMLElement | null) => {
     if (el) nodeRefs.current.set(nodeKey, el)
@@ -626,6 +720,7 @@ export function TabellenbezogenView({ filter }: Props) {
   const startDrag =
     (kind: 'm' | 'n' | 's', tableId: string, columnId: string, keyType: KeyType | null) =>
     (e: React.PointerEvent) => {
+      if (e.button !== 0) return
       e.preventDefault()
       e.stopPropagation()
       const sourceKey = `${kind}:${tableId}:${columnId}`
@@ -710,6 +805,30 @@ export function TabellenbezogenView({ filter }: Props) {
       window.addEventListener('pointerup', up)
     }
 
+  /** Beziehungslinie ziehen: verschiebt den Kanal (Versatz wird gespeichert). */
+  const startLinienDrag =
+    (m: BusMitglied) => (e: React.PointerEvent) => {
+      if (e.button !== 0) return
+      if (!m.keyKind || !m.keyTableId || !m.keyColumnId) return
+      e.preventDefault()
+      e.stopPropagation()
+      const kind = m.keyKind
+      const tableId = m.keyTableId
+      const columnId = m.keyColumnId
+      const startX = e.clientX
+      const startOffset = m.offset
+      const move = (ev: PointerEvent) => {
+        const neu = Math.max(-320, Math.min(320, Math.round(startOffset + (ev.clientX - startX))))
+        setBeziehungOffset(kind, tableId, columnId, neu)
+      }
+      const up = () => {
+        window.removeEventListener('pointermove', move)
+        window.removeEventListener('pointerup', up)
+      }
+      window.addEventListener('pointermove', move)
+      window.addEventListener('pointerup', up)
+    }
+
   const kindByTableId = new Map<string, string>()
   for (const m of alleMaschinen) kindByTableId.set(m.id, 'm')
   for (const st of alleSchritte) kindByTableId.set(st.id, 's')
@@ -723,6 +842,7 @@ export function TabellenbezogenView({ filter }: Props) {
     keyKind: 'm' | 'n' | 's' | null
     keyTableId: string | null
     keyColumnId: string | null
+    offset: number
   }
 
   const lines: LineDef[] = []
@@ -740,6 +860,7 @@ export function TabellenbezogenView({ filter }: Props) {
         keyKind: 'm',
         keyTableId: m.id,
         keyColumnId: k.columnId,
+        offset: k.offset ?? 0,
       })
     }
   }
@@ -757,6 +878,7 @@ export function TabellenbezogenView({ filter }: Props) {
         keyKind: 'n',
         keyTableId: n.id,
         keyColumnId: k.columnId,
+        offset: k.offset ?? 0,
       })
     }
   }
@@ -789,6 +911,7 @@ export function TabellenbezogenView({ filter }: Props) {
         keyKind: 's',
         keyTableId: st.id,
         keyColumnId: k.columnId,
+        offset: k.offset ?? 0,
       })
     }
   }
@@ -859,7 +982,7 @@ export function TabellenbezogenView({ filter }: Props) {
       : undefined
 
   return (
-    <div ref={containerRef} className="relative flex flex-col gap-6">
+    <div ref={containerRef} className="relative flex flex-col gap-6" onContextMenu={onKontextMenue}>
       {/* Abteilungsfarben – liegen hinter den Beziehungslinien */}
       {abteilungen.map((a, i) => {
         const r = boxes[`abt:${a.id}`]
@@ -887,13 +1010,21 @@ export function TabellenbezogenView({ filter }: Props) {
         </defs>
         {(() => {
           // Fremdschlüssel je Ziel bündeln (Kabelkanal/Bus)
-          const gruppen = new Map<string, { from: Rect; to: Rect; n1: boolean }[]>()
+          const gruppen = new Map<string, BusMitglied[]>()
           for (const ln of lines) {
             const from = boxes[ln.sourceKey]
             const to = boxes[ln.targetKey]
             if (!from || !to) continue
             const liste = gruppen.get(ln.targetKey) ?? []
-            liste.push({ from, to, n1: ln.n1 })
+            liste.push({
+              from,
+              to,
+              n1: ln.n1,
+              offset: ln.offset,
+              keyKind: ln.keyKind,
+              keyTableId: ln.keyTableId,
+              keyColumnId: ln.keyColumnId,
+            })
             gruppen.set(ln.targetKey, liste)
           }
           const halo = { paintOrder: 'stroke' as const, stroke: '#ffffff', strokeWidth: 3 }
@@ -912,6 +1043,21 @@ export function TabellenbezogenView({ filter }: Props) {
                 {bus.bus && <path d={bus.bus} stroke="#94a3b8" strokeWidth={1.5} fill="none" />}
                 {bus.taps.map((tp, i) => (
                   <circle key={`t${i}`} cx={tp.x} cy={tp.y} r={2.5} fill="#94a3b8" />
+                ))}
+                {bus.handles.map((h, i) => (
+                  <g key={`h${i}`}>
+                    <circle
+                      cx={h.x}
+                      cy={h.y}
+                      r={9}
+                      fill="transparent"
+                      style={{ cursor: 'ew-resize' }}
+                      onPointerDown={startLinienDrag(h.mitglied)}
+                    >
+                      <title>Linie ziehen: Beziehung verschieben</title>
+                    </circle>
+                    <circle cx={h.x} cy={h.y} r={3.5} fill="#64748b" />
+                  </g>
                 ))}
                 {mitglieder.map((m, i) =>
                   m.n1 ? (
@@ -1185,7 +1331,9 @@ export function TabellenbezogenView({ filter }: Props) {
                                                 {c.type}
                                               </span>
                                             )}
-                                            {c.id === 'auftragsnummer' && <KeyBadge type="pk" />}
+                                            {c.id === 'auftragsnummer' && (
+                                              <KeyBadge type="pk" info={`s:${bst.id}:${c.id}`} />
+                                            )}
                                             {c.id === 'auftragsnummer' && (
                                               <span
                                                 onPointerDown={startDrag('s', bst.id, 'auftragsnummer', 'pk')}
@@ -1526,7 +1674,9 @@ export function TabellenbezogenView({ filter }: Props) {
                                 {c.id !== 'auftragsnummer' && (
                                   <span className="text-[9px] uppercase text-slate-400">{c.type}</span>
                                 )}
-                                {c.id === 'auftragsnummer' && <KeyBadge type="pk" />}
+                                {c.id === 'auftragsnummer' && (
+                                  <KeyBadge type="pk" info={`s:${st.id}:${c.id}`} />
+                                )}
                                 {c.id === 'auftragsnummer' && (
                                   <span
                                     onPointerDown={startDrag('s', st.id, 'auftragsnummer', 'pk')}
@@ -1708,6 +1858,39 @@ export function TabellenbezogenView({ filter }: Props) {
         })}
       </div>
       {infoAbt && <InfoModal abteilungId={infoAbt} onClose={() => setInfoAbt(null)} />}
+
+      {menue && (
+        <>
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => setMenue(null)}
+            onContextMenu={(ev) => {
+              ev.preventDefault()
+              setMenue(null)
+            }}
+          />
+          <div
+            className="fixed z-50 min-w-[15rem] rounded-lg border border-slate-200 bg-white py-1 shadow-lg"
+            style={{ left: menue.x, top: menue.y }}
+          >
+            <div className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+              Beziehungen
+            </div>
+            {menue.eintraege.map((en, i) => (
+              <button
+                key={i}
+                onClick={() => {
+                  loescheBeziehung(en.kind, en.tableId, en.columnId)
+                  setMenue(null)
+                }}
+                className="block w-full px-2 py-1 text-left text-xs text-slate-700 hover:bg-red-50 hover:text-red-600"
+              >
+                {en.text}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   )
 }

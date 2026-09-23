@@ -87,6 +87,8 @@ export interface TableKey {
   refColumnId: string | null
   /** Anzeigename der Beziehung (editierbar, z. B. „n" oder „1") */
   label?: string
+  /** Manueller Versatz der Beziehungslinie in px (ziehen) */
+  offset?: number
 }
 
 /** Produktionstabelle (= Maschine) – gehört zu genau einem Schritt */
