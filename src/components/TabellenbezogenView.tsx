@@ -326,6 +326,66 @@ function computeLine(from: Rect, to: Rect): Geo {
   return { path, x1, y1, x2, y2, labelX, labelY }
 }
 
+const BUS_ABSTAND = 18
+const BUS_LANE = 6
+const TAP_MIN = 14
+
+/**
+ * Kabelkanal/Bus: mehrere Quellen auf dasselbe Ziel werden auf einer gemeinsamen senkrechten
+ * Linie (Bus) gebündelt. Jede Quelle mündet auf ihrer eigenen Höhe (nicht überlappend) ein;
+ * zu nahe Abzweige werden entzerrt. Kreuzen anderer Linien ist erlaubt, Überlappen nicht.
+ */
+function computeBus(
+  mitglieder: { from: Rect; to: Rect }[],
+  gruppe: number,
+): { pfade: string[]; bus: string | null; taps: { x: number; y: number }[] } {
+  if (mitglieder.length === 0) return { pfade: [], bus: null, taps: [] }
+  if (mitglieder.length === 1) {
+    return { pfade: [computeLine(mitglieder[0].from, mitglieder[0].to).path], bus: null, taps: [] }
+  }
+  const to = mitglieder[0].to
+  const alleLinks = mitglieder.every((m) => m.from.x + m.from.w <= to.x + 1)
+  const alleRechts = mitglieder.every((m) => m.from.x >= to.x + to.w - 1)
+  if (!alleLinks && !alleRechts) {
+    return { pfade: mitglieder.map((m) => computeLine(m.from, m.to).path), bus: null, taps: [] }
+  }
+  const ltr = alleLinks
+  const zielRand = ltr ? to.x : to.x + to.w
+  const abstand = BUS_ABSTAND + gruppe * BUS_LANE
+  const busX = ltr ? zielRand - abstand : zielRand + abstand
+  const naeherX = ltr ? busX - 12 : busX + 12
+  const zielY = to.y + to.h / 2
+
+  // Quellen nach Höhe sortieren, Abzweige mit Mindestabstand entzerren
+  const sortiert = [...mitglieder].sort((a, b) => a.from.y - b.from.y)
+  const taps: number[] = []
+  let letzter = -Infinity
+  for (const m of sortiert) {
+    const y = Math.max(m.from.y + m.from.h / 2, letzter + TAP_MIN)
+    taps.push(y)
+    letzter = y
+  }
+  // um das Ziel herum zentrieren
+  const mitte = (taps[0] + taps[taps.length - 1]) / 2
+  const versatz = (zielY - mitte) * 0.5
+  const tapsVerschoben = taps.map((y) => y + versatz)
+
+  const pfade: string[] = []
+  for (let i = 0; i < sortiert.length; i++) {
+    const m = sortiert[i]
+    const sx = ltr ? m.from.x + m.from.w : m.from.x
+    const sy = m.from.y + m.from.h / 2
+    const ty = tapsVerschoben[i]
+    // kleine Versätze, damit die Verbindungsstücke nicht übereinander liegen
+    const naeherXI = ltr ? naeherX - (i % 4) * 5 : naeherX + (i % 4) * 5
+    pfade.push(`M ${sx} ${sy} H ${naeherXI} V ${ty} H ${busX}`)
+  }
+  const oben = Math.min(...tapsVerschoben, zielY)
+  const unten = Math.max(...tapsVerschoben, zielY)
+  const bus = `M ${busX} ${oben} V ${unten} M ${busX} ${zielY} H ${zielRand}`
+  return { pfade, bus, taps: tapsVerschoben.map((y) => ({ x: busX, y })) }
+}
+
 function RelationshipLine({
   geo,
   n1,
@@ -680,39 +740,19 @@ export function TabellenbezogenView({ filter }: Props) {
       })
     }
   }
-  // Prozesskette: Der Fertigungsauftrag wandert durch die Kettenknoten (feste Schritte + variable Blöcke).
-  // Ein Block wird über seinen ersten Schritt betreten und über seinen letzten Schritt verlassen.
+  // Prozesskette Schritt → Schritt: wird separat als Linie "mittig unten → mittig oben" gezeichnet
+  const kettenLinien: { von: string; nach: string }[] = []
   for (const a of abteilungen) {
-    const nodes: { pos: number; inKey: string; outKey: string }[] = []
+    const knoten: { pos: number; key: string }[] = []
     for (const st of alleSchritte.filter((st) => st.abteilungId === a.id && !st.blockId)) {
-      nodes.push({
-        pos: st.position,
-        inKey: `s:${st.id}:auftragsnummer`,
-        outKey: `s:${st.id}:auftragsnummer`,
-      })
+      knoten.push({ pos: st.position, key: `sc:${st.id}` })
     }
     for (const b of alleBloecke.filter((b) => b.abteilungId === a.id)) {
-      const bs = alleSchritte.filter((st) => st.blockId === b.id)
-      const first = bs[0]
-      const last = bs[bs.length - 1]
-      if (!first || !last) continue
-      nodes.push({
-        pos: b.position,
-        inKey: `s:${first.id}:auftragsnummer`,
-        outKey: `s:${last.id}:auftragsnummer`,
-      })
+      knoten.push({ pos: b.position, key: `bc:${b.id}` })
     }
-    nodes.sort((x, y) => x.pos - y.pos)
-    for (let i = 0; i < nodes.length - 1; i++) {
-      lines.push({
-        sourceKey: nodes[i].outKey,
-        targetKey: nodes[i + 1].inKey,
-        label: 'Auftragsnummer',
-        n1: false,
-        keyKind: null,
-        keyTableId: null,
-        keyColumnId: null,
-      })
+    knoten.sort((x, y) => x.pos - y.pos)
+    for (let i = 0; i < knoten.length - 1; i++) {
+      kettenLinien.push({ von: knoten[i].key, nach: knoten[i + 1].key })
     }
   }
   // Schritt-Felder als Fremdschlüssel
@@ -835,11 +875,83 @@ export function TabellenbezogenView({ filter }: Props) {
             <path d="M0,0 L8,4 L0,8 z" fill="#F56405" />
           </marker>
         </defs>
-        {lines.map((ln, i) => {
-          const from = boxes[ln.sourceKey]
-          const to = boxes[ln.targetKey]
-          if (!from || !to) return null
-          return <RelationshipLine key={i} geo={computeLine(from, to)} n1={ln.n1} />
+        {(() => {
+          // Fremdschlüssel je Ziel bündeln (Kabelkanal/Bus)
+          const gruppen = new Map<string, { from: Rect; to: Rect; n1: boolean }[]>()
+          for (const ln of lines) {
+            const from = boxes[ln.sourceKey]
+            const to = boxes[ln.targetKey]
+            if (!from || !to) continue
+            const liste = gruppen.get(ln.targetKey) ?? []
+            liste.push({ from, to, n1: ln.n1 })
+            gruppen.set(ln.targetKey, liste)
+          }
+          const halo = { paintOrder: 'stroke' as const, stroke: '#ffffff', strokeWidth: 3 }
+          const ergebnis: React.ReactNode[] = []
+          let gruppe = 0
+          for (const [key, mitglieder] of gruppen) {
+            const bus = computeBus(mitglieder, gruppe)
+            gruppe += 1
+            const to = mitglieder[0].to
+            const alleLinks = mitglieder.every((m) => m.from.x + m.from.w <= to.x + 1)
+            ergebnis.push(
+              <g key={key}>
+                {bus.pfade.map((d, i) => (
+                  <path key={`p${i}`} d={d} stroke="#94a3b8" strokeWidth={1.5} fill="none" />
+                ))}
+                {bus.bus && <path d={bus.bus} stroke="#94a3b8" strokeWidth={1.5} fill="none" />}
+                {bus.taps.map((tp, i) => (
+                  <circle key={`t${i}`} cx={tp.x} cy={tp.y} r={2.5} fill="#94a3b8" />
+                ))}
+                {mitglieder.map((m, i) =>
+                  m.n1 ? (
+                    <text
+                      key={`n${i}`}
+                      x={alleLinks ? m.from.x + m.from.w + 5 : m.from.x - 5}
+                      y={m.from.y + m.from.h / 2 - 4}
+                      textAnchor={alleLinks ? 'start' : 'end'}
+                      fontSize={10}
+                      fontWeight={700}
+                      fill="#c45004"
+                      style={halo}
+                    >
+                      n
+                    </text>
+                  ) : null,
+                )}
+                {mitglieder.some((m) => m.n1) && (
+                  <text
+                    x={alleLinks ? to.x - 5 : to.x + to.w + 5}
+                    y={to.y + to.h / 2 - 4}
+                    textAnchor={alleLinks ? 'end' : 'start'}
+                    fontSize={10}
+                    fontWeight={700}
+                    fill="#c45004"
+                    style={halo}
+                  >
+                    1
+                  </text>
+                )}
+              </g>,
+            )
+          }
+          return ergebnis
+        })()}
+
+        {/* Prozesskette: mittig unten vom Schritt zum mittig oben des nächsten Schritts */}
+        {kettenLinien.map((k, i) => {
+          const von = boxes[k.von]
+          const nach = boxes[k.nach]
+          if (!von || !nach) return null
+          const vx = von.x + von.w / 2
+          const vy = von.y + von.h
+          const nx = nach.x + nach.w / 2
+          const ny = nach.y
+          const pfad =
+            Math.abs(vx - nx) < 4
+              ? `M ${vx} ${vy} V ${ny}`
+              : `M ${vx} ${vy} V ${(vy + ny) / 2} H ${nx} V ${ny}`
+          return <path key={`kette-${i}`} d={pfad} stroke="#475569" strokeWidth={2} fill="none" />
         })}
         {loops.map((lp, i) => {
           const from = boxes[lp.sourceKey]
@@ -961,6 +1073,7 @@ export function TabellenbezogenView({ filter }: Props) {
                         return (
                           <div
                             key={`block-${item.block.id}`}
+                            ref={registerRef(`bc:${item.block.id}`)}
                             className="col-span-2 rounded-lg border border-zollern-200 bg-zollern-50/40 p-2"
                           >
                             <div ref={registerRef(`b:${item.block.id}`)} className="mb-2 flex items-center gap-2">
@@ -1306,14 +1419,15 @@ export function TabellenbezogenView({ filter }: Props) {
                           </div>
 
                           {/* Schritt-Tabelle */}
-                          <EntityCard
-                            title={st.name}
-                            onRename={(name) => renameSchritt(st.id, name)}
-                            onRemove={() => removeSchritt(st.id)}
-                            percent={aggregate && matchedRows.length > 0 ? (matched / matchedRows.length) * 100 : null}
-                            onAddColumn={(name, type) => addColumnSchritt(st.id, name, type)}
-                            rahmen={extern ? 'extern' : 'normal'}
-                            betont
+                          <div ref={registerRef(`sc:${st.id}`)}>
+                            <EntityCard
+                              title={st.name}
+                              onRename={(name) => renameSchritt(st.id, name)}
+                              onRemove={() => removeSchritt(st.id)}
+                              percent={aggregate && matchedRows.length > 0 ? (matched / matchedRows.length) * 100 : null}
+                              onAddColumn={(name, type) => addColumnSchritt(st.id, name, type)}
+                              rahmen={extern ? 'extern' : 'normal'}
+                              betont
                             footer={
                               <div className="flex items-center justify-between gap-1 border-t border-slate-100 px-2 py-1">
                                 <div className="flex items-center gap-1">
@@ -1466,7 +1580,8 @@ export function TabellenbezogenView({ filter }: Props) {
                                 )}
                               </div>
                             </div>
-                          </EntityCard>
+                            </EntityCard>
+                          </div>
                         </Fragment>
                       )
                     })}
