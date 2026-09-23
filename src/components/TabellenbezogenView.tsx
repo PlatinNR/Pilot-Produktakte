@@ -669,7 +669,12 @@ export function TabellenbezogenView({ filter }: Props) {
       sammle('s', s.schritte)
     }
     if (eintraege.length === 0) return
-    setMenue({ x: e.clientX, y: e.clientY, eintraege })
+    // Menü innerhalb des sichtbaren Bereichs halten
+    const breite = 280
+    const hoehe = eintraege.length * 30 + 46
+    const x = Math.max(8, Math.min(e.clientX, window.innerWidth - breite - 8))
+    const y = Math.max(8, Math.min(e.clientY, window.innerHeight - hoehe - 8))
+    setMenue({ x, y, eintraege })
   }
 
   const registerRef = (nodeKey: string) => (el: HTMLElement | null) => {
@@ -1049,14 +1054,15 @@ export function TabellenbezogenView({ filter }: Props) {
                     <circle
                       cx={h.x}
                       cy={h.y}
-                      r={9}
+                      r={10}
                       fill="transparent"
+                      pointerEvents="all"
                       style={{ cursor: 'ew-resize' }}
                       onPointerDown={startLinienDrag(h.mitglied)}
                     >
                       <title>Linie ziehen: Beziehung verschieben</title>
                     </circle>
-                    <circle cx={h.x} cy={h.y} r={3.5} fill="#64748b" />
+                    <circle cx={h.x} cy={h.y} r={3.5} fill="#64748b" pointerEvents="none" />
                   </g>
                 ))}
                 {mitglieder.map((m, i) =>
