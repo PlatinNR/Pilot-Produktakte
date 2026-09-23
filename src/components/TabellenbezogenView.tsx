@@ -361,11 +361,16 @@ function computeBus(
     return { pfade: mitglieder.map((m) => computeLine(m.from, m.to).path), bus: null, taps: [] }
   }
   const ltr = alleLinks
+  const quellenRand = ltr
+    ? Math.max(...mitglieder.map((m) => m.from.x + m.from.w))
+    : Math.min(...mitglieder.map((m) => m.from.x))
   const zielRand = ltr ? to.x : to.x + to.w
-  const abstand = BUS_ABSTAND + gruppe * BUS_LANE
-  const busX = ltr ? zielRand - abstand : zielRand + abstand
-  const naeherX = ltr ? busX - 12 : busX + 12
   const zielY = to.y + to.h / 2
+  // Bus immer im Zwischenraum zwischen Quell- und Zielspalte halten
+  const gapBreite = ltr ? zielRand - quellenRand : quellenRand - zielRand
+  const abstand = Math.min(BUS_ABSTAND + gruppe * BUS_LANE, Math.max(6, gapBreite - 6))
+  const busX = ltr ? zielRand - abstand : zielRand + abstand
+  const naeherX = ltr ? busX - Math.min(10, Math.max(3, abstand - 2)) : busX + Math.min(10, Math.max(3, abstand - 2))
 
   // Quellen nach Höhe sortieren, Abzweige mit Mindestabstand entzerren
   const sortiert = [...mitglieder].sort((a, b) => a.from.y - b.from.y)
@@ -388,7 +393,7 @@ function computeBus(
     const sy = m.from.y + m.from.h / 2
     const ty = tapsVerschoben[i]
     // kleine Versätze, damit die Verbindungsstücke nicht übereinander liegen
-    const naeherXI = ltr ? naeherX - (i % 4) * 5 : naeherX + (i % 4) * 5
+    const naeherXI = ltr ? naeherX - (i % 3) * 3 : naeherX + (i % 3) * 3
     pfade.push(`M ${sx} ${sy} H ${naeherXI} V ${ty} H ${busX}`)
   }
   const oben = Math.min(...tapsVerschoben, zielY)
@@ -1073,7 +1078,7 @@ export function TabellenbezogenView({ filter }: Props) {
                 </button>
               </div>
 
-              <div className="flex items-start gap-6">
+              <div className="flex items-start gap-8">
                 {/* Produktionsstellen + Produktionskette als Schritt-Zeilen */}
                 <div className="min-w-0 flex-1">
                   <div className="grid grid-cols-[minmax(0,1fr)_20rem] items-start gap-x-6 gap-y-5">
