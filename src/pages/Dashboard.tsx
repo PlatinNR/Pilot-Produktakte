@@ -3,7 +3,7 @@ import type { Filter } from '../types'
 import { EMPTY_FILTER } from '../types'
 import { useStore } from '../store'
 import { isTraceMode } from '../utils/aggregate'
-import { loadFromCloud, saveAllChains, useSyncStatus } from '../lib/sync'
+import { loadFromCloud, raeumeCloudAuf, saveAllChains, useSyncStatus } from '../lib/sync'
 import { FilterBar } from '../components/FilterBar'
 import { TraceView } from '../components/TraceView'
 import { AbteilungBlock } from '../components/AbteilungBlock'
@@ -26,6 +26,18 @@ export function Dashboard() {
   const [filter, setFilter] = useState<Filter>(EMPTY_FILTER)
   const [view, setView] = useState<View>('zusammen')
   const [produktinfoOffen, setProduktinfoOffen] = useState(false)
+  const [aufraeumHinweis, setAufraeumHinweis] = useState<string | null>(null)
+
+  const handleAufraeumen = async () => {
+    if (!window.confirm('Früher automatisch angelegte Backup-Datensätze in der Cloud löschen?')) return
+    const anzahl = await raeumeCloudAuf()
+    setAufraeumHinweis(
+      anzahl > 0
+        ? `${anzahl} Backup-Datensatz/Datensätze gelöscht.`
+        : 'Keine Backup-Datensätze gefunden.',
+    )
+    setTimeout(() => setAufraeumHinweis(null), 5000)
+  }
 
   const abteilungen = alleAbteilungen.filter((a) => a.chainId === activeChainId)
   const activeChain = chains.find((c) => c.id === activeChainId)
@@ -104,6 +116,14 @@ export function Dashboard() {
             {sync.phase === 'loading' ? 'Lädt…' : 'Aus Cloud laden'}
           </button>
           <button
+            onClick={handleAufraeumen}
+            disabled={busy}
+            className="rounded-lg border border-slate-300 px-3 py-2 text-xs text-slate-500 hover:bg-slate-100 disabled:opacity-60"
+            title="Frühere automatische Backup-Duplikate aus der Cloud löschen"
+          >
+            Cloud aufräumen
+          </button>
+          <button
             onClick={() => addAbteilung()}
             className="rounded-lg border border-zollern-700 px-4 py-2 text-sm font-medium text-zollern-700 hover:bg-zollern-50"
           >
@@ -113,6 +133,8 @@ export function Dashboard() {
       </header>
 
       <p className={`text-xs ${sync.lastError ? 'text-red-600' : 'text-slate-500'}`}>{statusText}</p>
+
+      {aufraeumHinweis && <p className="text-xs text-slate-500">{aufraeumHinweis}</p>}
 
       {sync.cloudChecked && sync.cloudEmpty && chains.length > 0 && (
         <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">

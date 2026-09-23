@@ -1,11 +1,9 @@
 import { useEffect, useRef, useSyncExternalStore } from 'react'
 import { isSupabaseConfigured } from './supabase'
-import { listChains, saveChain } from './api'
+import { listChains, loescheBackupKetten, saveChain } from './api'
 import { mitUnterdruecktemUndo } from './undo'
 import { useStore } from '../store'
 import type { Abteilung, Bearbeitungsblock, ChainData, Nebentabelle, Produktionstabelle, Schritt } from '../types'
-
-const updatedAtMap = new Map<string, string>()
 
 export interface SyncStatus {
   phase: 'idle' | 'loading' | 'saving'
@@ -85,12 +83,28 @@ export async function saveAllChains(): Promise<void> {
     )
     for (const chain of ordered) {
       const data = extractChainData(chain.id)
-      const res = await saveChain(chain.id, chain.name, data, updatedAtMap.get(chain.id) ?? null)
-      if (res.updatedAt) updatedAtMap.set(chain.id, res.updatedAt)
+      await saveChain(chain.id, chain.name, data)
     }
     setStatus({ phase: 'idle', cloudChecked: true, cloudEmpty: false, lastSavedAt: Date.now() })
   } catch (e) {
     setStatus({ phase: 'idle', lastError: errorText(e) })
+  }
+}
+
+/** Löscht früher automatisch angelegte Backup-Datensätze in der Cloud. */
+export async function raeumeCloudAuf(): Promise<number> {
+  if (!isSupabaseConfigured()) {
+    setStatus({ lastError: 'Supabase ist nicht konfiguriert (Umgebungsvariablen fehlen).' })
+    return 0
+  }
+  setStatus({ phase: 'saving', lastError: null })
+  try {
+    const anzahl = await loescheBackupKetten()
+    setStatus({ phase: 'idle', cloudChecked: true, cloudEmpty: false, lastSavedAt: Date.now() })
+    return anzahl
+  } catch (e) {
+    setStatus({ phase: 'idle', lastError: errorText(e) })
+    return 0
   }
 }
 
@@ -108,13 +122,35 @@ export async function loadFromCloud(): Promise<boolean> {
       setStatus({ phase: 'idle' })
       return false
     }
-    const chains = records.map((r) => ({ id: r.id, name: r.name, info: r.data?.info }))
+    // Gleiche Datenstände (Snapshots/Kopien) zusammenfassen – verhindert Vervielfachung
+    const signaturen = new Set<string>()
+    const ausgewaehlt = records
+      .filter((r) => !r.name.includes('(Backup '))
+      .filter((r) => {
+        const sig = (r.data?.abteilungen ?? [])
+          .map((a) => a.id)
+          .sort()
+          .join('|')
+        if (sig.length === 0) return true
+        if (signaturen.has(sig)) return false
+        signaturen.add(sig)
+        return true
+      })
+
+    const chains = ausgewaehlt.map((r) => ({ id: r.id, name: r.name, info: r.data?.info }))
     const abteilungen: Abteilung[] = []
     const bearbeitungsbloecke: Bearbeitungsblock[] = []
     const schritte: Schritt[] = []
     const produktionstabellen: Produktionstabelle[] = []
     const nebentabellen: Nebentabelle[] = []
-    for (const r of records) {
+    // IDs nur einmal übernehmen (defensiv gegen doppelte Einträge)
+    const gesehen = new Set<string>()
+    const einmalig = (id: string) => {
+      if (gesehen.has(id)) return false
+      gesehen.add(id)
+      return true
+    }
+    for (const r of ausgewaehlt) {
       const d = r.data ?? {
         abteilungen: [],
         bearbeitungsbloecke: [],
@@ -122,16 +158,15 @@ export async function loadFromCloud(): Promise<boolean> {
         produktionstabellen: [],
         nebentabellen: [],
       }
-      for (const a of d.abteilungen ?? []) abteilungen.push({ ...a, chainId: r.id })
-      for (const b of d.bearbeitungsbloecke ?? []) bearbeitungsbloecke.push(b)
-      for (const st of d.schritte ?? []) schritte.push(st)
+      for (const a of d.abteilungen ?? []) if (einmalig(a.id)) abteilungen.push({ ...a, chainId: r.id })
+      for (const b of d.bearbeitungsbloecke ?? []) if (einmalig(b.id)) bearbeitungsbloecke.push(b)
+      for (const st of d.schritte ?? []) if (einmalig(st.id)) schritte.push(st)
       for (const p of d.produktionstabellen ?? []) {
-        produktionstabellen.push({ ...p, arbeitsplatz: p.arbeitsplatz ?? '' })
+        if (einmalig(p.id)) produktionstabellen.push({ ...p, arbeitsplatz: p.arbeitsplatz ?? '' })
       }
       for (const n of d.nebentabellen ?? []) {
-        nebentabellen.push({ ...n, arbeitsplatz: n.arbeitsplatz ?? '' })
+        if (einmalig(n.id)) nebentabellen.push({ ...n, arbeitsplatz: n.arbeitsplatz ?? '' })
       }
-      updatedAtMap.set(r.id, r.updated_at)
     }
     const state = useStore.getState()
     mitUnterdruecktemUndo(() =>

@@ -27,35 +27,12 @@ export interface SaveResult {
 }
 
 /**
- * Speichert eine Kette. Wurde die serverseitige Version inzwischen von jemand
- * anderem geändert (updated_at weicht ab), wird die fremde Version als
- * „<Name> (Backup <Datum>)" als neue Kette gesichert, bevor überschrieben wird.
+ * Speichert eine Kette (ein Datensatz je Kette).
+ * Hinweis: Es werden keine Backup-Datensätze mehr angelegt – diese hatten bei
+ * identischen IDs zu vervielfachten Einträgen beim Laden geführt.
  */
-export async function saveChain(
-  id: string,
-  name: string,
-  data: ChainData,
-  expectedUpdatedAt: string | null,
-): Promise<SaveResult> {
+export async function saveChain(id: string, name: string, data: ChainData): Promise<SaveResult> {
   if (!supabase) return { updatedAt: '', backup: false }
-
-  let backup = false
-  if (expectedUpdatedAt) {
-    const { data: current, error: readError } = await supabase
-      .from('chains')
-      .select('updated_at, name, data')
-      .eq('id', id)
-      .maybeSingle()
-    if (readError) throw readError
-    if (current && current.updated_at !== expectedUpdatedAt) {
-      const date = new Date().toLocaleDateString('de-DE')
-      const { error: backupError } = await supabase
-        .from('chains')
-        .insert({ name: `${current.name} (Backup ${date})`, data: current.data })
-      if (backupError) throw backupError
-      backup = true
-    }
-  }
 
   const { data: updated, error } = await supabase
     .from('chains')
@@ -64,7 +41,7 @@ export async function saveChain(
     .single()
   if (error) throw error
 
-  return { updatedAt: updated?.updated_at ?? '', backup }
+  return { updatedAt: updated?.updated_at ?? '', backup: false }
 }
 
 export async function renameChain(id: string, name: string): Promise<void> {
@@ -77,4 +54,16 @@ export async function deleteChain(id: string): Promise<void> {
   if (!supabase) return
   const { error } = await supabase.from('chains').delete().eq('id', id)
   if (error) throw error
+}
+
+/** Löscht alle früher automatisch angelegten Backup-Datensätze (Name enthält „(Backup "). */
+export async function loescheBackupKetten(): Promise<number> {
+  if (!supabase) return 0
+  const { data, error } = await supabase
+    .from('chains')
+    .delete()
+    .like('name', '%(Backup %')
+    .select('id')
+  if (error) throw error
+  return data?.length ?? 0
 }

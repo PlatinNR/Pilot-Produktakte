@@ -1029,7 +1029,7 @@ export const useStore = create<Store>()(
   }),
     {
       name: 'digitale-produktakte',
-      version: 14,
+      version: 15,
       migrate: (persisted, version) => {
         let p = persisted as Partial<AppState> & {
           abteilungen?: (Abteilung & { chainId?: string; parentId?: string | null; sequence?: 'fixed' | 'variable' })[]
@@ -1218,6 +1218,42 @@ export const useStore = create<Store>()(
               })
               return { ...t, columns: t.columns.filter((c) => c.id !== 'wdh'), rows }
             }),
+          } as typeof p
+        }
+        if (version < 15) {
+          // Reparatur: versehentlich vervielfachte Einträge (gleiche IDs) und Snapshot-Ketten entfernen
+          const gesehen = new Set<string>()
+          const einmalig = <T extends { id: string }>(liste: T[]): T[] =>
+            liste.filter((x) => {
+              if (gesehen.has(x.id)) return false
+              gesehen.add(x.id)
+              return true
+            })
+          const abteilungen = einmalig(p.abteilungen ?? [])
+          const bearbeitungsbloecke = einmalig(p.bearbeitungsbloecke ?? [])
+          const schritte = einmalig(p.schritte ?? [])
+          const produktionstabellen = einmalig(p.produktionstabellen ?? [])
+          const nebentabellen = einmalig(p.nebentabellen ?? [])
+          const sigs = new Set<string>()
+          const chains = (p.chains ?? []).filter((c) => {
+            const sig = abteilungen
+              .filter((a) => a.chainId === c.id)
+              .map((a) => a.id)
+              .sort()
+              .join('|')
+            if (sig.length === 0) return true
+            if (sigs.has(sig)) return false
+            sigs.add(sig)
+            return true
+          })
+          p = {
+            ...p,
+            chains,
+            abteilungen,
+            bearbeitungsbloecke,
+            schritte,
+            produktionstabellen,
+            nebentabellen,
           } as typeof p
         }
         return p as AppState
