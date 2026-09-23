@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
+import { useT } from '../lib/sprache'
 
 const PASSWORT = 'Zollern26Pilot'
 const SCHLUESSEL = 'produktakte-freigeschaltet'
 
 /** Einfaches Passwort-Tor (nur clientseitig, kein echter Schutz). */
 export function PasswortTor({ children }: { children: ReactNode }) {
+  const t = useT()
   const [freigeschaltet, setFreigeschaltet] = useState(
     () => sessionStorage.getItem(SCHLUESSEL) === 'ja',
   )
@@ -36,13 +38,13 @@ export function PasswortTor({ children }: { children: ReactNode }) {
           </span>
           <div className="leading-tight">
             <div className="text-base font-bold tracking-widest text-zo-ink">ZOLLERN</div>
-            <div className="text-[11px] text-zo-muted">Digitale Produktakte</div>
+            <div className="text-[11px] text-zo-muted">{t('Digitale Produktakte')}</div>
           </div>
         </div>
 
         <label className="flex flex-col gap-1">
           <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-            Passwort
+            {t('Passwort')}
           </span>
           <input
             type="password"
@@ -58,13 +60,13 @@ export function PasswortTor({ children }: { children: ReactNode }) {
           />
         </label>
 
-        {fehler && <p className="text-xs text-red-600">Falsches Passwort.</p>}
+        {fehler && <p className="text-xs text-red-600">{t('Falsches Passwort.')}</p>}
 
         <button
           type="submit"
           className="rounded-lg bg-zollern-700 px-4 py-2 text-sm font-medium text-white hover:bg-zollern-800"
         >
-          Öffnen
+          {t('Öffnen')}
         </button>
       </form>
     </div>

@@ -2,6 +2,8 @@ import { useState } from 'react'
 import type { ReactNode } from 'react'
 import type { ColumnType, TableColumn, TableKey, TableRow } from '../types'
 import { COLUMN_TYPE_LABELS } from '../types'
+import { spaltenName } from '../lib/i18n'
+import { useAktuelleSprache, useT } from '../lib/sprache'
 import { EditableName } from './EditableName'
 import { KeyBadge } from './KeyBadge'
 import { keyTypeOf } from '../utils/keys'
@@ -64,6 +66,8 @@ export function DataTable({
   kopfExtra,
   onKopieren,
 }: Props) {
+  const t = useT()
+  const sprache = useAktuelleSprache()
   const [addingCol, setAddingCol] = useState(false)
   const [colName, setColName] = useState('')
   const [colType, setColType] = useState<ColumnType>('text')
@@ -113,7 +117,7 @@ export function DataTable({
           <button
             onClick={onKopieren}
             className="shrink-0 rounded px-1 text-xs text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-            title="Tabelle kopieren (Spalten + Zeilen)"
+            title={t('Tabelle kopieren (Spalten + Zeilen)')}
           >
             ⧉
           </button>
@@ -121,7 +125,7 @@ export function DataTable({
         <button
           onClick={onRemove}
           className="shrink-0 rounded px-1.5 text-xs text-slate-400 hover:bg-red-50 hover:text-red-600"
-          title="Tabelle löschen"
+          title={t('Tabelle löschen')}
         >
           ✕
         </button>
@@ -136,11 +140,11 @@ export function DataTable({
       {onArbeitsplatzChange && (
         <div className="border-b border-slate-100 bg-slate-50/60">
           <div className="flex items-center gap-2 px-3 py-1">
-            <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Arbeitsplatz</span>
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">{t('Arbeitsplatz')}</span>
             <input
               value={arbeitsplatzDraft}
               onChange={(e) => aendereArbeitsplatz(e.target.value)}
-              placeholder="Nr. zuweisen"
+              placeholder={t('Nr. zuweisen')}
               className={`w-28 rounded border bg-white px-1.5 py-0.5 text-xs outline-none focus:border-zollern-400 ${
                 arbeitsplatzFehler
                   ? 'border-red-400 text-red-600'
@@ -151,8 +155,8 @@ export function DataTable({
               title={
                 arbeitsplatzFehler ??
                 (arbeitsplatzDraft
-                  ? 'Arbeitsplatz-Nummer (gilt für alle Einträge)'
-                  : 'Arbeitsplatz-Nummer fehlt')
+                  ? t('Arbeitsplatz-Nummer (gilt für alle Einträge)')
+                  : t('Arbeitsplatz-Nummer fehlt'))
               }
             />
           </div>
@@ -172,8 +176,8 @@ export function DataTable({
                 <th key={c.id} className="whitespace-nowrap border-b border-slate-100 px-2 py-1.5 text-left font-medium text-slate-600">
                   {c.fixed ? (
                     <span className="inline-flex items-center gap-1">
-                      {c.name}
-                      <span className="text-[9px] font-normal uppercase text-slate-400">fix</span>
+                      {spaltenName(c, sprache)}
+                      <span className="text-[9px] font-normal uppercase text-slate-400">{t('fix')}</span>
                       <KeyBadge
                         type={keyTypeOf(keys, c.id)}
                         onClick={onCycleKey ? () => onCycleKey(c.id) : undefined}
@@ -190,11 +194,11 @@ export function DataTable({
                         value={c.type}
                         onChange={(e) => onChangeColumnType(c.id, e.target.value as ColumnType)}
                         className="rounded border border-slate-200 bg-white px-1 py-0.5 text-[10px] text-slate-500"
-                        title="Spaltentyp"
+                        title={t('Spaltentyp')}
                       >
-                        {(Object.keys(COLUMN_TYPE_LABELS) as ColumnType[]).map((t) => (
-                          <option key={t} value={t}>
-                            {COLUMN_TYPE_LABELS[t]}
+                        {(Object.keys(COLUMN_TYPE_LABELS) as ColumnType[]).map((typ) => (
+                          <option key={typ} value={typ}>
+                            {t(COLUMN_TYPE_LABELS[typ])}
                           </option>
                         ))}
                       </select>
@@ -205,7 +209,7 @@ export function DataTable({
                       <button
                         onClick={() => onRemoveColumn(c.id)}
                         className="text-slate-300 hover:text-red-500"
-                        title="Spalte löschen"
+                        title={t('Spalte löschen')}
                       >
                         ✕
                       </button>
@@ -242,7 +246,7 @@ export function DataTable({
                   <button
                     onClick={() => onRemoveRow(ri)}
                     className="text-slate-300 hover:text-red-500"
-                    title="Zeile löschen"
+                    title={t('Zeile löschen')}
                   >
                     ✕
                   </button>
@@ -252,7 +256,7 @@ export function DataTable({
             {rows.length === 0 && (
               <tr>
                 <td colSpan={columns.length + 1} className="px-3 py-2 text-center text-[11px] text-slate-400">
-                  Noch keine Durchläufe
+                  {t('Noch keine Durchläufe')}
                 </td>
               </tr>
             )}
@@ -265,7 +269,7 @@ export function DataTable({
           onClick={onAddRow}
           className="rounded px-2 py-1 text-xs font-medium text-zollern-700 hover:bg-zollern-50"
         >
-          + Zeile
+          {t('+ Zeile')}
         </button>
 
         {addingCol ? (
@@ -301,7 +305,7 @@ export function DataTable({
             onClick={() => setAddingCol(true)}
             className="rounded px-2 py-1 text-xs text-slate-400 hover:bg-slate-50 hover:text-slate-600"
           >
-            + Spalte
+            {t('+ Spalte')}
           </button>
         )}
       </div>

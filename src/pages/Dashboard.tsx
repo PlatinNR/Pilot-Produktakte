@@ -5,6 +5,7 @@ import { useStore } from '../store'
 import { isTraceMode } from '../utils/aggregate'
 import { loadFromCloud, saveAllChains, useSyncStatus } from '../lib/sync'
 import { fuegeAbteilungEin } from '../lib/tabellenKopie'
+import { useSprache, useT } from '../lib/sprache'
 import { FilterBar } from '../components/FilterBar'
 import { TraceView } from '../components/TraceView'
 import { AbteilungBlock } from '../components/AbteilungBlock'
@@ -25,6 +26,9 @@ export function Dashboard() {
   const removeChain = useStore((s) => s.removeChain)
   const addAbteilung = useStore((s) => s.addAbteilung)
   const sync = useSyncStatus()
+  const t = useT()
+  const sprache = useSprache((s) => s.sprache)
+  const setSprache = useSprache((s) => s.setSprache)
   const [filter, setFilter] = useState<Filter>(EMPTY_FILTER)
   const [view, setView] = useState<View>('zusammen')
   const [produktinfoOffen, setProduktinfoOffen] = useState(false)
@@ -44,49 +48,56 @@ export function Dashboard() {
   const handleKetteLoeschen = () => {
     if (!activeChain) return
     const anzahlAbteilungen = abteilungen.length
-    const frage =
-      `Prozesskette „${activeChain.name}" wirklich löschen?\n\n` +
-      `Dabei werden ${anzahlAbteilungen} Abteilung(en) mit allen Schritten, Arbeitsplätzen und Einträgen ` +
-      `sowohl hier als auch in der Cloud entfernt. Das kann nicht rückgängig gemacht werden.`
+    const frage = t(
+      'Prozesskette „{name}" wirklich löschen?\n\nDabei werden {anzahl} Abteilung(en) mit allen Schritten, Arbeitsplätzen und Einträgen sowohl hier als auch in der Cloud entfernt. Das kann nicht rückgängig gemacht werden.',
+      { name: activeChain.name, anzahl: anzahlAbteilungen },
+    )
     if (!window.confirm(frage)) return
     removeChain(activeChain.id)
-    setHinweis(`Prozesskette „${activeChain.name}" gelöscht.`)
+    setHinweis(t('Prozesskette „{name}" gelöscht.', { name: activeChain.name }))
     setTimeout(() => setHinweis(null), 5000)
   }
 
   const busy = sync.phase !== 'idle'
   const statusText = sync.lastError
-    ? `Fehler: ${sync.lastError}`
+    ? t('Fehler: {text}', { text: sync.lastError })
     : sync.phase === 'saving'
-      ? 'Speichert…'
+      ? t('Speichert…')
       : sync.phase === 'loading'
-        ? 'Lädt…'
+        ? t('Lädt…')
         : sync.lastSavedAt
-          ? `Gespeichert ${new Date(sync.lastSavedAt).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}`
+          ? t('Gespeichert {zeit}', {
+              zeit: new Date(sync.lastSavedAt).toLocaleTimeString('de-DE', {
+                hour: '2-digit',
+                minute: '2-digit',
+              }),
+            })
           : sync.cloudChecked && sync.cloudEmpty
-            ? 'Cloud ist leer'
+            ? t('Cloud ist leer')
             : sync.cloudChecked
-              ? 'Cloud verbunden'
-              : 'Cloud wird geprüft…'
+              ? t('Cloud verbunden')
+              : t('Cloud wird geprüft…')
 
   return (
     <div className="flex h-full flex-col gap-4 overflow-y-auto p-6">
       <header className="flex items-end justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-zo-ink">Dashboard</h1>
+          <h1 className="text-2xl font-bold text-zo-ink">{t('Dashboard')}</h1>
           <p className="text-sm text-slate-500">
-            Fertigungsauftrag als Leitende Nummer – Trace oder Verteilung je Maschine.
+            {t('Fertigungsauftrag als Leitende Nummer – Trace oder Verteilung je Maschine.')}
           </p>
         </div>
         <div className="flex flex-col items-end gap-0.5">
           {/* Zeile 1: Kette */}
           <div className="flex items-center gap-1">
-            <span className="w-16 text-right text-[10px] uppercase tracking-wide text-slate-300">Kette</span>
+            <span className="w-16 text-right text-[10px] uppercase tracking-wide text-slate-300">
+              {t('Kette')}
+            </span>
             <select
               value={activeChainId}
               onChange={(e) => setActiveChain(e.target.value)}
               className="max-w-[14rem] rounded border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-600 outline-none focus:border-zollern-400"
-              title="Prozesskette wechseln"
+              title={t('Prozesskette wechseln')}
             >
               {chains.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -102,17 +113,17 @@ export function Dashboard() {
             <button
               onClick={() => addChain()}
               className="rounded px-1.5 py-0.5 text-xs text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-              title="Neue Prozesskette"
+              title={t('Neue Prozesskette')}
             >
-              + Kette
+              {t('+ Kette')}
             </button>
             <button
               onClick={handleKetteLoeschen}
               disabled={!activeChain}
               className="rounded px-1.5 py-0.5 text-xs text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
-              title="Aktuelle Prozesskette löschen (mit Sicherheitsabfrage)"
+              title={t('Aktuelle Prozesskette löschen (mit Sicherheitsabfrage)')}
             >
-              löschen
+              {t('löschen')}
             </button>
           </div>
 
@@ -123,38 +134,59 @@ export function Dashboard() {
               onClick={handleUpload}
               disabled={busy}
               className="rounded px-1.5 py-0.5 text-xs text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-40"
-              title="Lokale Daten in die Cloud hochladen"
+              title={t('Lokale Daten in die Cloud hochladen')}
             >
-              {sync.phase === 'saving' ? 'speichert…' : 'speichern'}
+              {sync.phase === 'saving' ? t('speichert…') : t('speichern')}
             </button>
             <button
               onClick={handleDownload}
               disabled={busy}
               className="rounded px-1.5 py-0.5 text-xs text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-40"
-              title="Stand aus der Cloud laden (ersetzt lokale Daten)"
+              title={t('Stand aus der Cloud laden (ersetzt lokale Daten)')}
             >
-              {sync.phase === 'loading' ? 'lädt…' : 'laden'}
+              {sync.phase === 'loading' ? t('lädt…') : t('laden')}
             </button>
+            {/* Sprachumschalter */}
+            <span className="ml-2 flex items-center overflow-hidden rounded border border-slate-200">
+              <button
+                onClick={() => setSprache('de')}
+                className={`px-1.5 py-0.5 text-[10px] font-semibold ${
+                  sprache === 'de' ? 'bg-zollern-600 text-white' : 'text-slate-400 hover:bg-slate-100'
+                }`}
+                title="Deutsch"
+              >
+                DE
+              </button>
+              <button
+                onClick={() => setSprache('en')}
+                className={`px-1.5 py-0.5 text-[10px] font-semibold ${
+                  sprache === 'en' ? 'bg-zollern-600 text-white' : 'text-slate-400 hover:bg-slate-100'
+                }`}
+                title="English"
+              >
+                EN
+              </button>
+            </span>
           </div>
 
           {/* Zeile 3: Abteilung */}
           <div className="flex items-center gap-1">
             <span className="w-16 text-right text-[10px] uppercase tracking-wide text-slate-300">
-              Abteilung
+              {t('Abteilung')}
             </span>
             <button
               onClick={() => addAbteilung()}
               className="rounded px-1.5 py-0.5 text-xs text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-              title="Neue Abteilung anlegen"
+              title={t('Neue Abteilung anlegen')}
             >
-              + Abteilung
+              {t('+ Abteilung')}
             </button>
             <button
               onClick={() => fuegeAbteilungEin(activeChainId)}
               className="rounded px-1.5 py-0.5 text-xs text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-              title="Kopierte Abteilung in die aktive Kette einfügen"
+              title={t('Kopierte Abteilung in die aktive Kette einfügen')}
             >
-              ⧉ einfügen
+              ⧉ {t('einfügen')}
             </button>
           </div>
         </div>
@@ -167,15 +199,16 @@ export function Dashboard() {
       {sync.cloudChecked && sync.cloudEmpty && chains.length > 0 && (
         <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
           <span>
-            Die Cloud ist leer – diese Daten liegen nur in diesem Browser. Lade sie hoch, damit sie auf
-            allen PCs sichtbar sind.
+            {t(
+              'Die Cloud ist leer – diese Daten liegen nur in diesem Browser. Lade sie hoch, damit sie auf allen PCs sichtbar sind.',
+            )}
           </span>
           <button
             onClick={handleUpload}
             disabled={busy}
             className="shrink-0 rounded-lg bg-amber-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-60"
           >
-            Jetzt hochladen
+            {t('Jetzt hochladen')}
           </button>
         </div>
       )}
@@ -189,7 +222,7 @@ export function Dashboard() {
               : 'text-slate-500 hover:text-slate-700'
           }`}
         >
-          Zusammengefasst
+          {t('Zusammengefasst')}
         </button>
         <button
           onClick={() => setView('tabellen')}
@@ -199,7 +232,7 @@ export function Dashboard() {
               : 'text-slate-500 hover:text-slate-700'
           }`}
         >
-          Tabellenbezogen
+          {t('Tabellenbezogen')}
         </button>
         <button
           onClick={() => setView('produkt')}
@@ -209,7 +242,7 @@ export function Dashboard() {
               : 'text-slate-500 hover:text-slate-700'
           }`}
         >
-          Produkt hinzufügen
+          {t('Produkt hinzufügen')}
         </button>
       </div>
 
@@ -227,7 +260,7 @@ export function Dashboard() {
                   : 'text-slate-500 hover:text-slate-700'
               }`}
             >
-              Produktinfo
+              {t('Produktinfo')}
             </button>
           </div>
 
@@ -247,7 +280,7 @@ export function Dashboard() {
                 onClick={() => addAbteilung()}
                 className="flex min-h-[10rem] items-center justify-center rounded-xl border-2 border-dashed border-slate-300 text-slate-400 hover:border-zollern-400 hover:bg-zollern-50 hover:text-zollern-700"
               >
-                + Erste Abteilung hinzufügen
+                {t('+ Erste Abteilung hinzufügen')}
               </button>
             )}
             {abteilungen.map((a, i) => (

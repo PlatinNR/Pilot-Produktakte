@@ -20,6 +20,13 @@ import type {
 } from './types'
 import { NEBEN_SPALTEN, PRODUKTION_SPALTEN, WIEDERHOLUNG_SPALTE, emptyInfo } from './types'
 import { istInSchleife } from './utils/schleifen'
+import { uebersetze } from './lib/i18n'
+import { useSprache } from './lib/sprache'
+
+/** Übersetzt mit der aktuell eingestellten Sprache (für Standardnamen). */
+function t(text: string, werte?: Record<string, string | number>): string {
+  return uebersetze(text, useSprache.getState().sprache, werte)
+}
 import { createChain as apiCreateChain, renameChain as apiRenameChain, deleteChain as apiDeleteChain } from './lib/api'
 
 let counter = 0
@@ -263,7 +270,11 @@ export function arbeitsplatzBelegt(tabelleId: string, wert: string): string | nu
 /** Fehlermeldung, wenn die Arbeitsplatz-Nummer bereits vergeben ist – sonst null. */
 export function arbeitsplatzFehlerText(tabelleId: string, wert: string): string | null {
   const belegt = arbeitsplatzBelegt(tabelleId, wert)
-  return belegt ? `Arbeitsplatz „${wert.trim()}" ist bereits bei „${belegt}" vergeben.` : null
+  if (!belegt) return null
+  return uebersetze('Arbeitsplatz „{wert}" ist bereits bei „{belegt}" vergeben.', useSprache.getState().sprache, {
+    wert: wert.trim(),
+    belegt,
+  })
 }
 
 /** Alle bereits vergebenen Arbeitsplatz-Nummern einer Kette. */
@@ -372,7 +383,7 @@ export const useStore = create<Store>()(
     set((s) =>
       patchInfo(s, abteilungId, (info) => ({
         ...info,
-        felder: [...info.felder, { id: nextId('f'), name: 'Neues Feld', type: 'text', value: '', fixed: false }],
+        felder: [...info.felder, { id: nextId('f'), name: t('Neues Feld'), type: 'text', value: '', fixed: false }],
       })),
     ),
 
@@ -405,7 +416,7 @@ export const useStore = create<Store>()(
     set((s) =>
       patchChainInfo(s, chainId, (info) => ({
         ...info,
-        felder: [...info.felder, { id: nextId('f'), name: 'Neues Feld', type: 'text', value: '', fixed: false }],
+        felder: [...info.felder, { id: nextId('f'), name: t('Neues Feld'), type: 'text', value: '', fixed: false }],
       })),
     ),
 
@@ -452,7 +463,7 @@ export const useStore = create<Store>()(
         {
           id: nextId('b'),
           abteilungId,
-          name: name ?? 'Variabler Block',
+          name: name ?? t('Variabler Block'),
           position: maxChainPosition(s, abteilungId) + 1,
         },
       ],
@@ -490,7 +501,7 @@ export const useStore = create<Store>()(
           id: nextId('s'),
           abteilungId,
           blockId: blockId ?? null,
-          name: name ?? `Schritt ${s.schritte.length + 1}`,
+          name: name ?? t('Schritt {n}', { n: s.schritte.length + 1 }),
           position: blockId ? 0 : maxChainPosition(s, abteilungId) + 1,
           columns: [],
           keys: [],
@@ -648,7 +659,7 @@ export const useStore = create<Store>()(
           {
             id: nextId('p'),
             schrittId,
-            name: name ?? 'Neue Maschine',
+            name: name ?? t('Neue Maschine'),
             arbeitsplatz: '',
             columns,
             rows: [],
@@ -833,7 +844,7 @@ export const useStore = create<Store>()(
         {
           id: nextId('n'),
           abteilungId,
-          name: name ?? 'Neue Nebentabelle',
+          name: name ?? t('Neue Nebentabelle'),
           arbeitsplatz: '',
           columns: cloneSpalten(NEBEN_SPALTEN),
           rows: [],

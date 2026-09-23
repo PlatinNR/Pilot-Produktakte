@@ -1,5 +1,6 @@
 import type { Filter } from '../types'
 import { isTraceMode, isAggregateMode } from '../utils/aggregate'
+import { useT } from '../lib/sprache'
 
 interface Props {
   filter: Filter
@@ -8,6 +9,7 @@ interface Props {
 }
 
 export function FilterBar({ filter, onChange, onClear }: Props) {
+  const t = useT()
   const set = (patch: Partial<Filter>) => onChange({ ...filter, ...patch })
   const trace = isTraceMode(filter)
   const aggregate = isAggregateMode(filter)
@@ -16,7 +18,7 @@ export function FilterBar({ filter, onChange, onClear }: Props) {
     <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
       <div className="flex flex-wrap items-end gap-3 px-4 py-3">
         <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">
-          Fertigungsauftrag (Leitende Nummer)
+          {t('Fertigungsauftrag (Leitende Nummer)')}
           <input
             value={filter.auftragsnummer}
             onChange={(e) => set({ auftragsnummer: e.target.value })}
@@ -32,7 +34,7 @@ export function FilterBar({ filter, onChange, onClear }: Props) {
           />
         </label>
         <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">
-          Datum (ein Tag)
+          {t('Datum (ein Tag)')}
           <input
             type="date"
             value={filter.datum}
@@ -45,18 +47,18 @@ export function FilterBar({ filter, onChange, onClear }: Props) {
           onClick={onClear}
           className="rounded border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50"
         >
-          Zurücksetzen
+          {t('Zurücksetzen')}
         </button>
 
         <span className="ml-auto text-xs font-medium">
           {trace && (
             <span className="rounded-full bg-zollern-700 px-2.5 py-1 text-white">
-              Trace: Weg des Auftrags
+              {t('Trace: Weg des Auftrags')}
             </span>
           )}
           {aggregate && (
             <span className="rounded-full bg-slate-200 px-2.5 py-1 text-slate-700">
-              Verteilung je Maschine
+              {t('Verteilung je Maschine')}
             </span>
           )}
         </span>

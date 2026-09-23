@@ -3,11 +3,13 @@ import { useSupabaseSync } from './lib/sync'
 import { initUndo, useUndoShortcut } from './lib/undo'
 import { KopierToast } from './components/KopierToast'
 import { PasswortTor } from './components/PasswortTor'
+import { useT } from './lib/sprache'
 import { Dashboard } from './pages/Dashboard'
 
 function AppShell() {
   useSupabaseSync()
   useUndoShortcut()
+  const t = useT()
 
   useEffect(() => {
     initUndo()
@@ -22,12 +24,12 @@ function AppShell() {
           </span>
           <div className="leading-tight">
             <div className="text-base font-bold tracking-widest text-zo-ink">ZOLLERN</div>
-            <div className="text-[11px] text-zo-muted">Digitale Produktakte</div>
+            <div className="text-[11px] text-zo-muted">{t('Digitale Produktakte')}</div>
           </div>
         </div>
         <div className="hidden text-right text-xs text-zo-muted sm:block">
-          <div>Produktions-Dashboard</div>
-          <div className="text-[11px] text-slate-400">Strg + Z: letzte Änderung rückgängig</div>
+          <div>{t('Produktions-Dashboard')}</div>
+          <div className="text-[11px] text-slate-400">{t('Strg + Z: letzte Änderung rückgängig')}</div>
         </div>
       </header>
 
