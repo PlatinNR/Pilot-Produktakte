@@ -748,8 +748,9 @@ export function TabellenbezogenView({ filter }: Props) {
       })
     }
   }
-  // Prozesskette Schritt → Schritt: wird separat als Linie "mittig unten → mittig oben" gezeichnet
-  const kettenLinien: { von: string; nach: string }[] = []
+  // Prozesskette Schritt → Schritt: wird separat als Linie "mittig unten → mittig oben" gezeichnet.
+  // Die Reihenfolge wird beim Zeichnen nach der tatsächlichen Höhe bestimmt (nie nach oben).
+  const kettenKnoten: string[][] = []
   for (const a of abteilungen) {
     const knoten: { pos: number; key: string }[] = []
     for (const st of alleSchritte.filter((st) => st.abteilungId === a.id && !st.blockId)) {
@@ -759,9 +760,7 @@ export function TabellenbezogenView({ filter }: Props) {
       knoten.push({ pos: b.position, key: `bc:${b.id}` })
     }
     knoten.sort((x, y) => x.pos - y.pos)
-    for (let i = 0; i < knoten.length - 1; i++) {
-      kettenLinien.push({ von: knoten[i].key, nach: knoten[i + 1].key })
-    }
+    kettenKnoten.push(knoten.map((k) => k.key))
   }
   // Schritt-Felder als Fremdschlüssel
   for (const st of alleSchritte) {
@@ -946,20 +945,26 @@ export function TabellenbezogenView({ filter }: Props) {
           return ergebnis
         })()}
 
-        {/* Prozesskette: mittig unten vom Schritt zum mittig oben des nächsten Schritts */}
-        {kettenLinien.map((k, i) => {
-          const von = boxes[k.von]
-          const nach = boxes[k.nach]
-          if (!von || !nach) return null
-          const vx = von.x + von.w / 2
-          const vy = von.y + von.h
-          const nx = nach.x + nach.w / 2
-          const ny = nach.y
-          const pfad =
-            Math.abs(vx - nx) < 4
-              ? `M ${vx} ${vy} V ${ny}`
-              : `M ${vx} ${vy} V ${(vy + ny) / 2} H ${nx} V ${ny}`
-          return <path key={`kette-${i}`} d={pfad} stroke="#475569" strokeWidth={2} fill="none" />
+        {/* Prozesskette: mittig unten vom Schritt zum mittig oben des nächsten Schritts (nur abwärts) */}
+        {kettenKnoten.map((knoten, gi) => {
+          const sortiert = knoten
+            .map((k) => ({ key: k, box: boxes[k] }))
+            .filter((x): x is { key: string; box: Rect } => !!x.box)
+            .sort((a, b) => a.box.y - b.box.y)
+          return sortiert.slice(0, -1).map((x, i) => {
+            const von = x.box
+            const nach = sortiert[i + 1].box
+            const vx = von.x + von.w / 2
+            const vy = von.y + von.h
+            const nx = nach.x + nach.w / 2
+            const ny = nach.y
+            if (ny <= vy - 2) return null
+            const d =
+              Math.abs(vx - nx) < 4
+                ? `M ${vx} ${vy} V ${ny}`
+                : `M ${vx} ${vy} V ${(vy + ny) / 2} H ${nx} V ${ny}`
+            return <path key={`kette-${gi}-${i}`} d={d} stroke="#475569" strokeWidth={2} fill="none" />
+          })
         })}
         {loops.map((lp, i) => {
           const from = boxes[lp.sourceKey]
