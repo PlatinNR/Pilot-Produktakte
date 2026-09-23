@@ -156,6 +156,18 @@ export interface TabellenKopie {
   quelle: { schrittId?: string; abteilungId?: string }
 }
 
+/** Kopie einer Abteilung (System-Zwischenablage, JSON) */
+export interface AbteilungKopie {
+  typ: 'produktakte-abteilung'
+  version: 1
+  name: string
+  info?: InfoBereich
+  bloecke: Bearbeitungsblock[]
+  schritte: Schritt[]
+  produktionstabellen: Produktionstabelle[]
+  nebentabellen: Nebentabelle[]
+}
+
 /** Zentraler Anwendungszustand */
 export interface AppState {
   chains: Chain[]

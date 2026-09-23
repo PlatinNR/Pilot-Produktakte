@@ -55,15 +55,3 @@ export async function deleteChain(id: string): Promise<void> {
   const { error } = await supabase.from('chains').delete().eq('id', id)
   if (error) throw error
 }
-
-/** Löscht alle früher automatisch angelegten Backup-Datensätze (Name enthält „(Backup "). */
-export async function loescheBackupKetten(): Promise<number> {
-  if (!supabase) return 0
-  const { data, error } = await supabase
-    .from('chains')
-    .delete()
-    .like('name', '%(Backup %')
-    .select('id')
-  if (error) throw error
-  return data?.length ?? 0
-}

@@ -6,6 +6,7 @@ import { SchrittRow } from './SchrittRow'
 import { NebentabellenColumn } from './NebentabellenColumn'
 import { InfoModal } from './InfoModal'
 import { abteilungFarbe } from '../utils/colors'
+import { kopiereAbteilung } from '../lib/tabellenKopie'
 
 interface Props {
   abteilung: Abteilung
@@ -51,6 +52,13 @@ export function AbteilungBlock({ abteilung, filter, index }: Props) {
           title="Info anzeigen"
         >
           Info
+        </button>
+        <button
+          onClick={() => kopiereAbteilung(abteilung.id)}
+          className="rounded border border-slate-300 bg-white/70 px-2 py-0.5 text-[11px] text-slate-600 hover:bg-white"
+          title="Abteilung kopieren (in eine andere Kette einfügbar)"
+        >
+          ⧉ Kopieren
         </button>
         <EditableName
           value={abteilung.name}

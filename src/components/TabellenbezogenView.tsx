@@ -17,7 +17,7 @@ import {
 import { EditableName } from './EditableName'
 import { InfoModal } from './InfoModal'
 import { DurchlaufWahl } from './DurchlaufWahl'
-import { einfuegenMaschine, einfuegenNebentabelle, kopiereMaschine, kopiereNebentabelle } from '../lib/tabellenKopie'
+import { einfuegenMaschine, einfuegenNebentabelle, kopiereAbteilung, kopiereMaschine, kopiereNebentabelle } from '../lib/tabellenKopie'
 import { KeyBadge } from './KeyBadge'
 import { keyTypeOf, nextKey } from '../utils/keys'
 import { abteilungFarbe } from '../utils/colors'
@@ -899,6 +899,13 @@ export function TabellenbezogenView({ filter }: Props) {
                   title="Info anzeigen"
                 >
                   Info
+                </button>
+                <button
+                  onClick={() => kopiereAbteilung(a.id)}
+                  className="rounded border border-slate-300 bg-white/70 px-2 py-0.5 text-[11px] text-slate-600 hover:bg-white"
+                  title="Abteilung kopieren (in eine andere Kette einfügbar)"
+                >
+                  ⧉ Kopieren
                 </button>
                 <EditableName
                   value={a.name}

@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type {
   Abteilung,
+  AbteilungKopie,
   AppState,
   Bearbeitungsblock,
   Chain,
@@ -236,6 +237,7 @@ interface Store extends AppState {
     kopie: TabellenKopie,
     ziel: { art: 'maschine'; schrittId: string } | { art: 'nebentabelle'; abteilungId: string },
   ) => { arbeitsplatzGeleert: boolean }
+  fuegeAbteilungEin: (chainId: string, kopie: AbteilungKopie) => { arbeitsplatzGeleert: boolean }
 }
 
 /** Name der Tabelle (Maschine/Nebentabelle), die diese Arbeitsplatz-Nummer in der aktiven Kette schon nutzt. */
@@ -262,6 +264,22 @@ export function arbeitsplatzBelegt(tabelleId: string, wert: string): string | nu
 export function arbeitsplatzFehlerText(tabelleId: string, wert: string): string | null {
   const belegt = arbeitsplatzBelegt(tabelleId, wert)
   return belegt ? `Arbeitsplatz „${wert.trim()}" ist bereits bei „${belegt}" vergeben.` : null
+}
+
+/** Alle bereits vergebenen Arbeitsplatz-Nummern einer Kette. */
+function arbeitsplatzVergeben(s: AppState, chainId: string): Set<string> {
+  const abteilungIds = new Set(s.abteilungen.filter((a) => a.chainId === chainId).map((a) => a.id))
+  const schrittIds = new Set(
+    s.schritte.filter((st) => abteilungIds.has(st.abteilungId)).map((st) => st.id),
+  )
+  const werte = new Set<string>()
+  for (const t of s.produktionstabellen) {
+    if (schrittIds.has(t.schrittId) && t.arbeitsplatz.trim()) werte.add(t.arbeitsplatz.trim())
+  }
+  for (const n of s.nebentabellen) {
+    if (abteilungIds.has(n.abteilungId) && n.arbeitsplatz.trim()) werte.add(n.arbeitsplatz.trim())
+  }
+  return werte
 }
 
 function addColumn(columns: TableColumn[], name: string, type: ColumnType): TableColumn[] {
@@ -1025,6 +1043,93 @@ export const useStore = create<Store>()(
       }))
     }
 
+    return { arbeitsplatzGeleert }
+  },
+
+  // Kopierte Abteilung in eine Kette einfügen (mit neuen IDs)
+  fuegeAbteilungEin: (chainId, kopie) => {
+    const s = useStore.getState()
+    const neueAbtId = nextId('a')
+
+    // Neue IDs für alle enthaltenen Objekte
+    const blockMap = new Map(kopie.bloecke.map((b) => [b.id, nextId('b')]))
+    const schrittMap = new Map(kopie.schritte.map((st) => [st.id, nextId('s')]))
+    const maschinenMap = new Map(kopie.produktionstabellen.map((t) => [t.id, nextId('p')]))
+    const nebenMap = new Map(kopie.nebentabellen.map((n) => [n.id, nextId('n')]))
+    const zielId = (ref: string | null): string | null => {
+      if (!ref) return null
+      return (
+        blockMap.get(ref) ?? schrittMap.get(ref) ?? maschinenMap.get(ref) ?? nebenMap.get(ref) ?? null
+      )
+    }
+
+    // Arbeitsplatz-Nummern der Zielkette prüfen (Konflikte leeren)
+    const vergeben = arbeitsplatzVergeben(s, chainId)
+    let arbeitsplatzGeleert = false
+    const arbeitsplatz = (wert: string) => {
+      const w = wert.trim()
+      if (!w) return wert
+      if (vergeben.has(w)) {
+        arbeitsplatzGeleert = true
+        return ''
+      }
+      vergeben.add(w)
+      return wert
+    }
+    const remapKeys = (keys: TableKey[]) =>
+      keys
+        .map((k) => (k.type === 'fk' ? { ...k, refTableId: zielId(k.refTableId) } : { ...k }))
+        .filter((k) => k.type !== 'fk' || k.refTableId)
+
+    const abteilung: Abteilung = {
+      id: neueAbtId,
+      chainId,
+      name: kopie.name,
+      parentId: null,
+      info: kopie.info
+        ? { ...kopie.info, felder: kopie.info.felder.map((f) => ({ ...f })) }
+        : undefined,
+    }
+    const bloecke: Bearbeitungsblock[] = kopie.bloecke.map((b) => ({
+      ...b,
+      id: blockMap.get(b.id)!,
+      abteilungId: neueAbtId,
+    }))
+    const schritte: Schritt[] = kopie.schritte.map((st) => ({
+      ...st,
+      id: schrittMap.get(st.id)!,
+      abteilungId: neueAbtId,
+      blockId: zielId(st.blockId),
+      loopTargetId: zielId(st.loopTargetId),
+      columns: st.columns.map((c) => ({ ...c })),
+      keys: remapKeys(st.keys),
+    }))
+    const produktionstabellen: Produktionstabelle[] = kopie.produktionstabellen.map((t) => ({
+      ...t,
+      id: maschinenMap.get(t.id)!,
+      schrittId: zielId(t.schrittId) ?? '',
+      arbeitsplatz: arbeitsplatz(t.arbeitsplatz),
+      columns: t.columns.map((c) => ({ ...c })),
+      rows: t.rows.map((r) => ({ ...r })),
+      keys: remapKeys(t.keys),
+    }))
+    const nebentabellen: Nebentabelle[] = kopie.nebentabellen.map((n) => ({
+      ...n,
+      id: nebenMap.get(n.id)!,
+      abteilungId: neueAbtId,
+      arbeitsplatz: arbeitsplatz(n.arbeitsplatz),
+      columns: n.columns.map((c) => ({ ...c })),
+      rows: n.rows.map((r) => ({ ...r })),
+      keys: remapKeys(n.keys),
+    }))
+
+    set((st) => ({
+      abteilungen: [...st.abteilungen, abteilung],
+      bearbeitungsbloecke: [...st.bearbeitungsbloecke, ...bloecke],
+      schritte: [...st.schritte, ...schritte],
+      produktionstabellen: [...st.produktionstabellen, ...produktionstabellen],
+      nebentabellen: [...st.nebentabellen, ...nebentabellen],
+    }))
     return { arbeitsplatzGeleert }
   },
   }),

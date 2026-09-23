@@ -1,6 +1,6 @@
 import { useEffect, useRef, useSyncExternalStore } from 'react'
 import { isSupabaseConfigured } from './supabase'
-import { listChains, loescheBackupKetten, saveChain } from './api'
+import { listChains, saveChain } from './api'
 import { mitUnterdruecktemUndo } from './undo'
 import { useStore } from '../store'
 import type { Abteilung, Bearbeitungsblock, ChainData, Nebentabelle, Produktionstabelle, Schritt } from '../types'
@@ -88,23 +88,6 @@ export async function saveAllChains(): Promise<void> {
     setStatus({ phase: 'idle', cloudChecked: true, cloudEmpty: false, lastSavedAt: Date.now() })
   } catch (e) {
     setStatus({ phase: 'idle', lastError: errorText(e) })
-  }
-}
-
-/** Löscht früher automatisch angelegte Backup-Datensätze in der Cloud. */
-export async function raeumeCloudAuf(): Promise<number> {
-  if (!isSupabaseConfigured()) {
-    setStatus({ lastError: 'Supabase ist nicht konfiguriert (Umgebungsvariablen fehlen).' })
-    return 0
-  }
-  setStatus({ phase: 'saving', lastError: null })
-  try {
-    const anzahl = await loescheBackupKetten()
-    setStatus({ phase: 'idle', cloudChecked: true, cloudEmpty: false, lastSavedAt: Date.now() })
-    return anzahl
-  } catch (e) {
-    setStatus({ phase: 'idle', lastError: errorText(e) })
-    return 0
   }
 }
 

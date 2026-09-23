@@ -1,12 +1,12 @@
 import { useSyncExternalStore } from 'react'
 import { useStore } from '../store'
-import type { TabellenKopie } from '../types'
+import type { AbteilungKopie, TabellenKopie } from '../types'
 
 let status: string | null = null
 const listeners = new Set<() => void>()
 let timer: ReturnType<typeof setTimeout> | null = null
 /** Fallback, wenn der Browser keinen Zwischenablage-Zugriff erlaubt */
-let interneAblage: TabellenKopie | null = null
+let interneAblage: { typ?: string } | null = null
 
 function setStatus(text: string | null) {
   status = text
@@ -26,7 +26,7 @@ export function useKopieStatus(): string | null {
   )
 }
 
-async function inZwischenablage(kopie: TabellenKopie): Promise<boolean> {
+async function inZwischenablage(kopie: { typ: string }): Promise<boolean> {
   interneAblage = kopie
   try {
     await navigator.clipboard.writeText(JSON.stringify(kopie))
@@ -36,15 +36,16 @@ async function inZwischenablage(kopie: TabellenKopie): Promise<boolean> {
   }
 }
 
-async function ausZwischenablage(): Promise<TabellenKopie | null> {
+async function ausZwischenablage<T extends { typ: string }>(typ: string): Promise<T | null> {
+  let daten: { typ?: string } | null = null
   try {
     const text = await navigator.clipboard.readText()
-    const daten = JSON.parse(text) as TabellenKopie
-    if (daten && daten.typ === 'produktakte-tabelle') return daten
-    return null
+    daten = JSON.parse(text)
   } catch {
-    return interneAblage
+    daten = interneAblage
   }
+  if (daten && daten.typ === typ) return daten as T
+  return null
 }
 
 /** Kopiert eine Maschinentabelle samt Spalten, Schlüsseln und Zeilen. */
@@ -87,7 +88,7 @@ export async function kopiereNebentabelle(tabelleId: string): Promise<void> {
 
 /** Fügt eine kopierte Maschinentabelle am Schritt ein. */
 export async function einfuegenMaschine(schrittId: string): Promise<void> {
-  const kopie = await ausZwischenablage()
+  const kopie = await ausZwischenablage<TabellenKopie>('produktakte-tabelle')
   if (!kopie) {
     setStatus('Zwischenablage leer oder unbekanntes Format')
     return
@@ -106,7 +107,7 @@ export async function einfuegenMaschine(schrittId: string): Promise<void> {
 
 /** Fügt eine kopierte Nebentabelle in der Abteilung ein. */
 export async function einfuegenNebentabelle(abteilungId: string): Promise<void> {
-  const kopie = await ausZwischenablage()
+  const kopie = await ausZwischenablage<TabellenKopie>('produktakte-tabelle')
   if (!kopie) {
     setStatus('Zwischenablage leer oder unbekanntes Format')
     return
@@ -120,5 +121,43 @@ export async function einfuegenNebentabelle(abteilungId: string): Promise<void> 
     res.arbeitsplatzGeleert
       ? 'Tabelle eingefügt – Arbeitsplatz war belegt, bitte neu zuweisen'
       : 'Tabelle eingefügt',
+  )
+}
+
+/** Kopiert eine Abteilung samt Schritten, Blöcken, Arbeitsplätzen und Unterstützungsprozessen. */
+export async function kopiereAbteilung(abteilungId: string): Promise<void> {
+  const s = useStore.getState()
+  const abteilung = s.abteilungen.find((a) => a.id === abteilungId)
+  if (!abteilung) return
+  const kopie: AbteilungKopie = {
+    typ: 'produktakte-abteilung',
+    version: 1,
+    name: abteilung.name,
+    info: abteilung.info,
+    bloecke: s.bearbeitungsbloecke.filter((b) => b.abteilungId === abteilungId),
+    schritte: s.schritte.filter((st) => st.abteilungId === abteilungId),
+    produktionstabellen: s.produktionstabellen.filter((t) =>
+      s.schritte.some((st) => st.abteilungId === abteilungId && st.id === t.schrittId),
+    ),
+    nebentabellen: s.nebentabellen.filter((n) => n.abteilungId === abteilungId),
+  }
+  const ok = await inZwischenablage(kopie)
+  setStatus(
+    ok ? `Abteilung „${abteilung.name}" kopiert` : `Abteilung „${abteilung.name}" kopiert (App-Ablage)`,
+  )
+}
+
+/** Fügt eine kopierte Abteilung in die aktive Kette ein. */
+export async function fuegeAbteilungEin(chainId: string): Promise<void> {
+  const kopie = await ausZwischenablage<AbteilungKopie>('produktakte-abteilung')
+  if (!kopie) {
+    setStatus('Zwischenablage enthält keine kopierte Abteilung')
+    return
+  }
+  const res = useStore.getState().fuegeAbteilungEin(chainId, kopie)
+  setStatus(
+    res.arbeitsplatzGeleert
+      ? `Abteilung „${kopie.name}" eingefügt – Arbeitsplatznummern waren belegt, bitte neu zuweisen`
+      : `Abteilung „${kopie.name}" eingefügt`,
   )
 }
