@@ -120,18 +120,21 @@ function ColumnRow({
           className={`min-w-0 flex-1 bg-transparent text-slate-700 outline-none ${compact ? 'text-[10px]' : 'text-[11px]'}`}
         />
       )}
-      <select
-        value={col.type}
-        onChange={(e) => onChangeType(e.target.value as ColumnType)}
-        className="rounded border border-slate-200 px-0.5 py-0 text-[9px] text-slate-500"
-        title="Spaltentyp"
-      >
-        {(Object.keys(COLUMN_TYPE_LABELS) as ColumnType[]).map((t) => (
-          <option key={t} value={t}>
-            {COLUMN_TYPE_LABELS[t]}
-          </option>
-        ))}
-      </select>
+      {/* Bei der Fertigungsauftrag-Nummer wird der Typ nicht angezeigt */}
+      {col.id !== 'auftragsnummer' && (
+        <select
+          value={col.type}
+          onChange={(e) => onChangeType(e.target.value as ColumnType)}
+          className="rounded border border-slate-200 px-0.5 py-0 text-[9px] text-slate-500"
+          title="Spaltentyp"
+        >
+          {(Object.keys(COLUMN_TYPE_LABELS) as ColumnType[]).map((t) => (
+            <option key={t} value={t}>
+              {COLUMN_TYPE_LABELS[t]}
+            </option>
+          ))}
+        </select>
+      )}
       <KeyBadge type={keyType} onClick={onCycleKey} />
       {keyType === 'pk' && (
         <span
@@ -1177,7 +1180,11 @@ export function TabellenbezogenView({ filter }: Props) {
                                             <span className="min-w-0 flex-1 text-[10px] font-medium text-slate-700">
                                               {c.name}
                                             </span>
-                                            <span className="text-[8px] uppercase text-slate-400">{c.type}</span>
+                                            {c.id !== 'auftragsnummer' && (
+                                              <span className="text-[8px] uppercase text-slate-400">
+                                                {c.type}
+                                              </span>
+                                            )}
                                             {c.id === 'auftragsnummer' && <KeyBadge type="pk" />}
                                             {c.id === 'auftragsnummer' && (
                                               <span
@@ -1516,7 +1523,9 @@ export function TabellenbezogenView({ filter }: Props) {
                                 <span className="min-w-0 flex-1 text-[11px] font-medium text-slate-700">
                                   {c.name}
                                 </span>
-                                <span className="text-[9px] uppercase text-slate-400">{c.type}</span>
+                                {c.id !== 'auftragsnummer' && (
+                                  <span className="text-[9px] uppercase text-slate-400">{c.type}</span>
+                                )}
                                 {c.id === 'auftragsnummer' && <KeyBadge type="pk" />}
                                 {c.id === 'auftragsnummer' && (
                                   <span
