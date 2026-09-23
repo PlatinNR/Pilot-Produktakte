@@ -3,10 +3,12 @@ import type {
   ColumnType,
   Filter,
   KeyType,
+  Produktionstabelle,
   TableColumn,
 } from '../types'
 import { COLUMN_TYPE_LABELS, SCHRITT_TABELLE_SPALTEN } from '../types'
 import { useStore, arbeitsplatzFehlerText } from '../store'
+import { istInSchleife } from '../utils/schleifen'
 import {
   aggregateSchritt,
   formatPercent,
@@ -396,38 +398,23 @@ function computeBus(
   return { pfade, bus, taps: tapsVerschoben.map((y) => ({ x: busX, y })) }
 }
 
-function RelationshipLine({
-  geo,
-  n1,
-  variante = 'normal',
-}: {
-  geo: Geo
-  n1: boolean
-  variante?: 'normal' | 'prozess'
-}) {
-  const prozess = variante === 'prozess'
-  const halo = { paintOrder: 'stroke' as const, stroke: '#ffffff', strokeWidth: 3 }
-  return (
-    <g>
-      <path
-        d={geo.path}
-        stroke={prozess ? '#F56405' : '#94a3b8'}
-        strokeWidth={prozess ? 2.5 : 1.5}
-        fill="none"
-        markerEnd={prozess ? 'url(#er-prozess-arrow)' : undefined}
-      />
-      {n1 && (
-        <text x={geo.x1 < geo.x2 ? geo.x1 + 8 : geo.x1 - 8} y={geo.y1 - 5} textAnchor="middle" fontSize={10} fontWeight={700} fill="#c45004" style={halo}>
-          n
-        </text>
-      )}
-      {n1 && (
-        <text x={geo.x1 < geo.x2 ? geo.x2 - 8 : geo.x2 + 8} y={geo.y2 - 5} textAnchor="middle" fontSize={10} fontWeight={700} fill="#c45004" style={halo}>
-          1
-        </text>
-      )}
-    </g>
-  )
+/** Kürzeste rechtwinklige Prozessverbindung: normal unten → oben, sonst Seite → Seite. */
+function prozessPfad(from: Rect, to: Rect): string {
+  const cx1 = from.x + from.w / 2
+  const cx2 = to.x + to.w / 2
+  const unten = to.y >= from.y + from.h - 2
+  const oben = to.y + to.h <= from.y + 2
+  if (unten || oben) {
+    const yStart = unten ? from.y + from.h : from.y
+    const yEnd = unten ? to.y : to.y + to.h
+    return `M ${cx1} ${yStart} V ${(yStart + yEnd) / 2} H ${cx2} V ${yEnd}`
+  }
+  const ltr = from.x <= to.x
+  const xStart = ltr ? from.x + from.w : from.x
+  const xEnd = ltr ? to.x : to.x + to.w
+  const cy1 = from.y + from.h / 2
+  const cy2 = to.y + to.h / 2
+  return `M ${xStart} ${cy1} H ${(xStart + xEnd) / 2} V ${cy2} H ${xEnd}`
 }
 
 function LoopLine({ from, to, label }: { from: Rect; to: Rect; label: string }) {
@@ -449,6 +436,28 @@ function LoopLine({ from, to, label }: { from: Rect; to: Rect; label: string }) 
         </text>
       )}
     </g>
+  )
+}
+
+/** Zeigt neben der Maschine, wie oft sie für den Auftrag verwendet wurde (Schleifen). */
+function VerwendetHinweis({
+  tabelle,
+  auftrag,
+  inSchleife,
+}: {
+  tabelle: Produktionstabelle
+  auftrag: string
+  inSchleife: boolean
+}) {
+  const anzahl = tabelle.rows.filter((r) => r.auftragsnummer === auftrag).length
+  if (!inSchleife || anzahl === 0) return null
+  return (
+    <div
+      className="border-t border-orange-100 bg-orange-50 px-2 py-0.5 text-[10px] font-semibold text-orange-700"
+      title="So oft wurde die Maschine für diesen Fertigungsauftrag verwendet"
+    >
+      {anzahl}× verwendet
+    </div>
   )
 }
 
@@ -794,21 +803,14 @@ export function TabellenbezogenView({ filter }: Props) {
     })
   }
 
-  // Prozessfolge der Maschinen für den verfolgten Auftrag (Kette → Schritte → Maschinen nach Datum/Uhrzeit)
-  const prozessFolge: string[] = []
+  // Prozessfolge für den verfolgten Auftrag. Feste Schritte liefern Maschinen-Stopps,
+  // ein beteiligter Variabler Block wird als Ganzes angesteuert (nur zum Block).
+  const prozessStops: string[] = []
   if (trace) {
     const eintragVon = (m: (typeof alleMaschinen)[number]) =>
       m.rows.find((r) => r.auftragsnummer === auftrag)
-    const zeitVonSchritt = (schrittId: string): string => {
-      for (const m of alleMaschinen) {
-        if (m.schrittId !== schrittId) continue
-        const r = eintragVon(m)
-        if (r) return `${r.datum ?? ''}T${r.zeit ?? ''}`
-      }
-      return '9999'
-    }
     for (const a of abteilungen) {
-      const knoten: { id: string; istBlock: boolean; pos: number }[] = []
+      const knoten: { pos: number; istBlock: boolean; id: string }[] = []
       for (const st of alleSchritte.filter((s) => s.abteilungId === a.id && !s.blockId)) {
         knoten.push({ id: st.id, istBlock: false, pos: st.position })
       }
@@ -817,20 +819,18 @@ export function TabellenbezogenView({ filter }: Props) {
       }
       knoten.sort((x, y) => x.pos - y.pos)
 
-      const schrittIds: string[] = []
       for (const k of knoten) {
         if (k.istBlock) {
-          const blockSchritte = alleSchritte
-            .filter((s) => s.blockId === k.id)
-            .sort((x, y) => zeitVonSchritt(x.id).localeCompare(zeitVonSchritt(y.id)))
-          for (const s of blockSchritte) schrittIds.push(s.id)
-        } else {
-          schrittIds.push(k.id)
+          const beteiligt = alleSchritte.some(
+            (st) =>
+              st.blockId === k.id &&
+              alleMaschinen.some((m) => m.schrittId === st.id && eintragVon(m)),
+          )
+          if (beteiligt) prozessStops.push(`bc:${k.id}`)
+          continue
         }
-      }
-      for (const sid of schrittIds) {
         const ms = alleMaschinen
-          .filter((m) => m.schrittId === sid && m.rows.some((r) => r.auftragsnummer === auftrag))
+          .filter((m) => m.schrittId === k.id && eintragVon(m))
           .sort((x, y) => {
             const rx = eintragVon(x)
             const ry = eintragVon(y)
@@ -838,7 +838,7 @@ export function TabellenbezogenView({ filter }: Props) {
               `${ry?.datum ?? ''}T${ry?.zeit ?? ''}`,
             )
           })
-        for (const m of ms) prozessFolge.push(`mc:${m.id}`)
+        for (const m of ms) prozessStops.push(`mc:${m.id}`)
       }
     }
   }
@@ -972,17 +972,19 @@ export function TabellenbezogenView({ filter }: Props) {
           if (!from || !to) return null
           return <LoopLine key={`loop-${i}`} from={from} to={to} label={lp.label} />
         })}
-        {/* Prozesspfeile: Maschine → nächste Maschine (nach Datum/Uhrzeit), prägnant orange */}
-        {prozessFolge.slice(0, -1).map((key, i) => {
+        {/* Prozesspfeile: Arbeitsplatz → nächster Arbeitsplatz bzw. Variabler Block, prägnant orange */}
+        {prozessStops.slice(0, -1).map((key, i) => {
           const from = boxes[key]
-          const to = boxes[prozessFolge[i + 1]]
+          const to = boxes[prozessStops[i + 1]]
           if (!from || !to) return null
           return (
-            <RelationshipLine
+            <path
               key={`prozess-${i}`}
-              geo={computeLine(from, to)}
-              n1={false}
-              variante="prozess"
+              d={prozessPfad(from, to)}
+              stroke="#F56405"
+              strokeWidth={2.5}
+              fill="none"
+              markerEnd="url(#er-prozess-arrow)"
             />
           )
         })}
@@ -1137,10 +1139,6 @@ export function TabellenbezogenView({ filter }: Props) {
                                 {blockSteps.map((bst) => {
                                   const bstepMaschinen = alleMaschinen.filter((m) => m.schrittId === bst.id)
                                   const agg = aggregate ? aggregateSchritt(bst, bstepMaschinen, filter) : null
-                                  const bstepUsed = bstepMaschinen.some((m) =>
-                                    m.rows.some((r) => r.auftragsnummer === auftrag),
-                                  )
-                                  const extern = trace && !bstepUsed && !bst.optional
                                   return (
                                     <div key={bst.id} className="flex w-56 shrink-0 flex-col gap-2">
                                       <EntityCard
@@ -1148,7 +1146,7 @@ export function TabellenbezogenView({ filter }: Props) {
                                         onRename={(name) => renameSchritt(bst.id, name)}
                                         onRemove={() => removeSchritt(bst.id)}
                                         onAddColumn={(name, type) => addColumnSchritt(bst.id, name, type)}
-                                        rahmen={extern ? 'extern' : 'normal'}
+                                        rahmen='normal'
                                         betont
                                         kopfExtra={
                                           <span className="flex shrink-0 items-center gap-0.5">
@@ -1169,11 +1167,6 @@ export function TabellenbezogenView({ filter }: Props) {
                                           </span>
                                         }
                                       >
-                                        {extern && (
-                                          <div className="border-t border-purple-100 bg-purple-100/70 px-2 py-0.5 text-[10px] font-semibold text-purple-700">
-                                            extern bearbeitet
-                                          </div>
-                                        )}
                                         {SCHRITT_TABELLE_SPALTEN.map((c) => (
                                           <div
                                             key={c.id}
@@ -1319,7 +1312,14 @@ export function TabellenbezogenView({ filter }: Props) {
                                           />
                                         }
                                       >
-                                                {m.columns.map((c) => (
+                                        {trace && (
+                                          <VerwendetHinweis
+                                            tabelle={m}
+                                            auftrag={auftrag}
+                                            inSchleife={istInSchleife(bst.id, alleSchritte, alleBloecke)}
+                                          />
+                                        )}
+                                        {m.columns.map((c) => (
                                                   <ColumnRow
                                                     key={c.id}
                                                     compact
@@ -1385,11 +1385,6 @@ export function TabellenbezogenView({ filter }: Props) {
                       const matched = aggregate
                         ? matchedRows.filter((r) => r.fn === filter.fn.trim() || r.datum === filter.datum).length
                         : 0
-                      // Nicht optionale Schritte ohne Eintrag gelten im Trace als "extern bearbeitet"
-                      const schrittUsed = stepMaschinen.some((m) =>
-                        m.rows.some((r) => r.auftragsnummer === auftrag),
-                      )
-                      const extern = trace && !schrittUsed && !st.optional
                       return (
                         <Fragment key={st.id}>
                           {/* Maschinen dieses Schritts */}
@@ -1422,13 +1417,20 @@ export function TabellenbezogenView({ filter }: Props) {
                                     onKopieren={() => kopiereMaschine(m.id)}
                                     kopfExtra={
                                       <ArbeitsplatzZeile
-                                        tabelleId={m.id}
-                                        wert={m.arbeitsplatz}
-                                        onChange={setProduktionArbeitsplatz}
-                                      />
-                                    }
-                                  >
-                                    {m.columns.map((c) => (
+                                          tabelleId={m.id}
+                                          wert={m.arbeitsplatz}
+                                          onChange={setProduktionArbeitsplatz}
+                                        />
+                                      }
+                                    >
+                                      {trace && (
+                                        <VerwendetHinweis
+                                          tabelle={m}
+                                          auftrag={auftrag}
+                                          inSchleife={istInSchleife(st.id, alleSchritte, alleBloecke)}
+                                        />
+                                      )}
+                                      {m.columns.map((c) => (
                                       <ColumnRow
                                         key={c.id}
                                         compact
@@ -1464,7 +1466,7 @@ export function TabellenbezogenView({ filter }: Props) {
                               onRemove={() => removeSchritt(st.id)}
                               percent={aggregate && matchedRows.length > 0 ? (matched / matchedRows.length) * 100 : null}
                               onAddColumn={(name, type) => addColumnSchritt(st.id, name, type)}
-                              rahmen={extern ? 'extern' : 'normal'}
+                              rahmen='normal'
                               betont
                             footer={
                               <div className="flex items-center justify-between gap-1 border-t border-slate-100 px-2 py-1">
@@ -1504,11 +1506,6 @@ export function TabellenbezogenView({ filter }: Props) {
                               </div>
                             }
                           >
-                            {extern && (
-                              <div className="border-t border-purple-100 bg-purple-100/70 px-2 py-0.5 text-[10px] font-semibold text-purple-700">
-                                extern bearbeitet
-                              </div>
-                            )}
                             {SCHRITT_TABELLE_SPALTEN.map((c) => (
                               <div
                                 key={c.id}
