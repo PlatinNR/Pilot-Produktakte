@@ -163,6 +163,8 @@ interface EntityProps {
   betont?: boolean
   /** Tabelle kopieren */
   onKopieren?: () => void
+  /** Zusätzliches Element im Kopf (z. B. AP-Nummer) */
+  kopfExtra?: React.ReactNode
 }
 
 function EntityCard({
@@ -178,6 +180,7 @@ function EntityCard({
   rahmen = 'normal',
   betont = false,
   onKopieren,
+  kopfExtra,
 }: EntityProps) {
   const [addingCol, setAddingCol] = useState(false)
   const [colName, setColName] = useState('')
@@ -211,6 +214,7 @@ function EntityCard({
           onCommit={onRename}
           className={`min-w-0 flex-1 bg-transparent outline-none ${titelKlasse}`}
         />
+        {kopfExtra}
         {typeof percent === 'number' && percent >= 0 && (
           <span className="shrink-0 rounded-full bg-zollern-50 px-1.5 py-0.5 text-[10px] font-bold text-zollern-700">
             {formatPercent(percent)}
@@ -341,7 +345,14 @@ function computeBus(
 ): { pfade: string[]; bus: string | null; taps: { x: number; y: number }[] } {
   if (mitglieder.length === 0) return { pfade: [], bus: null, taps: [] }
   if (mitglieder.length === 1) {
-    return { pfade: [computeLine(mitglieder[0].from, mitglieder[0].to).path], bus: null, taps: [] }
+    // Einzelne Verbindung: direkt ohne Knick
+    const m = mitglieder[0]
+    const ltr = m.from.x + m.from.w <= m.to.x + 1
+    const x1 = ltr ? m.from.x + m.from.w : m.from.x
+    const y1 = m.from.y + m.from.h / 2
+    const x2 = ltr ? m.to.x : m.to.x + m.to.w
+    const y2 = m.to.y + m.to.h / 2
+    return { pfade: [`M ${x1} ${y1} L ${x2} ${y2}`], bus: null, taps: [] }
   }
   const to = mitglieder[0].to
   const alleLinks = mitglieder.every((m) => m.from.x + m.from.w <= to.x + 1)
@@ -442,7 +453,7 @@ function LoopLine({ from, to, label }: { from: Rect; to: Rect; label: string }) 
   )
 }
 
-/** Arbeitsplatz-Nummer einer Maschine – gilt für alle Einträge. */
+/** Arbeitsplatz-Nummer einer Maschine – klein im Kopf („AP"), gilt für alle Einträge. */
 function ArbeitsplatzZeile({
   tabelleId,
   wert,
@@ -470,27 +481,24 @@ function ArbeitsplatzZeile({
   }
 
   return (
-    <div className="border-t border-slate-50">
-      <div className="flex items-center gap-1 px-2 py-1">
-        <span className="min-w-0 flex-1 text-[10px] font-medium text-slate-700">Arbeitsplatz</span>
-        <input
-          value={draft}
-          onChange={(e) => aendern(e.target.value)}
-          placeholder="Nr."
-          className={`w-20 shrink-0 rounded border px-1 py-0.5 text-[10px] outline-none focus:border-zollern-400 ${
-            fehler
-              ? 'border-red-400 text-red-600'
-              : draft
-                ? 'border-slate-200 text-slate-700'
-                : 'border-red-300 text-slate-500'
-          }`}
-          title={
-            fehler ?? (draft ? 'Arbeitsplatz-Nummer (gilt für alle Einträge)' : 'Arbeitsplatz-Nummer fehlt')
-          }
-        />
-      </div>
-      {fehler && <p className="px-2 pb-1 text-[10px] text-red-600">{fehler}</p>}
-    </div>
+    <span className="flex shrink-0 items-center gap-0.5">
+      <span className="text-[9px] font-bold uppercase tracking-wide text-slate-400">AP</span>
+      <input
+        value={draft}
+        onChange={(e) => aendern(e.target.value)}
+        placeholder="Nr."
+        className={`w-14 rounded border px-1 py-0.5 text-[10px] outline-none focus:border-zollern-400 ${
+          fehler
+            ? 'border-red-400 text-red-600'
+            : draft
+              ? 'border-slate-200 text-slate-700'
+              : 'border-red-300 text-slate-500'
+        }`}
+        title={
+          fehler ?? (draft ? 'Arbeitsplatz-Nummer (gilt für alle Einträge)' : 'Arbeitsplatz-Nummer fehlt')
+        }
+      />
+    </span>
   )
 }
 
@@ -1277,12 +1285,14 @@ export function TabellenbezogenView({ filter }: Props) {
                                                 colorClass={MASCHINEN_FARBEN[mi % MASCHINEN_FARBEN.length]}
                                         onAddColumn={(name, type) => addColumnProduktion(m.id, name, type)}
                                         onKopieren={() => kopiereMaschine(m.id)}
+                                        kopfExtra={
+                                          <ArbeitsplatzZeile
+                                            tabelleId={m.id}
+                                            wert={m.arbeitsplatz}
+                                            onChange={setProduktionArbeitsplatz}
+                                          />
+                                        }
                                       >
-                                        <ArbeitsplatzZeile
-                                                  tabelleId={m.id}
-                                                  wert={m.arbeitsplatz}
-                                                  onChange={setProduktionArbeitsplatz}
-                                                />
                                                 {m.columns.map((c) => (
                                                   <ColumnRow
                                                     key={c.id}
@@ -1384,12 +1394,14 @@ export function TabellenbezogenView({ filter }: Props) {
                                     colorClass={MASCHINEN_FARBEN[mi % MASCHINEN_FARBEN.length]}
                                     onAddColumn={(name, type) => addColumnProduktion(m.id, name, type)}
                                     onKopieren={() => kopiereMaschine(m.id)}
+                                    kopfExtra={
+                                      <ArbeitsplatzZeile
+                                        tabelleId={m.id}
+                                        wert={m.arbeitsplatz}
+                                        onChange={setProduktionArbeitsplatz}
+                                      />
+                                    }
                                   >
-                                    <ArbeitsplatzZeile
-                                      tabelleId={m.id}
-                                      wert={m.arbeitsplatz}
-                                      onChange={setProduktionArbeitsplatz}
-                                    />
                                     {m.columns.map((c) => (
                                       <ColumnRow
                                         key={c.id}
@@ -1630,12 +1642,14 @@ export function TabellenbezogenView({ filter }: Props) {
                         onRemove={() => removeNebentabelle(n.id)}
                         onAddColumn={(name, type) => addColumnNeben(n.id, name, type)}
                         onKopieren={() => kopiereNebentabelle(n.id)}
+                        kopfExtra={
+                          <ArbeitsplatzZeile
+                            tabelleId={n.id}
+                            wert={n.arbeitsplatz}
+                            onChange={setNebenArbeitsplatz}
+                          />
+                        }
                       >
-                        <ArbeitsplatzZeile
-                          tabelleId={n.id}
-                          wert={n.arbeitsplatz}
-                          onChange={setNebenArbeitsplatz}
-                        />
                         {n.columns.map((c) => (
                           <ColumnRow
                             key={c.id}
