@@ -1,12 +1,14 @@
 import { useStore, arbeitsplatzFehlerText } from '../store'
 import { DataTable } from './DataTable'
 import { einfuegenNebentabelle, kopiereNebentabelle } from '../lib/tabellenKopie'
+import { useT } from '../lib/sprache'
 
 interface Props {
   abteilungId: string
 }
 
 export function NebentabellenColumn({ abteilungId }: Props) {
+  const t = useT()
   const alleNebentabellen = useStore((s) => s.nebentabellen)
   const nebentabellen = alleNebentabellen.filter((n) => n.abteilungId === abteilungId)
   const {
@@ -26,31 +28,31 @@ export function NebentabellenColumn({ abteilungId }: Props) {
   return (
     <aside className="flex w-full shrink-0 flex-col gap-2 lg:w-96">
       <div>
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Nebentabellen</h2>
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t('Unterstützungsprozesse')}</h2>
         <div className="mt-1 flex flex-wrap items-center gap-1">
           <button
             onClick={() => einfuegenNebentabelle(abteilungId)}
             className="rounded border border-slate-300 px-2 py-0.5 text-xs text-slate-500 hover:bg-slate-100"
-            title="Kopierte Nebentabelle hier einfügen"
+            title={t('Kopierte Nebentabelle hier einfügen')}
           >
-            ⧉ Einfügen
+            ⧉ Paste
           </button>
           <button
             onClick={() => addNebentabelle(abteilungId)}
             className="rounded border border-slate-300 px-2 py-0.5 text-xs text-slate-600 hover:bg-slate-100"
           >
-            + Unterstützungsprozess
+            {t('+ Unterstützungsprozess')}
           </button>
         </div>
       </div>
-      <p className="text-[11px] text-slate-400">Zeitbezogene Daten der Abteilung (z. B. Wachsqualität).</p>
+      <p className="text-[11px] text-slate-400">{t('Zeitbezogene Daten der Abteilung (z. B. Wachsqualität).')}</p>
 
       {nebentabellen.length === 0 && (
         <button
           onClick={() => addNebentabelle(abteilungId)}
           className="flex min-h-[5rem] items-center justify-center rounded-lg border-2 border-dashed border-slate-300 text-sm text-slate-400 hover:border-zollern-400 hover:bg-zollern-50 hover:text-zollern-700"
         >
-          + Unterstützungsprozess
+          {t('+ Unterstützungsprozess')}
         </button>
       )}
 

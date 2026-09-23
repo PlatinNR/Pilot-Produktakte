@@ -5,6 +5,7 @@ import { EditableName } from './EditableName'
 import { DataTable } from './DataTable'
 import { DurchlaufWahl } from './DurchlaufWahl'
 import { einfuegenMaschine, kopiereMaschine } from '../lib/tabellenKopie'
+import { useT } from '../lib/sprache'
 
 interface Props {
   schritt: Schritt
@@ -12,6 +13,7 @@ interface Props {
 }
 
 export function SchrittRow({ schritt, filter }: Props) {
+  const t = useT()
   const alleMaschinen = useStore((s) => s.produktionstabellen)
   const maschinen = alleMaschinen.filter((t) => t.schrittId === schritt.id)
   const alleBloecke = useStore((s) => s.bearbeitungsbloecke)
@@ -52,9 +54,9 @@ export function SchrittRow({ schritt, filter }: Props) {
           value={schritt.blockId ?? ''}
           onChange={(e) => setSchrittBlock(schritt.id, e.target.value || null)}
           className="shrink-0 rounded border border-slate-300 px-1 py-0.5 text-[11px] text-slate-600"
-          title="Zugehörigkeit: fester Schritt oder Variabler Block"
+          title={t('Zugehörigkeit: fester Schritt oder Variabler Block')}
         >
-          <option value="">fester Schritt</option>
+          <option value="">{t('fester Schritt')}</option>
           {bloecke.map((b) => (
             <option key={b.id} value={b.id}>
               {b.name}
@@ -84,21 +86,21 @@ export function SchrittRow({ schritt, filter }: Props) {
           <button
             onClick={() => moveSchritt(schritt.id, 'up')}
             className="rounded px-1.5 text-slate-400 hover:bg-slate-100"
-            title="Schritt nach oben"
+            title={t('Schritt nach oben')}
           >
             ↑
           </button>
           <button
             onClick={() => moveSchritt(schritt.id, 'down')}
             className="rounded px-1.5 text-slate-400 hover:bg-slate-100"
-            title="Schritt nach unten"
+            title={t('Schritt nach unten')}
           >
             ↓
           </button>
           <button
             onClick={() => removeSchritt(schritt.id)}
             className="rounded px-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"
-            title="Schritt löschen"
+            title={t('Schritt löschen')}
           >
             ✕
           </button>
@@ -157,14 +159,14 @@ export function SchrittRow({ schritt, filter }: Props) {
             onClick={() => addProduktionstabelle(schritt.id)}
             className="text-sm text-slate-400 hover:text-zollern-700"
           >
-            + Arbeitsplatz
+            {t('+ Arbeitsplatz')}
           </button>
           <button
             onClick={() => einfuegenMaschine(schritt.id)}
             className="text-[11px] text-slate-400 hover:text-zollern-700"
-            title="Kopierte Maschinentabelle hier einfügen"
+            title={t('Kopierte Maschinentabelle hier einfügen')}
           >
-            ⧉ Einfügen
+            ⧉ Paste
           </button>
         </div>
       </div>

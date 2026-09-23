@@ -7,6 +7,7 @@ import { NebentabellenColumn } from './NebentabellenColumn'
 import { InfoModal } from './InfoModal'
 import { abteilungFarbe } from '../utils/colors'
 import { kopiereAbteilung } from '../lib/tabellenKopie'
+import { useT } from '../lib/sprache'
 
 interface Props {
   abteilung: Abteilung
@@ -15,6 +16,7 @@ interface Props {
 }
 
 export function AbteilungBlock({ abteilung, filter, index }: Props) {
+  const t = useT()
   const alleSchritte = useStore((s) => s.schritte)
   const alleBloecke = useStore((s) => s.bearbeitungsbloecke)
   const [infoOffen, setInfoOffen] = useState(false)
@@ -49,16 +51,16 @@ export function AbteilungBlock({ abteilung, filter, index }: Props) {
         <button
           onClick={() => setInfoOffen(true)}
           className="rounded border border-slate-300 bg-white/70 px-2 py-0.5 text-[11px] text-slate-600 hover:bg-white"
-          title="Info anzeigen"
+          title={t('Info anzeigen')}
         >
-          Info
+          {t('Info')}
         </button>
         <button
           onClick={() => kopiereAbteilung(abteilung.id)}
           className="rounded border border-slate-300 bg-white/70 px-2 py-0.5 text-[11px] text-slate-600 hover:bg-white"
-          title="Abteilung kopieren (in eine andere Kette einfügbar)"
+          title={t('Abteilung kopieren (in eine andere Kette einfügbar)')}
         >
-          ⧉ Kopieren
+          ⧉ Copy
         </button>
         <EditableName
           value={abteilung.name}
@@ -69,18 +71,18 @@ export function AbteilungBlock({ abteilung, filter, index }: Props) {
           onClick={() => addSchritt(abteilung.id)}
           className="rounded bg-zollern-700 px-3 py-1 text-xs font-medium text-white hover:bg-zollern-800"
         >
-          + Schritt
+          {t('+ Schritt')}
         </button>
         <button
           onClick={() => addBearbeitungsblock(abteilung.id)}
           className="rounded border border-zollern-700 px-3 py-1 text-xs font-medium text-zollern-700 hover:bg-zollern-50"
         >
-          + Variabler Block
+          {t('+ Variabler Block')}
         </button>
         <button
           onClick={() => removeAbteilung(abteilung.id)}
           className="rounded px-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"
-          title="Abteilung löschen"
+          title={t('Abteilung löschen')}
         >
           ✕
         </button>
@@ -93,7 +95,7 @@ export function AbteilungBlock({ abteilung, filter, index }: Props) {
               onClick={() => addSchritt(abteilung.id)}
               className="flex min-h-[6rem] w-full items-center justify-center rounded-lg border-2 border-dashed border-slate-300 text-sm text-slate-400 hover:border-zollern-400 hover:bg-zollern-50 hover:text-zollern-700"
             >
-              + Ersten Produktionsschritt hinzufügen
+              {t('Ersten Produktionsschritt hinzufügen')}
             </button>
           ) : (
             <div className="flex flex-col gap-3">
@@ -108,7 +110,7 @@ export function AbteilungBlock({ abteilung, filter, index }: Props) {
                       <div className="mb-2 flex items-center gap-2">
                         <span className="h-2 w-2 rounded-full bg-zollern-400" />
                         <span className="text-[9px] font-semibold uppercase tracking-wide text-zollern-500">
-                          Variabler Block
+                          {t('Variabler Block')}
                         </span>
                         <EditableName
                           value={item.block.name}
@@ -118,14 +120,14 @@ export function AbteilungBlock({ abteilung, filter, index }: Props) {
                         <button
                           onClick={() => moveBearbeitungsblock(item.block.id, 'up')}
                           className="rounded px-1 text-slate-400 hover:bg-slate-100"
-                          title="Block nach oben"
+                          title={t('Block nach oben')}
                         >
                           ↑
                         </button>
                         <button
                           onClick={() => moveBearbeitungsblock(item.block.id, 'down')}
                           className="rounded px-1 text-slate-400 hover:bg-slate-100"
-                          title="Block nach unten"
+                          title={t('Block nach unten')}
                         >
                           ↓
                         </button>
@@ -133,12 +135,12 @@ export function AbteilungBlock({ abteilung, filter, index }: Props) {
                           onClick={() => addSchritt(abteilung.id, item.block.id)}
                           className="rounded bg-zollern-700 px-2 py-0.5 text-[11px] font-medium text-white hover:bg-zollern-800"
                         >
-                          + Schritt
+                          {t('+ Schritt')}
                         </button>
                         <button
                           onClick={() => removeBearbeitungsblock(item.block.id)}
                           className="rounded px-1 text-slate-400 hover:text-red-500"
-                          title="Block löschen"
+                          title={t('Block löschen')}
                         >
                           ✕
                         </button>
@@ -153,7 +155,7 @@ export function AbteilungBlock({ abteilung, filter, index }: Props) {
                           ))}
                           {blockSteps.length === 0 && (
                             <div className="flex min-h-[6rem] w-full items-center justify-center rounded-lg border-2 border-dashed border-slate-200 text-sm text-slate-400">
-                              + Schritt über den Button oben hinzufügen
+                              {t('+ Schritt über den Button oben hinzufügen')}
                             </div>
                           )}
                         </div>

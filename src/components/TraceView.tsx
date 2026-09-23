@@ -3,12 +3,16 @@ import type { Produktionstabelle } from '../types'
 import { traceAuftrag } from '../utils/aggregate'
 import { istInSchleife } from '../utils/schleifen'
 import { DurchlaufWahl } from './DurchlaufWahl'
+import { useT, useAktuelleSprache } from '../lib/sprache'
+import { spaltenName } from '../lib/i18n'
 
 interface Props {
   auftragsnummer: string
 }
 
 export function TraceView({ auftragsnummer }: Props) {
+  const t = useT()
+  const sprache = useAktuelleSprache()
   const activeChainId = useStore((s) => s.activeChainId)
   const abteilungen = useStore((s) => s.abteilungen)
   const alleSchritte = useStore((s) => s.schritte)
@@ -43,7 +47,7 @@ export function TraceView({ auftragsnummer }: Props) {
   if (!trace.found) {
     return (
       <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-        Auftrag „{auftragsnummer}" wurde in keiner Maschine gefunden.
+        {t('Auftrag „{name}" wurde in keiner Maschine gefunden.', { name: auftragsnummer })}
       </div>
     )
   }
@@ -55,7 +59,7 @@ export function TraceView({ auftragsnummer }: Props) {
   return (
     <div className="rounded-lg border border-zollern-200 bg-zollern-50/60 p-4">
       <div className="mb-2 flex items-center gap-3 text-sm">
-        <span className="font-bold text-zo-ink">Auftrag {auftragsnummer}</span>
+        <span className="font-bold text-zo-ink">{t('Auftrag {name}', { name: auftragsnummer })}</span>
         {trace.fn && <span className="rounded bg-white px-2 py-0.5 text-xs text-slate-600">FN: {trace.fn}</span>}
         {trace.datum && (
           <span className="rounded bg-white px-2 py-0.5 text-xs text-slate-600">Datum: {trace.datum}</span>
@@ -91,7 +95,7 @@ export function TraceView({ auftragsnummer }: Props) {
                   {stop.schritt.optional && <span className="ml-1 text-slate-300">(opt.)</span>}
                   {istInSchleife(stop.schritt.id, alleSchritte, alleBloecke) && (
                     <span className="ml-1 text-zollern-600" title="Schritt liegt in einer Schleife">
-                      ⟲ Schleife
+                      {t('⟲ Schleife')}
                     </span>
                   )}
                 </div>
@@ -124,7 +128,7 @@ export function TraceView({ auftragsnummer }: Props) {
                       skipped ? 'text-slate-300 italic' : 'text-purple-700 italic'
                     }`}
                   >
-                    {skipped ? 'übersprungen' : 'extern bearbeitet'}
+                    {skipped ? t('übersprungen') : t('extern bearbeitet')}
                   </div>
                 )}
               </div>
@@ -137,7 +141,7 @@ export function TraceView({ auftragsnummer }: Props) {
       {nebenZuZeitpunkt.length > 0 && (
         <div className="mt-3 border-t border-zollern-200 pt-3">
           <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Nebentabellen zum Zeitpunkt {trace.datum}
+            {t('Nebentabellen zum Zeitpunkt {datum}', { datum: trace.datum ?? '' })}
           </div>
           <div className="flex flex-wrap gap-2">
             {nebenZuZeitpunkt.map(({ tabelle, row }) => (
@@ -147,7 +151,7 @@ export function TraceView({ auftragsnummer }: Props) {
                   .filter((c) => c.id !== 'datum')
                   .map((c) => (
                     <div key={c.id} className="mt-1 flex items-baseline gap-2 text-xs">
-                      <span className="text-slate-400">{c.name}:</span>
+                      <span className="text-slate-400">{spaltenName(c, sprache)}:</span>
                       <span className="font-semibold text-slate-800">{row?.[c.id] || '–'}</span>
                     </div>
                   ))}

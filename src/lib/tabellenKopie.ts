@@ -1,5 +1,11 @@
 import { useSyncExternalStore } from 'react'
 import { useStore } from '../store'
+import { uebersetze } from './i18n'
+import { useSprache } from './sprache'
+
+/** Übersetzt mit der aktuell eingestellten Sprache. */
+const tt = (text: string, werte?: Record<string, string | number>) =>
+  uebersetze(text, useSprache.getState().sprache, werte)
 import type { AbteilungKopie, TabellenKopie } from '../types'
 
 let status: string | null = null
@@ -64,7 +70,7 @@ export async function kopiereMaschine(tabelleId: string): Promise<void> {
     quelle: { schrittId: t.schrittId },
   }
   const ok = await inZwischenablage(kopie)
-  setStatus(ok ? `„${t.name}" kopiert` : `„${t.name}" kopiert (App-Ablage)`)
+  setStatus(ok ? tt('{name} kopiert', { name: t.name }) : tt('{name} kopiert (App-Ablage)', { name: t.name }))
 }
 
 /** Kopiert eine Nebentabelle samt Spalten, Schlüsseln und Zeilen. */
@@ -83,25 +89,25 @@ export async function kopiereNebentabelle(tabelleId: string): Promise<void> {
     quelle: { abteilungId: t.abteilungId },
   }
   const ok = await inZwischenablage(kopie)
-  setStatus(ok ? `„${t.name}" kopiert` : `„${t.name}" kopiert (App-Ablage)`)
+  setStatus(ok ? tt('{name} kopiert', { name: t.name }) : tt('{name} kopiert (App-Ablage)', { name: t.name }))
 }
 
 /** Fügt eine kopierte Maschinentabelle am Schritt ein. */
 export async function einfuegenMaschine(schrittId: string): Promise<void> {
   const kopie = await ausZwischenablage<TabellenKopie>('produktakte-tabelle')
   if (!kopie) {
-    setStatus('Zwischenablage leer oder unbekanntes Format')
+    setStatus(tt('Zwischenablage leer oder unbekanntes Format'))
     return
   }
   if (kopie.art !== 'maschine') {
-    setStatus('Zwischenablage enthält keine Maschinentabelle')
+    setStatus(tt('Zwischenablage enthält keine Maschinentabelle'))
     return
   }
   const res = useStore.getState().einfuegenTabelle(kopie, { art: 'maschine', schrittId })
   setStatus(
     res.arbeitsplatzGeleert
-      ? 'Tabelle eingefügt – Arbeitsplatz war belegt, bitte neu zuweisen'
-      : 'Tabelle eingefügt',
+      ? tt('Tabelle eingefügt – Arbeitsplatz war belegt, bitte neu zuweisen')
+      : tt('Tabelle eingefügt'),
   )
 }
 
@@ -109,18 +115,18 @@ export async function einfuegenMaschine(schrittId: string): Promise<void> {
 export async function einfuegenNebentabelle(abteilungId: string): Promise<void> {
   const kopie = await ausZwischenablage<TabellenKopie>('produktakte-tabelle')
   if (!kopie) {
-    setStatus('Zwischenablage leer oder unbekanntes Format')
+    setStatus(tt('Zwischenablage leer oder unbekanntes Format'))
     return
   }
   if (kopie.art !== 'nebentabelle') {
-    setStatus('Zwischenablage enthält keine Nebentabelle')
+    setStatus(tt('Zwischenablage enthält keine Nebentabelle'))
     return
   }
   const res = useStore.getState().einfuegenTabelle(kopie, { art: 'nebentabelle', abteilungId })
   setStatus(
     res.arbeitsplatzGeleert
-      ? 'Tabelle eingefügt – Arbeitsplatz war belegt, bitte neu zuweisen'
-      : 'Tabelle eingefügt',
+      ? tt('Tabelle eingefügt – Arbeitsplatz war belegt, bitte neu zuweisen')
+      : tt('Tabelle eingefügt'),
   )
 }
 
@@ -143,7 +149,7 @@ export async function kopiereAbteilung(abteilungId: string): Promise<void> {
   }
   const ok = await inZwischenablage(kopie)
   setStatus(
-    ok ? `Abteilung „${abteilung.name}" kopiert` : `Abteilung „${abteilung.name}" kopiert (App-Ablage)`,
+    ok ? tt('Abteilung „{name}" kopiert', { name: abteilung.name }) : tt('Abteilung „{name}" kopiert (App-Ablage)', { name: abteilung.name }),
   )
 }
 
@@ -151,13 +157,13 @@ export async function kopiereAbteilung(abteilungId: string): Promise<void> {
 export async function fuegeAbteilungEin(chainId: string): Promise<void> {
   const kopie = await ausZwischenablage<AbteilungKopie>('produktakte-abteilung')
   if (!kopie) {
-    setStatus('Zwischenablage enthält keine kopierte Abteilung')
+    setStatus(tt('Zwischenablage enthält keine kopierte Abteilung'))
     return
   }
   const res = useStore.getState().fuegeAbteilungEin(chainId, kopie)
   setStatus(
     res.arbeitsplatzGeleert
-      ? `Abteilung „${kopie.name}" eingefügt – Arbeitsplatznummern waren belegt, bitte neu zuweisen`
-      : `Abteilung „${kopie.name}" eingefügt`,
+      ? tt('Abteilung „{name}" eingefügt – Arbeitsplatznummern waren belegt, bitte neu zuweisen', { name: kopie.name })
+      : tt('Abteilung „{name}" eingefügt', { name: kopie.name }),
   )
 }

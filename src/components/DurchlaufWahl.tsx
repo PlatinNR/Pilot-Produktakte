@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import type { Produktionstabelle } from '../types'
+import { useT, useAktuelleSprache } from '../lib/sprache'
+import { spaltenName } from '../lib/i18n'
 
 interface Props {
   tabelle: Produktionstabelle
@@ -13,6 +15,8 @@ interface Props {
  * - Mehrere Durchläufe an derselben Maschine sind wählbar
  */
 export function DurchlaufWahl({ tabelle, auftragsnummer, kompakt = false }: Props) {
+  const t = useT()
+  const sprache = useAktuelleSprache()
   const [wdhIndex, setWdhIndex] = useState(0)
   const [runIndex, setRunIndex] = useState(0)
 
@@ -36,7 +40,7 @@ export function DurchlaufWahl({ tabelle, auftragsnummer, kompakt = false }: Prop
     >
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-[9px] font-semibold uppercase tracking-wide text-slate-500">
-          Werte des Auftrags
+          {t('Werte des Auftrags')}
         </span>
         {wdhWerte.length > 1 && aktiveWdh && (
           <label className="flex items-center gap-1">
@@ -47,15 +51,15 @@ export function DurchlaufWahl({ tabelle, auftragsnummer, kompakt = false }: Prop
                 setRunIndex(0)
               }}
               className="rounded border border-slate-200 bg-white px-1 py-0.5 text-[10px] text-slate-700"
-              title="Wiederholung der Schleife wählen"
+              title={t('Wiederholung der Schleife wählen')}
             >
               {wdhWerte.map((w) => (
                 <option key={w} value={w}>
-                  Wiederholung {w}
+                  {t('Wiederholung')} {w}
                 </option>
               ))}
             </select>
-            <span className="text-[10px] text-slate-400">von {wdhWerte.length}</span>
+            <span className="text-[10px] text-slate-400">{t('von')} {wdhWerte.length}</span>
           </label>
         )}
         {gefiltert.length > 1 && (
@@ -64,22 +68,22 @@ export function DurchlaufWahl({ tabelle, auftragsnummer, kompakt = false }: Prop
               value={aktiverIndex}
               onChange={(e) => setRunIndex(Number(e.target.value))}
               className="rounded border border-slate-200 bg-white px-1 py-0.5 text-[10px] text-slate-700"
-              title="Werte eines anderen Durchlaufs anzeigen"
+              title={t('Werte eines anderen Durchlaufs anzeigen')}
             >
               {gefiltert.map((_, i) => (
                 <option key={i} value={i}>
-                  Durchlauf {i + 1}
+                  {t('Durchlauf')} {i + 1}
                 </option>
               ))}
             </select>
-            <span className="text-[10px] text-slate-400">von {gefiltert.length}</span>
+            <span className="text-[10px] text-slate-400">{t('von')} {gefiltert.length}</span>
           </label>
         )}
       </div>
       <div className={`mt-1 grid gap-x-3 gap-y-0.5 ${kompakt ? 'grid-cols-2' : 'grid-cols-2 md:grid-cols-3'}`}>
         {spalten.map((c) => (
           <div key={c.id} className="flex items-baseline gap-1 text-xs">
-            <span className="shrink-0 text-slate-400">{c.name}:</span>
+            <span className="shrink-0 text-slate-400">{spaltenName(c, sprache)}:</span>
             <span className="truncate font-semibold text-slate-800">{aktiv[c.id] || '–'}</span>
           </div>
         ))}
