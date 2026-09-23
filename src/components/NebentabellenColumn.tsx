@@ -39,7 +39,7 @@ export function NebentabellenColumn({ abteilungId }: Props) {
             onClick={() => addNebentabelle(abteilungId)}
             className="rounded border border-slate-300 px-2 py-0.5 text-xs text-slate-600 hover:bg-slate-100"
           >
-            + Nebentabelle
+            + Unterstützungsprozess
           </button>
         </div>
       </div>
@@ -50,7 +50,7 @@ export function NebentabellenColumn({ abteilungId }: Props) {
           onClick={() => addNebentabelle(abteilungId)}
           className="flex min-h-[5rem] items-center justify-center rounded-lg border-2 border-dashed border-slate-300 text-sm text-slate-400 hover:border-zollern-400 hover:bg-zollern-50 hover:text-zollern-700"
         >
-          + Nebentabelle
+          + Unterstützungsprozess
         </button>
       )}
 

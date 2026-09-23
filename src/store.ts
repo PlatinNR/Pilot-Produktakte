@@ -17,7 +17,8 @@ import type {
   TabellenKopie,
   TableRow,
 } from './types'
-import { NEBEN_SPALTEN, PRODUKTION_SPALTEN, emptyInfo } from './types'
+import { NEBEN_SPALTEN, PRODUKTION_SPALTEN, WIEDERHOLUNG_SPALTE, emptyInfo } from './types'
+import { istInSchleife } from './utils/schleifen'
 import { createChain as apiCreateChain, renameChain as apiRenameChain, deleteChain as apiDeleteChain } from './lib/api'
 
 let counter = 0
@@ -567,11 +568,33 @@ export const useStore = create<Store>()(
     })),
 
   setSchrittLoop: (schrittId, loopTargetId, loopCondition) =>
-    set((s) => ({
-      schritte: s.schritte.map((st) =>
+    set((s) => {
+      const schritte = s.schritte.map((st) =>
         st.id === schrittId ? { ...st, loopTargetId, loopCondition } : st,
-      ),
-    })),
+      )
+      let produktionstabellen = s.produktionstabellen
+      if (loopTargetId) {
+        // "Wiederholung"-Spalte (entfernbar) an den Maschinen der Schleifen-Schritte ergänzen
+        const ende = schritte.find((st) => st.id === schrittId)
+        if (ende) {
+          const betroffen = new Set<string>()
+          for (const st of schritte) {
+            if (
+              st.abteilungId === ende.abteilungId &&
+              istInSchleife(st.id, schritte, s.bearbeitungsbloecke)
+            ) {
+              betroffen.add(st.id)
+            }
+          }
+          produktionstabellen = s.produktionstabellen.map((t) =>
+            betroffen.has(t.schrittId) && !t.columns.some((c) => c.id === 'wdh')
+              ? { ...t, columns: [...t.columns, { ...WIEDERHOLUNG_SPALTE }] }
+              : t,
+          )
+        }
+      }
+      return { schritte, produktionstabellen }
+    }),
 
   setSchrittOptional: (schrittId, optional) =>
     set((s) => ({
@@ -594,20 +617,27 @@ export const useStore = create<Store>()(
 
   // --- Produktionstabellen ---
   addProduktionstabelle: (schrittId, name) =>
-    set((s) => ({
-      produktionstabellen: [
-        ...s.produktionstabellen,
-        {
-          id: nextId('p'),
-          schrittId,
-          name: name ?? 'Neue Maschine',
-          arbeitsplatz: '',
-          columns: cloneSpalten(PRODUKTION_SPALTEN),
-          rows: [],
-          keys: produktionKeys(schrittId),
-        },
-      ],
-    })),
+    set((s) => {
+      // "Wiederholung"-Spalte nur bei Schritten in einer Schleife ergänzen (entfernbar)
+      const inSchleife = istInSchleife(schrittId, s.schritte, s.bearbeitungsbloecke)
+      const columns = inSchleife
+        ? [...cloneSpalten(PRODUKTION_SPALTEN), { ...WIEDERHOLUNG_SPALTE }]
+        : cloneSpalten(PRODUKTION_SPALTEN)
+      return {
+        produktionstabellen: [
+          ...s.produktionstabellen,
+          {
+            id: nextId('p'),
+            schrittId,
+            name: name ?? 'Neue Maschine',
+            arbeitsplatz: '',
+            columns,
+            rows: [],
+            keys: produktionKeys(schrittId),
+          },
+        ],
+      }
+    }),
 
   renameProduktionstabelle: (id, name) =>
     set((s) => ({
@@ -692,6 +722,7 @@ export const useStore = create<Store>()(
         }
         const durchlaeufe =
           eintrag.durchlaeufe.length > 0 ? eintrag.durchlaeufe : [{ datum: '', zeit: '', spalten: {} }]
+        const hatWdh = columns.some((c) => c.id === 'wdh')
         const neueZeilen = durchlaeufe.map((d) => {
           const zeile: TableRow = {
             ...emptyRow(columns),
@@ -699,8 +730,8 @@ export const useStore = create<Store>()(
             fn,
             datum: d.datum || datum,
             zeit: d.zeit,
-            wdh: d.wiederholung ?? '',
           }
+          if (hatWdh) zeile.wdh = d.wiederholung ?? ''
           for (const c of columns) {
             if (
               c.id === 'auftragsnummer' ||
@@ -998,7 +1029,7 @@ export const useStore = create<Store>()(
   }),
     {
       name: 'digitale-produktakte',
-      version: 13,
+      version: 14,
       migrate: (persisted, version) => {
         let p = persisted as Partial<AppState> & {
           abteilungen?: (Abteilung & { chainId?: string; parentId?: string | null; sequence?: 'fixed' | 'variable' })[]
@@ -1163,6 +1194,29 @@ export const useStore = create<Store>()(
               const zeitIdx = columns.findIndex((c) => c.id === 'zeit')
               columns.splice(zeitIdx + 1, 0, { id: 'wdh', name: 'Wiederholung', type: 'text', fixed: true })
               return { ...t, columns }
+            }),
+          } as typeof p
+        }
+        if (version < 14) {
+          // "Wiederholung" ist keine feste Spalte mehr: nur bei Schleifen-Schritten behalten (entfernbar)
+          const bloecke = p.bearbeitungsbloecke ?? []
+          const schritte14 = p.schritte ?? []
+          p = {
+            ...p,
+            produktionstabellen: (p.produktionstabellen ?? []).map((t) => {
+              if (!t.columns.some((c) => c.id === 'wdh')) return t
+              if (istInSchleife(t.schrittId, schritte14, bloecke)) {
+                return {
+                  ...t,
+                  columns: t.columns.map((c) => (c.id === 'wdh' ? { ...c, fixed: false } : c)),
+                }
+              }
+              const rows = t.rows.map((r) => {
+                const kopie = { ...r }
+                delete kopie.wdh
+                return kopie
+              })
+              return { ...t, columns: t.columns.filter((c) => c.id !== 'wdh'), rows }
             }),
           } as typeof p
         }

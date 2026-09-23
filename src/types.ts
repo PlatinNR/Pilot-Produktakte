@@ -184,8 +184,15 @@ export const PRODUKTION_SPALTEN: TableColumn[] = [
   { id: 'fn', name: 'FN', type: 'text', fixed: true },
   { id: 'datum', name: 'Datum', type: 'date', fixed: true },
   { id: 'zeit', name: 'Uhrzeit', type: 'time', fixed: true },
-  { id: 'wdh', name: 'Wiederholung', type: 'text', fixed: true },
 ]
+
+/** „Wiederholung" – wird nur bei Schritten in einer Schleife ergänzt (entfernbar). */
+export const WIEDERHOLUNG_SPALTE: TableColumn = {
+  id: 'wdh',
+  name: 'Wiederholung',
+  type: 'text',
+  fixed: false,
+}
 
 /** Standardspalte jeder Nebentabelle (zeitlicher Bezug) */
 export const NEBEN_SPALTEN: TableColumn[] = [

@@ -299,7 +299,7 @@ export function ProduktHinzufuegenView() {
                                   {auswahl[m.id] && (
                                     <>
                                       <div className="mt-2 flex flex-wrap items-center gap-3 border-t border-slate-100 pt-2">
-                                        {inSchleife && (
+                                        {inSchleife && m.columns.some((c) => c.id === 'wdh') && (
                                           <label className="flex items-center gap-1">
                                             <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
                                               Wiederholungen

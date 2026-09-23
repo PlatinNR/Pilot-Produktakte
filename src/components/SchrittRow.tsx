@@ -157,7 +157,7 @@ export function SchrittRow({ schritt, filter }: Props) {
             onClick={() => addProduktionstabelle(schritt.id)}
             className="text-sm text-slate-400 hover:text-zollern-700"
           >
-            + Maschine
+            + Arbeitsplatz
           </button>
           <button
             onClick={() => einfuegenMaschine(schritt.id)}

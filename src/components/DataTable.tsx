@@ -164,9 +164,9 @@ export function DataTable({
 
       {kopfExtra && <div className="border-b border-slate-100 px-2 py-1.5">{kopfExtra}</div>}
 
-      <div className="overflow-x-auto">
+      <div className="max-h-[10.5rem] overflow-x-auto overflow-y-auto">
         <table className="w-full border-collapse text-xs">
-          <thead>
+          <thead className="sticky top-0 z-10">
             <tr className="bg-slate-50">
               {columns.map((c) => (
                 <th key={c.id} className="whitespace-nowrap border-b border-slate-100 px-2 py-1.5 text-left font-medium text-slate-600">
