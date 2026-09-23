@@ -21,6 +21,7 @@ export function Dashboard() {
   const setActiveChain = useStore((s) => s.setActiveChain)
   const addChain = useStore((s) => s.addChain)
   const renameChain = useStore((s) => s.renameChain)
+  const removeChain = useStore((s) => s.removeChain)
   const addAbteilung = useStore((s) => s.addAbteilung)
   const sync = useSyncStatus()
   const [filter, setFilter] = useState<Filter>(EMPTY_FILTER)
@@ -48,6 +49,19 @@ export function Dashboard() {
 
   const handleDownload = async () => {
     await loadFromCloud()
+  }
+
+  const handleKetteLoeschen = () => {
+    if (!activeChain) return
+    const anzahlAbteilungen = abteilungen.length
+    const frage =
+      `Prozesskette „${activeChain.name}" wirklich löschen?\n\n` +
+      `Dabei werden ${anzahlAbteilungen} Abteilung(en) mit allen Schritten, Arbeitsplätzen und Einträgen ` +
+      `sowohl hier als auch in der Cloud entfernt. Das kann nicht rückgängig gemacht werden.`
+    if (!window.confirm(frage)) return
+    removeChain(activeChain.id)
+    setAufraeumHinweis(`Prozesskette „${activeChain.name}" gelöscht.`)
+    setTimeout(() => setAufraeumHinweis(null), 5000)
   }
 
   const busy = sync.phase !== 'idle'
@@ -98,6 +112,14 @@ export function Dashboard() {
             title="Neue Prozesskette"
           >
             + Kette
+          </button>
+          <button
+            onClick={handleKetteLoeschen}
+            disabled={!activeChain}
+            className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+            title="Aktuelle Prozesskette löschen (mit Sicherheitsabfrage)"
+          >
+            Kette löschen
           </button>
           <button
             onClick={handleUpload}

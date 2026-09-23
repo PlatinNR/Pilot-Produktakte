@@ -315,6 +315,7 @@ export const useStore = create<Store>()(
             chains: s.chains.filter((c) => c.id !== id),
             activeChainId: s.activeChainId === id ? (s.chains.find((c) => c.id !== id)?.id ?? '') : s.activeChainId,
             abteilungen,
+            bearbeitungsbloecke: s.bearbeitungsbloecke.filter((b) => abteilungIds.has(b.abteilungId)),
             schritte,
             nebentabellen: s.nebentabellen.filter((n) => abteilungIds.has(n.abteilungId)),
             produktionstabellen: s.produktionstabellen.filter((t) => schrittIds.has(t.schrittId)),
