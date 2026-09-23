@@ -101,7 +101,7 @@ export function AbteilungBlock({ abteilung, filter, index }: Props) {
             <div className="flex flex-col gap-3">
               {renderItems.map((item) => {
                 if (item.type === 'block') {
-                  const blockSteps = schritte.filter((x) => x.blockId === item.block.id)
+                  const blockSteps = schritte.filter((x) => x.blockId === item.block.id).sort((x, y) => x.position - y.position)
                   return (
                     <div
                       key={`block-${item.block.id}`}

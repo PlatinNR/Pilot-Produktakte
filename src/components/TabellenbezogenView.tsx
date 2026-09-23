@@ -522,6 +522,7 @@ export function TabellenbezogenView({ filter }: Props) {
     renameSchritt,
     removeSchritt,
     moveSchritt,
+    moveBlockSchritt,
     addColumnSchritt,
     renameColumnSchritt,
     changeColumnTypeSchritt,
@@ -1087,7 +1088,7 @@ export function TabellenbezogenView({ filter }: Props) {
 
                     {renderItems.map((item, i) => {
                       if (item.type === 'block') {
-                        const blockSteps = schritte.filter((x) => x.blockId === item.block.id)
+                        const blockSteps = schritte.filter((x) => x.blockId === item.block.id).sort((x, y) => x.position - y.position)
                         return (
                           <div
                             key={`block-${item.block.id}`}
@@ -1152,6 +1153,24 @@ export function TabellenbezogenView({ filter }: Props) {
                                         onAddColumn={(name, type) => addColumnSchritt(bst.id, name, type)}
                                         rahmen={extern ? 'extern' : 'normal'}
                                         betont
+                                        kopfExtra={
+                                          <span className="flex shrink-0 items-center gap-0.5">
+                                            <button
+                                              onClick={() => moveBlockSchritt(bst.id, 'links')}
+                                              className="rounded px-1 text-[11px] text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                                              title="Nach links verschieben"
+                                            >
+                                              ◀
+                                            </button>
+                                            <button
+                                              onClick={() => moveBlockSchritt(bst.id, 'rechts')}
+                                              className="rounded px-1 text-[11px] text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                                              title="Nach rechts verschieben"
+                                            >
+                                              ▶
+                                            </button>
+                                          </span>
+                                        }
                                       >
                                         {extern && (
                                           <div className="border-t border-purple-100 bg-purple-100/70 px-2 py-0.5 text-[10px] font-semibold text-purple-700">

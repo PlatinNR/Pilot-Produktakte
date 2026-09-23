@@ -182,6 +182,7 @@ interface Store extends AppState {
 
   // Schritte
   addSchritt: (abteilungId: string, blockId?: string | null, name?: string) => void
+  moveBlockSchritt: (schrittId: string, richtung: 'links' | 'rechts') => void
   renameSchritt: (id: string, name: string) => void
   removeSchritt: (id: string) => void
   moveSchritt: (id: string, direction: 'up' | 'down') => void
@@ -502,7 +503,9 @@ export const useStore = create<Store>()(
           abteilungId,
           blockId: blockId ?? null,
           name: name ?? t('Schritt {n}', { n: s.schritte.length + 1 }),
-          position: blockId ? 0 : maxChainPosition(s, abteilungId) + 1,
+          position: blockId
+            ? Math.max(0, ...s.schritte.filter((st) => st.blockId === blockId).map((st) => st.position)) + 1
+            : maxChainPosition(s, abteilungId) + 1,
           columns: [],
           keys: [],
           loopCondition: null,
@@ -515,6 +518,30 @@ export const useStore = create<Store>()(
 
   renameSchritt: (id, name) =>
     set((s) => ({ schritte: s.schritte.map((st) => (st.id === id ? { ...st, name } : st)) })),
+
+  /** Block-Schritt innerhalb seines Blocks nach links/rechts verschieben. */
+  moveBlockSchritt: (schrittId, richtung) =>
+    set((s) => {
+      const st = s.schritte.find((x) => x.id === schrittId)
+      if (!st || !st.blockId) return s
+      const geschwister = s.schritte
+        .filter((x) => x.blockId === st.blockId)
+        .sort((a, b) => a.position - b.position)
+      const idx = geschwister.findIndex((x) => x.id === schrittId)
+      const ziel = richtung === 'links' ? idx - 1 : idx + 1
+      if (ziel < 0 || ziel >= geschwister.length) return s
+      const a = geschwister[idx]
+      const b = geschwister[ziel]
+      return {
+        schritte: s.schritte.map((x) =>
+          x.id === a.id
+            ? { ...x, position: b.position }
+            : x.id === b.id
+              ? { ...x, position: a.position }
+              : x,
+        ),
+      }
+    }),
 
   removeSchritt: (id) =>
     set((s) => ({
@@ -1146,7 +1173,7 @@ export const useStore = create<Store>()(
   }),
     {
       name: 'digitale-produktakte',
-      version: 15,
+      version: 16,
       migrate: (persisted, version) => {
         let p = persisted as Partial<AppState> & {
           abteilungen?: (Abteilung & { chainId?: string; parentId?: string | null; sequence?: 'fixed' | 'variable' })[]
@@ -1372,6 +1399,17 @@ export const useStore = create<Store>()(
             produktionstabellen,
             nebentabellen,
           } as typeof p
+        }
+        if (version < 16) {
+          // Block-Schritte bekommen eine eigene Reihenfolge (Position im Block, verschiebbar)
+          const proBlock = new Map<string, number>()
+          const schritte16 = (p.schritte ?? []).map((st) => {
+            if (!st.blockId) return st
+            const naechste = (proBlock.get(st.blockId) ?? 0) + 1
+            proBlock.set(st.blockId, naechste)
+            return { ...st, position: naechste }
+          })
+          p = { ...p, schritte: schritte16 } as typeof p
         }
         return p as AppState
       },
