@@ -229,6 +229,7 @@ interface Store extends AppState {
   renameNebentabelle: (id: string, name: string) => void
   setNebenArbeitsplatz: (id: string, arbeitsplatz: string) => void
   removeNebentabelle: (id: string) => void
+  moveNebentabelle: (id: string, richtung: 'up' | 'down') => void
   addColumnNeben: (tabelleId: string, name: string, type: ColumnType) => void
   renameColumnNeben: (tabelleId: string, spalteId: string, name: string) => void
   changeColumnTypeNeben: (tabelleId: string, spalteId: string, type: ColumnType) => void
@@ -876,12 +877,43 @@ export const useStore = create<Store>()(
           abteilungId,
           name: name ?? t('Neue Nebentabelle'),
           arbeitsplatz: '',
+          position:
+            Math.max(
+              0,
+              ...s.nebentabellen
+                .filter((n) => n.abteilungId === abteilungId)
+                .map((n) => n.position ?? 0),
+            ) + 1,
           columns: cloneSpalten(NEBEN_SPALTEN),
           rows: [],
           keys: nebenKeys(),
         },
       ],
     })),
+
+  /** Unterstützungsprozess in der Spalte nach oben/unten verschieben. */
+  moveNebentabelle: (id, richtung) =>
+    set((s) => {
+      const t0 = s.nebentabellen.find((x) => x.id === id)
+      if (!t0) return s
+      const geschwister = s.nebentabellen
+        .filter((x) => x.abteilungId === t0.abteilungId)
+        .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+      const idx = geschwister.findIndex((x) => x.id === id)
+      const ziel = richtung === 'up' ? idx - 1 : idx + 1
+      if (ziel < 0 || ziel >= geschwister.length) return s
+      const a = geschwister[idx]
+      const b = geschwister[ziel]
+      return {
+        nebentabellen: s.nebentabellen.map((x) =>
+          x.id === a.id
+            ? { ...x, position: b.position }
+            : x.id === b.id
+              ? { ...x, position: a.position }
+              : x,
+        ),
+      }
+    }),
 
   renameNebentabelle: (id, name) =>
     set((s) => ({ nebentabellen: s.nebentabellen.map((t) => (t.id === id ? { ...t, name } : t)) })),
@@ -1203,7 +1235,7 @@ export const useStore = create<Store>()(
     }),
     {
       name: 'digitale-produktakte',
-      version: 17,
+      version: 18,
       migrate: (persisted, version) => {
         let p = persisted as Partial<AppState> & {
           abteilungen?: (Abteilung & { chainId?: string; parentId?: string | null; sequence?: 'fixed' | 'variable' })[]
@@ -1462,6 +1494,16 @@ export const useStore = create<Store>()(
               return { ...t, columns }
             }),
           } as typeof p
+        }
+        if (version < 18) {
+          // Unterstützungsprozesse bekommen eine Position (Reihenfolge in der Spalte)
+          const proAbteilung = new Map<string, number>()
+          const neben18 = (p.nebentabellen ?? []).map((n) => {
+            const naechste = (proAbteilung.get(n.abteilungId) ?? 0) + 1
+            proAbteilung.set(n.abteilungId, naechste)
+            return { ...n, position: n.position ?? naechste }
+          })
+          p = { ...p, nebentabellen: neben18 } as typeof p
         }
         return p as AppState
       },

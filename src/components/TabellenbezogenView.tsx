@@ -591,6 +591,7 @@ export function TabellenbezogenView({ filter }: Props) {
     renameNebentabelle,
     removeNebentabelle,
     setNebenArbeitsplatz,
+    moveNebentabelle,
     loescheBeziehung,
     setBeziehungOffset,
     addColumnNeben,
@@ -1162,7 +1163,7 @@ export function TabellenbezogenView({ filter }: Props) {
       <div className="relative z-20 flex flex-col gap-6">
         {abteilungen.map((a) => {
           const schritte = alleSchritte.filter((st) => st.abteilungId === a.id)
-          const neben = alleNeben.filter((n) => n.abteilungId === a.id)
+          const neben = alleNeben.filter((n) => n.abteilungId === a.id).sort((x, y) => (x.position ?? 0) - (y.position ?? 0))
           const bloecke = alleBloecke.filter((b) => b.abteilungId === a.id)
 
           // Render-Reihenfolge: Kettenknoten (feste Schritte + Blöcke) nach Position sortiert
@@ -1842,11 +1843,29 @@ export function TabellenbezogenView({ filter }: Props) {
                         onAddColumn={(name, type) => addColumnNeben(n.id, name, type)}
                         onKopieren={() => kopiereNebentabelle(n.id)}
                         kopfExtra={
-                          <ArbeitsplatzZeile
-                            tabelleId={n.id}
-                            wert={n.arbeitsplatz}
-                            onChange={setNebenArbeitsplatz}
-                          />
+                          <span className="flex shrink-0 items-center gap-1">
+                            <ArbeitsplatzZeile
+                              tabelleId={n.id}
+                              wert={n.arbeitsplatz}
+                              onChange={setNebenArbeitsplatz}
+                            />
+                            <span className="flex shrink-0 items-center gap-0.5">
+                              <button
+                                onClick={() => moveNebentabelle(n.id, 'up')}
+                                className="rounded px-1 text-[11px] text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                                title="Nach oben verschieben"
+                              >
+                                ↑
+                              </button>
+                              <button
+                                onClick={() => moveNebentabelle(n.id, 'down')}
+                                className="rounded px-1 text-[11px] text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                                title="Nach unten verschieben"
+                              >
+                                ↓
+                              </button>
+                            </span>
+                          </span>
                         }
                       >
                         {n.columns.map((c) => (

@@ -10,12 +10,13 @@ interface Props {
 export function NebentabellenColumn({ abteilungId }: Props) {
   const t = useT()
   const alleNebentabellen = useStore((s) => s.nebentabellen)
-  const nebentabellen = alleNebentabellen.filter((n) => n.abteilungId === abteilungId)
+  const nebentabellen = alleNebentabellen.filter((n) => n.abteilungId === abteilungId).sort((x, y) => (x.position ?? 0) - (y.position ?? 0))
   const {
     addNebentabelle,
     renameNebentabelle,
     removeNebentabelle,
     setNebenArbeitsplatz,
+    moveNebentabelle,
     addColumnNeben,
     renameColumnNeben,
     changeColumnTypeNeben,
@@ -76,6 +77,24 @@ export function NebentabellenColumn({ abteilungId }: Props) {
             onArbeitsplatzChange={(wert) => setNebenArbeitsplatz(t.id, wert)}
             arbeitsplatzPruefen={(wert) => arbeitsplatzFehlerText(t.id, wert)}
             onKopieren={() => kopiereNebentabelle(t.id)}
+            kopfExtra={
+              <span className="flex items-center gap-0.5">
+                <button
+                  onClick={() => moveNebentabelle(t.id, 'up')}
+                  className="rounded px-1 text-[11px] text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                  title="Nach oben verschieben"
+                >
+                  ↑
+                </button>
+                <button
+                  onClick={() => moveNebentabelle(t.id, 'down')}
+                  className="rounded px-1 text-[11px] text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                  title="Nach unten verschieben"
+                >
+                  ↓
+                </button>
+              </span>
+            }
           />
         ))}
       </div>

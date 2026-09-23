@@ -110,6 +110,8 @@ export interface Nebentabelle {
   name: string
   /** Feste Arbeitsplatz-Nummer – gilt für alle Einträge der Nebentabelle */
   arbeitsplatz: string
+  /** Position in der Spalte (Reihenfolge, per Pfeilen verschiebbar) */
+  position?: number
   columns: TableColumn[]
   rows: TableRow[]
   keys: TableKey[]
