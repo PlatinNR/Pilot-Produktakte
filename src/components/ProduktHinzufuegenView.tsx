@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useStore } from '../store'
 import { abteilungFarbe } from '../utils/colors'
 import { istInSchleife } from '../utils/schleifen'
@@ -24,7 +24,7 @@ export function ProduktHinzufuegenView() {
   const [modus, setModus] = useState<Modus>('manuell')
   const [auftragsnummer, setAuftragsnummer] = useState('')
   const [fn, setFn] = useState('')
-  const [datum, setDatum] = useState('')
+  const [datum, setDatum] = useState(() => new Date().toLocaleDateString('sv-SE'))
   const [auswahl, setAuswahl] = useState<Record<string, boolean>>({})
   const [wdhAnzahl, setWdhAnzahl] = useState<Record<string, number>>({})
   const [durchlaufAnzahl, setDurchlaufAnzahl] = useState<Record<string, number>>({})
@@ -35,6 +35,8 @@ export function ProduktHinzufuegenView() {
     {},
   )
   const [meldung, setMeldung] = useState<string | null>(null)
+  /** Nächste freie Minute für die automatische Zeitvergabe (Start 08:00) */
+  const naechsteMinute = useRef(8 * 60)
 
   const abteilungen = alleAbteilungen.filter((a) => a.chainId === activeChainId)
   const gewaehlt = alleMaschinen.filter((m) => auswahl[m.id])
@@ -60,15 +62,44 @@ export function ProduktHinzufuegenView() {
   const kannSpeichern =
     auftragsnummer.trim().length > 0 && gewaehlt.length > 0 && fehlendeZeiten.length === 0
 
+  /** Minuten -> HH:MM */
+  const minuteZuZeit = (min: number) =>
+    `${String(Math.floor(min / 60) % 24).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`
+
+  /**
+   * Füllt fehlende Uhrzeiten automatisch auf: jede neue Wiederholung/ein neuer Arbeitsplatz
+   * bekommt die jeweils nächste Minute (letzte höchste Minute + 1). Manuell gesetzte Zeiten bleiben.
+   */
+  const zeitenFuellen = (tabelleId: string, wdh: number, durchlaeufe: number) => {
+    setZeiten((z) => {
+      const vorhanden = { ...(z[tabelleId] ?? {}) }
+      let min = naechsteMinute.current
+      for (let w = 1; w <= wdh; w++) {
+        for (let d = 1; d <= durchlaeufe; d++) {
+          const key = schluessel(w, d)
+          if (!vorhanden[key]?.zeit) {
+            vorhanden[key] = { datum: vorhanden[key]?.datum ?? '', zeit: minuteZuZeit(min) }
+            min += 1
+          }
+        }
+      }
+      naechsteMinute.current = min
+      return { ...z, [tabelleId]: vorhanden }
+    })
+  }
+
   const setAnzahl = (
     setter: React.Dispatch<React.SetStateAction<Record<string, number>>>,
     aktivSetter: React.Dispatch<React.SetStateAction<Record<string, number>>>,
     tabelleId: string,
     n: number,
+    andereAnzahl: number,
+    istWdh: boolean,
   ) => {
     const v = Math.max(1, Math.min(10, Math.floor(n) || 1))
     setter((x) => ({ ...x, [tabelleId]: v }))
     aktivSetter((a) => ({ ...a, [tabelleId]: Math.min(a[tabelleId] ?? 0, v - 1) }))
+    zeitenFuellen(tabelleId, istWdh ? v : andereAnzahl, istWdh ? andereAnzahl : v)
   }
 
   const setWert = (tabelleId: string, key: string, spalteId: string, value: string) =>
@@ -285,9 +316,10 @@ export function ProduktHinzufuegenView() {
                                     <input
                                       type="checkbox"
                                       checked={!!auswahl[m.id]}
-                                      onChange={(e) =>
+                                      onChange={(e) => {
                                         setAuswahl((x) => ({ ...x, [m.id]: e.target.checked }))
-                                      }
+                                        if (e.target.checked) zeitenFuellen(m.id, w, d)
+                                      }}
                                       className="h-4 w-4 accent-zollern-600"
                                     />
                                     <span className="min-w-0 flex-1 truncate font-medium">{m.name}</span>
@@ -330,6 +362,8 @@ export function ProduktHinzufuegenView() {
                                                   setAktiveWdh,
                                                   m.id,
                                                   Number(e.target.value),
+                                                  d,
+                                                  true,
                                                 )
                                               }
                                               className="w-14 rounded border border-slate-200 bg-white px-1.5 py-0.5 text-xs text-slate-700 outline-none focus:border-zollern-400"
@@ -352,6 +386,8 @@ export function ProduktHinzufuegenView() {
                                                 setAktiverDurchlauf,
                                                 m.id,
                                                 Number(e.target.value),
+                                                w,
+                                                false,
                                               )
                                             }
                                             className="w-14 rounded border border-slate-200 bg-white px-1.5 py-0.5 text-xs text-slate-700 outline-none focus:border-zollern-400"
