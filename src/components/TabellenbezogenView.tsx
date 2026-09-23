@@ -1089,6 +1089,12 @@ export function TabellenbezogenView({ filter }: Props) {
                     {renderItems.map((item, i) => {
                       if (item.type === 'block') {
                         const blockSteps = schritte.filter((x) => x.blockId === item.block.id).sort((x, y) => x.position - y.position)
+                        // Nur visuell: Block-Schritte rechts unter die normalen Schritte schieben
+                        const bezugSchritt = schritte.find((x) => !x.blockId)
+                        const bezugBox = bezugSchritt ? boxes[`sc:${bezugSchritt.id}`] : undefined
+                        const blockBox = boxes[`bc:${item.block.id}`]
+                        const versatz =
+                          bezugBox && blockBox ? Math.max(0, bezugBox.x - blockBox.x - 9) : 0
                         return (
                           <div
                             key={`block-${item.block.id}`}
@@ -1135,7 +1141,7 @@ export function TabellenbezogenView({ filter }: Props) {
                             </div>
 
                             {/* Schritte als Spalten von links nach rechts */}
-                            <div className="overflow-x-auto pb-1">
+                            <div className="overflow-x-auto pb-1" style={{ marginLeft: versatz }}>
                               <div className="flex items-start gap-3">
                                 {blockSteps.map((bst) => {
                                   const bstepMaschinen = alleMaschinen.filter((m) => m.schrittId === bst.id)

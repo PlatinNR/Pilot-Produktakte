@@ -504,7 +504,7 @@ export const useStore = create<Store>()(
           blockId: blockId ?? null,
           name: name ?? t('Schritt {n}', { n: s.schritte.length + 1 }),
           position: blockId
-            ? Math.max(0, ...s.schritte.filter((st) => st.blockId === blockId).map((st) => st.position)) + 1
+            ? Math.min(0, ...s.schritte.filter((st) => st.blockId === blockId).map((st) => st.position)) - 1
             : maxChainPosition(s, abteilungId) + 1,
           columns: [],
           keys: [],
