@@ -1088,13 +1088,10 @@ export function TabellenbezogenView({ filter }: Props) {
 
                     {renderItems.map((item, i) => {
                       if (item.type === 'block') {
-                        const blockSteps = schritte.filter((x) => x.blockId === item.block.id).sort((x, y) => x.position - y.position)
-                        // Nur visuell: Block-Schritte rechts unter die normalen Schritte schieben
-                        const bezugSchritt = schritte.find((x) => !x.blockId)
-                        const bezugBox = bezugSchritt ? boxes[`sc:${bezugSchritt.id}`] : undefined
-                        const blockBox = boxes[`bc:${item.block.id}`]
-                        const versatz =
-                          bezugBox && blockBox ? Math.max(0, bezugBox.x - blockBox.x - 9) : 0
+                        // Rechts verankert: der erste (älteste) Schritt steht rechts, neue kommen nach links
+                        const blockSteps = schritte
+                          .filter((x) => x.blockId === item.block.id)
+                          .sort((x, y) => y.position - x.position)
                         return (
                           <div
                             key={`block-${item.block.id}`}
@@ -1140,9 +1137,9 @@ export function TabellenbezogenView({ filter }: Props) {
                               </button>
                             </div>
 
-                            {/* Schritte als Spalten von links nach rechts */}
-                            <div className="overflow-x-auto pb-1" style={{ marginLeft: versatz }}>
-                              <div className="flex items-start gap-3">
+                            {/* Schritte als Spalten, rechts verankert (neue Schritte kommen nach links) */}
+                            <div className="overflow-x-auto pb-1" style={{ direction: 'rtl' }}>
+                              <div className="flex items-start gap-3" style={{ direction: 'ltr' }}>
                                 {blockSteps.map((bst) => {
                                   const bstepMaschinen = alleMaschinen.filter((m) => m.schrittId === bst.id)
                                   const agg = aggregate ? aggregateSchritt(bst, bstepMaschinen, filter) : null
