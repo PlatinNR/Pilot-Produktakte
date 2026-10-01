@@ -536,143 +536,200 @@ function EntityCard({
   )
 }
 
-interface Geo {
-  path: string
+
+const LANE_STEP = 14
+
+export interface RenderedConnection {
+  id: string
+  sourceKey: string
+  targetKey: string
+  from: Rect
+  to: Rect
+  ltr: boolean
+  rtl: boolean
+  sameCol: boolean
   x1: number
   y1: number
   x2: number
   y2: number
-  labelX: number
-  labelY: number
+  xLane: number
+  path: string
+  handleX: number
+  handleY: number
+  label: string
+  kardinalitaet: 'n:1' | '1:n' | '1:1' | 'n:m' | string
+  keyKind: 'm' | 'n' | 's'
+  keyTableId: string
+  keyColumnId: string
+  offset: number
+  color: string
 }
 
-function computeLine(from: Rect, to: Rect, versatz = 0): Geo {
-  const sameColumn = Math.abs(from.x - to.x) < 24
-  let x1: number
-  let y1: number
-  let x2: number
-  let y2: number
-  let path: string
-  let labelX: number
-  let labelY: number
-  if (sameColumn) {
-    const channel = Math.min(from.x, to.x) - 16 + versatz
-    x1 = from.x
-    y1 = from.y + from.h / 2
-    x2 = to.x
-    y2 = to.y + to.h / 2
-    path = `M ${x1} ${y1} H ${channel} V ${y2} H ${x2}`
-    labelX = channel
-    labelY = (y1 + y2) / 2
-  } else {
-    const ltr = from.x <= to.x
-    x1 = ltr ? from.x + from.w : from.x
-    y1 = from.y + from.h / 2
-    x2 = ltr ? to.x : to.x + to.w
-    y2 = to.y + to.h / 2
-    const midX = (x1 + x2) / 2 + versatz
-    path = `M ${x1} ${y1} H ${midX} V ${y2} H ${x2}`
-    labelX = midX
-    labelY = (y1 + y2) / 2
-  }
-  return { path, x1, y1, x2, y2, labelX, labelY }
+interface RawLineDef {
+  sourceKey: string
+  targetKey: string
+  label: string
+  n1: boolean
+  kardinalitaet: 'n:1' | '1:n' | '1:1' | 'n:m' | string
+  keyKind: 'm' | 'n' | 's'
+  keyTableId: string
+  keyColumnId: string
+  offset: number
 }
 
-const BUS_ABSTAND = 18
-const BUS_LANE = 6
-const TAP_MIN = 14
+interface LaneRoutingResult {
+  connections: RenderedConnection[]
+  junctionDots: { x: number; y: number }[]
+}
 
 /**
- * Kabelkanal/Bus: mehrere Quellen auf dasselbe Ziel werden auf einer gemeinsamen senkrechten
- * Linie (Bus) gebündelt. Jede Quelle mündet auf ihrer eigenen Höhe (nicht überlappend) ein;
- * zu nahe Abzweige werden entzerrt. Kreuzen anderer Linien ist erlaubt, Überlappen nicht.
+ * Feste Spuren-Routing (Lane Routing):
+ * Weist vertikalen Liniensegmenten kollisionsfreie Spuren (X-Koordinaten) zu.
+ * Parallele Überlappungen werden verhindert; 90°-Rechtwinkligkeit bleibt gewahrt.
+ * Linien zum selben Ziel münden gemeinsam in den Ziel-Sockel.
  */
-interface BusMitglied {
-  from: Rect
-  to: Rect
-  offset: number
-  n1: boolean
-  keyKind: 'm' | 'n' | 's' | null
-  keyTableId: string | null
-  keyColumnId: string | null
-}
+function computeLaneRouting(
+  lines: RawLineDef[],
+  boxes: Record<string, Rect>,
+): LaneRoutingResult {
+  const validLines = lines
+    .map((ln) => {
+      const from = boxes[ln.sourceKey]
+      const to = boxes[ln.targetKey]
+      if (!from || !to) return null
+      const ltr = from.x + from.w <= to.x + 20
+      const rtl = from.x >= to.x + to.w - 20
+      const sameCol = !ltr && !rtl
+      const x1 = ltr ? from.x + from.w : from.x
+      const y1 = from.y + from.h / 2
+      const x2 = ltr ? to.x : (rtl ? to.x + to.w : to.x)
+      const y2 = to.y + to.h / 2
+      const minY = Math.min(y1, y2)
+      const maxY = Math.max(y1, y2)
+      return {
+        ...ln,
+        id: `${ln.sourceKey}->${ln.targetKey}`,
+        from,
+        to,
+        ltr,
+        rtl,
+        sameCol,
+        x1,
+        y1,
+        x2,
+        y2,
+        minY,
+        maxY,
+      }
+    })
+    .filter((x): x is NonNullable<typeof x> => x !== null)
 
-function computeBus(
-  mitglieder: BusMitglied[],
-  gruppe: number,
-): {
-  pfade: string[]
-  bus: string | null
-  taps: { x: number; y: number }[]
-  handles: { x: number; y: number; mitglied: BusMitglied }[]
-} {
-  if (mitglieder.length === 0) return { pfade: [], bus: null, taps: [], handles: [] }
-  if (mitglieder.length === 1) {
-    // Einzelne Verbindung: rechtwinklig (90°), Versatz per Ziehen möglich
-    const g = computeLine(mitglieder[0].from, mitglieder[0].to, mitglieder[0].offset)
-    return {
-      pfade: [g.path],
-      bus: null,
-      taps: [],
-      handles: [{ x: g.labelX, y: g.labelY, mitglied: mitglieder[0] }],
+  // In Korridore nach Ausrichtung gruppieren
+  const corridorGroups = new Map<string, typeof validLines>()
+  for (const ln of validLines) {
+    const key = ln.ltr
+      ? `ltr_${Math.round(ln.to.x / 100) * 100}`
+      : ln.rtl
+        ? `rtl_${Math.round((ln.to.x + ln.to.w) / 100) * 100}`
+        : `same_${Math.round(Math.min(ln.from.x, ln.to.x) / 100) * 100}`
+    const list = corridorGroups.get(key) || []
+    list.push(ln)
+    corridorGroups.set(key, list)
+  }
+
+  const connections: RenderedConnection[] = []
+  const junctionDots: { x: number; y: number }[] = []
+
+  // Lane Allocation je Korridor (Intervall-Färbung zur Vermeidung von Überlappungen)
+  for (const [, list] of corridorGroups.entries()) {
+    list.sort((a, b) => a.minY - b.minY || a.maxY - b.maxY)
+    const laneIntervals: { minY: number; maxY: number }[][] = []
+
+    for (const item of list) {
+      let laneIndex = 0
+      while (true) {
+        const intervals = laneIntervals[laneIndex] || []
+        const hasOverlap = intervals.some(
+          (iv) => Math.max(item.minY, iv.minY) <= Math.min(item.maxY, iv.maxY) + 6,
+        )
+        if (!hasOverlap) {
+          if (!laneIntervals[laneIndex]) laneIntervals[laneIndex] = []
+          laneIntervals[laneIndex].push({ minY: item.minY, maxY: item.maxY })
+          break
+        }
+        laneIndex++
+      }
+
+      // X-Position der Lane berechnen
+      let xLane: number
+      if (item.ltr) {
+        const base = item.to.x - 18
+        xLane = base - laneIndex * LANE_STEP + item.offset
+      } else if (item.rtl) {
+        const base = item.to.x + item.to.w + 18
+        xLane = base + laneIndex * LANE_STEP + item.offset
+      } else {
+        const base = Math.min(item.from.x, item.to.x) - 18
+        xLane = base - laneIndex * LANE_STEP + item.offset
+      }
+
+      const path = `M ${item.x1} ${item.y1} H ${xLane} V ${item.y2} H ${item.x2}`
+      const handleX = xLane
+      const handleY = (item.y1 + item.y2) / 2
+
+      // Farbe nach Tabelle: Nebentabelle (Unterstützung) = Teal, Maschine = Slate, Schritt = Violett
+      const color =
+        item.keyKind === 'n'
+          ? '#0d9488'
+          : item.keyKind === 's'
+            ? '#7c3aed'
+            : '#64748b'
+
+      connections.push({
+        id: item.id,
+        sourceKey: item.sourceKey,
+        targetKey: item.targetKey,
+        from: item.from,
+        to: item.to,
+        ltr: item.ltr,
+        rtl: item.rtl,
+        sameCol: item.sameCol,
+        x1: item.x1,
+        y1: item.y1,
+        x2: item.x2,
+        y2: item.y2,
+        xLane,
+        path,
+        handleX,
+        handleY,
+        label: item.label,
+        kardinalitaet: item.kardinalitaet || 'n:1',
+        keyKind: item.keyKind,
+        keyTableId: item.keyTableId,
+        keyColumnId: item.keyColumnId,
+        offset: item.offset,
+        color,
+      })
     }
   }
-  const to = mitglieder[0].to
-  const alleLinks = mitglieder.every((m) => m.from.x + m.from.w <= to.x + 1)
-  const alleRechts = mitglieder.every((m) => m.from.x >= to.x + to.w - 1)
-  if (!alleLinks && !alleRechts) {
-    return {
-      pfade: mitglieder.map((m) => computeLine(m.from, m.to, m.offset).path),
-      bus: null,
-      taps: [],
-      handles: mitglieder.map((m) => {
-        const g = computeLine(m.from, m.to, m.offset)
-        return { x: g.labelX, y: g.labelY, mitglied: m }
-      }),
+
+  // Abzweig-Punkte (Junctions) markieren bei Mehrfach-Verbindungen auf denselben Schlüssel
+  const targetMap = new Map<string, RenderedConnection[]>()
+  for (const c of connections) {
+    const list = targetMap.get(c.targetKey) || []
+    list.push(c)
+    targetMap.set(c.targetKey, list)
+  }
+  for (const [, conns] of targetMap.entries()) {
+    if (conns.length > 1) {
+      const toY = conns[0].y2
+      for (const c of conns) {
+        junctionDots.push({ x: c.xLane, y: toY })
+      }
     }
   }
-  const ltr = alleLinks
-  const quellenRand = ltr
-    ? Math.max(...mitglieder.map((m) => m.from.x + m.from.w))
-    : Math.min(...mitglieder.map((m) => m.from.x))
-  const zielRand = ltr ? to.x : to.x + to.w
-  const zielY = to.y + to.h / 2
-  // Bus immer im Zwischenraum zwischen Quell- und Zielspalte halten
-  const gapBreite = ltr ? zielRand - quellenRand : quellenRand - zielRand
-  const abstand = Math.min(BUS_ABSTAND + gruppe * BUS_LANE, Math.max(6, gapBreite - 6))
-  const busX = ltr ? zielRand - abstand : zielRand + abstand
-  const naeherX = ltr ? busX - Math.min(10, Math.max(3, abstand - 2)) : busX + Math.min(10, Math.max(3, abstand - 2))
 
-  // Quellen nach Höhe sortieren, Abzweige mit Mindestabstand entzerren
-  const sortiert = [...mitglieder].sort((a, b) => a.from.y - b.from.y)
-  const taps: number[] = []
-  let letzter = -Infinity
-  for (const m of sortiert) {
-    const y = Math.max(m.from.y + m.from.h / 2, letzter + TAP_MIN)
-    taps.push(y)
-    letzter = y
-  }
-  // um das Ziel herum zentrieren
-  const mitte = (taps[0] + taps[taps.length - 1]) / 2
-  const versatz = (zielY - mitte) * 0.5
-  const tapsVerschoben = taps.map((y) => y + versatz)
-
-  const pfade: string[] = []
-  const handles: { x: number; y: number; mitglied: BusMitglied }[] = []
-  for (let i = 0; i < sortiert.length; i++) {
-    const m = sortiert[i]
-    const sx = ltr ? m.from.x + m.from.w : m.from.x
-    const sy = m.from.y + m.from.h / 2
-    const ty = tapsVerschoben[i]
-    // kleine Versätze, damit die Verbindungsstücke nicht übereinander liegen (+ manueller Versatz)
-    const naeherXI = (ltr ? naeherX - (i % 3) * 3 : naeherX + (i % 3) * 3) + m.offset
-    pfade.push(`M ${sx} ${sy} H ${naeherXI} V ${ty} H ${busX}`)
-    handles.push({ x: naeherXI, y: (sy + ty) / 2, mitglied: m })
-  }
-  const oben = Math.min(...tapsVerschoben, zielY)
-  const unten = Math.max(...tapsVerschoben, zielY)
-  const bus = `M ${busX} ${oben} V ${unten} M ${busX} ${zielY} H ${zielRand}`
-  return { pfade, bus, taps: tapsVerschoben.map((y) => ({ x: busX, y })), handles }
+  return { connections, junctionDots }
 }
 
 /** Kürzeste rechtwinklige Prozessverbindung: normal unten → oben, sonst Seite → Seite. */
@@ -861,6 +918,7 @@ export function TabellenbezogenView({ filter }: Props) {
     removeRegister,
     setActiveRegister,
     moveColumnToRegister,
+    setBeziehungKardinalitaet,
   } = useStore()
 
   const trace = isTraceMode(filter)
@@ -873,6 +931,12 @@ export function TabellenbezogenView({ filter }: Props) {
   const [origin, setOrigin] = useState({ left: 0, top: 0 })
   const [dragPos, setDragPos] = useState<{ x: number; y: number; sourceKey: string } | null>(null)
   const [infoAbt, setInfoAbt] = useState<string | null>(null)
+  const [hoveredConnId, setHoveredConnId] = useState<string | null>(null)
+  const [kardinalitaetMenue, setKardinalitaetMenue] = useState<{
+    x: number
+    y: number
+    conn: RenderedConnection
+  } | null>(null)
   const [menue, setMenue] = useState<{
     x: number
     y: number
@@ -1072,18 +1136,17 @@ export function TabellenbezogenView({ filter }: Props) {
       window.addEventListener('pointerup', up)
     }
 
-  /** Beziehungslinie ziehen: verschiebt den Kanal (Versatz wird gespeichert). */
+  /** Beziehungslinie ziehen: verschiebt die Lane (Versatz wird gespeichert). */
   const startLinienDrag =
-    (m: BusMitglied) => (e: React.PointerEvent) => {
+    (conn: RenderedConnection) => (e: React.PointerEvent) => {
       if (e.button !== 0) return
-      if (!m.keyKind || !m.keyTableId || !m.keyColumnId) return
       e.preventDefault()
       e.stopPropagation()
-      const kind = m.keyKind
-      const tableId = m.keyTableId
-      const columnId = m.keyColumnId
+      const kind = conn.keyKind
+      const tableId = conn.keyTableId
+      const columnId = conn.keyColumnId
       const startX = e.clientX
-      const startOffset = m.offset
+      const startOffset = conn.offset
       const move = (ev: PointerEvent) => {
         const neu = Math.max(-320, Math.min(320, Math.round(startOffset + (ev.clientX - startX))))
         setBeziehungOffset(kind, tableId, columnId, neu)
@@ -1101,18 +1164,7 @@ export function TabellenbezogenView({ filter }: Props) {
   for (const st of alleSchritte) kindByTableId.set(st.id, 's')
   for (const n of alleNeben) kindByTableId.set(n.id, 'n')
 
-  interface LineDef {
-    sourceKey: string
-    targetKey: string
-    label: string
-    n1: boolean
-    keyKind: 'm' | 'n' | 's' | null
-    keyTableId: string | null
-    keyColumnId: string | null
-    offset: number
-  }
-
-  const lines: LineDef[] = []
+  const lines: RawLineDef[] = []
   for (const m of alleMaschinen) {
     for (const k of m.keys) {
       if (k.type !== 'fk' || !k.refTableId || !k.refColumnId) continue
@@ -1123,7 +1175,8 @@ export function TabellenbezogenView({ filter }: Props) {
         sourceKey: `m:${m.id}:${k.columnId}`,
         targetKey: `${targetKind}:${k.refTableId}:${k.refColumnId}`,
         label: k.label ?? colName,
-        n1: k.columnId !== 'datum',
+        n1: true,
+        kardinalitaet: (k.kardinalitaet as any) || (k.columnId === 'datum' ? '1:1' : 'n:1'),
         keyKind: 'm',
         keyTableId: m.id,
         keyColumnId: k.columnId,
@@ -1141,7 +1194,8 @@ export function TabellenbezogenView({ filter }: Props) {
         sourceKey: `n:${n.id}:${k.columnId}`,
         targetKey: `${targetKind}:${k.refTableId}:${k.refColumnId}`,
         label: k.label ?? colName,
-        n1: false,
+        n1: true,
+        kardinalitaet: (k.kardinalitaet as any) || 'n:1',
         keyKind: 'n',
         keyTableId: n.id,
         keyColumnId: k.columnId,
@@ -1174,7 +1228,8 @@ export function TabellenbezogenView({ filter }: Props) {
         sourceKey: `s:${st.id}:${k.columnId}`,
         targetKey: `${targetKind}:${k.refTableId}:${k.refColumnId}`,
         label: k.label ?? colName,
-        n1: false,
+        n1: true,
+        kardinalitaet: (k.kardinalitaet as any) || '1:n',
         keyKind: 's',
         keyTableId: st.id,
         keyColumnId: k.columnId,
@@ -1248,33 +1303,8 @@ export function TabellenbezogenView({ filter }: Props) {
         })()
       : undefined
 
-  // Fremdschlüssel je Ziel bündeln (Kabelkanal/Bus) – Linien bleiben unter den Karten,
-  // nur die Greifpunkte werden darüber gezeichnet.
-  const busGruppen = (() => {
-    const gruppen = new Map<string, BusMitglied[]>()
-    for (const ln of lines) {
-      const from = boxes[ln.sourceKey]
-      const to = boxes[ln.targetKey]
-      if (!from || !to) continue
-      const liste = gruppen.get(ln.targetKey) ?? []
-      liste.push({
-        from,
-        to,
-        n1: ln.n1,
-        offset: ln.offset,
-        keyKind: ln.keyKind,
-        keyTableId: ln.keyTableId,
-        keyColumnId: ln.keyColumnId,
-      })
-      gruppen.set(ln.targetKey, liste)
-    }
-    let gruppe = 0
-    return [...gruppen.entries()].map(([key, mitglieder]) => {
-      const bus = computeBus(mitglieder, gruppe)
-      gruppe += 1
-      return { key, mitglieder, bus }
-    })
-  })()
+  // Feste Spuren-Routing (Lane Routing) berechnen
+  const { connections: laneConnections, junctionDots } = computeLaneRouting(lines, boxes)
 
   return (
     <div ref={containerRef} className="relative flex flex-col gap-6" onContextMenu={onKontextMenue}>
@@ -1305,50 +1335,64 @@ export function TabellenbezogenView({ filter }: Props) {
         </defs>
         {(() => {
           const halo = { paintOrder: 'stroke' as const, stroke: '#ffffff', strokeWidth: 3 }
-          return busGruppen.map(({ key, mitglieder, bus }) => {
-            const to = mitglieder[0].to
-            const alleLinks = mitglieder.every((m) => m.from.x + m.from.w <= to.x + 1)
-            return (
-              <g key={key}>
-                {bus.pfade.map((d, i) => (
-                  <path key={`p${i}`} d={d} stroke="#94a3b8" strokeWidth={1.5} fill="none" />
-                ))}
-                {bus.bus && <path d={bus.bus} stroke="#94a3b8" strokeWidth={1.5} fill="none" />}
-                {bus.taps.map((tp, i) => (
-                  <circle key={`t${i}`} cx={tp.x} cy={tp.y} r={2.5} fill="#94a3b8" />
-                ))}
-                {mitglieder.map((m, i) =>
-                  m.n1 ? (
+          return (
+            <g>
+              {laneConnections.map((conn) => {
+                const isHovered = hoveredConnId === conn.id
+                const [sCard, tCard] = (conn.kardinalitaet || 'n:1').split(':')
+                const sLabel = sCard || 'n'
+                const tLabel = tCard || '1'
+                const sX = conn.ltr ? conn.x1 + 6 : conn.x1 - 6
+                const tX = conn.ltr ? conn.x2 - 6 : conn.x2 + 6
+                const strokeColor = isHovered ? '#2563eb' : conn.color
+                const strokeWidth = isHovered ? 2.5 : 1.5
+
+                return (
+                  <g
+                    key={conn.id}
+                    opacity={hoveredConnId && !isHovered ? 0.25 : 1}
+                    className="transition-opacity duration-150"
+                  >
+                    <path
+                      d={conn.path}
+                      stroke={strokeColor}
+                      strokeWidth={strokeWidth}
+                      fill="none"
+                      strokeLinejoin="round"
+                    />
+                    {/* Kardinalität Quell-Seite */}
                     <text
-                      key={`n${i}`}
-                      x={alleLinks ? m.from.x + m.from.w + 5 : m.from.x - 5}
-                      y={m.from.y + m.from.h / 2 - 4}
-                      textAnchor={alleLinks ? 'start' : 'end'}
+                      x={sX}
+                      y={conn.y1 - 4}
+                      textAnchor={conn.ltr ? 'start' : 'end'}
                       fontSize={10}
                       fontWeight={700}
-                      fill="#c45004"
+                      fill={strokeColor}
                       style={halo}
                     >
-                      n
+                      {sLabel}
                     </text>
-                  ) : null,
-                )}
-                {mitglieder.some((m) => m.n1) && (
-                  <text
-                    x={alleLinks ? to.x - 5 : to.x + to.w + 5}
-                    y={to.y + to.h / 2 - 4}
-                    textAnchor={alleLinks ? 'end' : 'start'}
-                    fontSize={10}
-                    fontWeight={700}
-                    fill="#c45004"
-                    style={halo}
-                  >
-                    1
-                  </text>
-                )}
-              </g>
-            )
-          })
+                    {/* Kardinalität Ziel-Seite */}
+                    <text
+                      x={tX}
+                      y={conn.y2 - 4}
+                      textAnchor={conn.ltr ? 'end' : 'start'}
+                      fontSize={10}
+                      fontWeight={700}
+                      fill={strokeColor}
+                      style={halo}
+                    >
+                      {tLabel}
+                    </text>
+                  </g>
+                )
+              })}
+              {/* Abzweig-Punkte (Junction Dots) an gemeinsamen Ziel-Achsen */}
+              {junctionDots.map((jd, i) => (
+                <circle key={`jd-${i}`} cx={jd.x} cy={jd.y} r={2.5} fill="#64748b" />
+              ))}
+            </g>
+          )
         })()}
 
         {/* Prozesskette: mittig unten vom Schritt zum mittig oben des nächsten Schritts (nur abwärts) */}
@@ -1399,26 +1443,76 @@ export function TabellenbezogenView({ filter }: Props) {
         )}
       </svg>
 
-      {/* Greifpunkte der Beziehungslinien – über den Karten, damit sie immer erreichbar sind */}
+      {/* Greifpunkte und Kardinalitäts-Badges der Beziehungen (über den Karten) */}
       <svg className="pointer-events-none absolute inset-0 z-30 h-full w-full">
-        {busGruppen.map(({ key, bus }) =>
-          bus.handles.map((h, i) => (
-            <g key={`${key}-h${i}`}>
+        {laneConnections.map((conn) => {
+          const isHovered = hoveredConnId === conn.id
+          return (
+            <g
+              key={`h-${conn.id}`}
+              onMouseEnter={() => setHoveredConnId(conn.id)}
+              onMouseLeave={() => setHoveredConnId(null)}
+            >
+              {/* Greifpunkt zum Verschieben der Lane */}
               <circle
-                cx={h.x}
-                cy={h.y}
-                r={10}
+                cx={conn.handleX}
+                cy={conn.handleY}
+                r={12}
                 fill="transparent"
                 pointerEvents="all"
                 style={{ cursor: 'ew-resize' }}
-                onPointerDown={startLinienDrag(h.mitglied)}
+                onPointerDown={startLinienDrag(conn)}
               >
-                <title>Linie ziehen: Beziehung verschieben</title>
+                <title>Linie ziehen: Spur / Versatz anpassen</title>
               </circle>
-              <circle cx={h.x} cy={h.y} r={3.5} fill="#64748b" pointerEvents="none" />
+              <circle
+                cx={conn.handleX}
+                cy={conn.handleY}
+                r={isHovered ? 4.5 : 3.5}
+                fill={isHovered ? '#2563eb' : conn.color}
+                pointerEvents="none"
+              />
+
+              {/* Klickbares Kardinalitäts-Badge auf der Lane */}
+              <g
+                transform={`translate(${conn.handleX}, ${conn.handleY - 14})`}
+                pointerEvents="all"
+                style={{ cursor: 'pointer' }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setKardinalitaetMenue({
+                    x: e.clientX,
+                    y: e.clientY,
+                    conn,
+                  })
+                }}
+              >
+                <rect
+                  x={-15}
+                  y={-8}
+                  width={30}
+                  height={16}
+                  rx={8}
+                  fill={isHovered ? '#eff6ff' : '#ffffff'}
+                  stroke={isHovered ? '#2563eb' : '#94a3b8'}
+                  strokeWidth={isHovered ? 1.5 : 1}
+                  className="shadow-xs"
+                />
+                <text
+                  x={0}
+                  y={3.5}
+                  textAnchor="middle"
+                  fontSize={8.5}
+                  fontWeight={700}
+                  fill={isHovered ? '#2563eb' : '#475569'}
+                >
+                  {conn.kardinalitaet}
+                </text>
+                <title>Klick: Kardinalität anpassen (aktuell: {conn.kardinalitaet})</title>
+              </g>
             </g>
-          )),
-        )}
+          )
+        })}
       </svg>
 
       <div className="relative z-20 flex flex-col gap-6">
@@ -2203,6 +2297,87 @@ export function TabellenbezogenView({ filter }: Props) {
         })}
       </div>
       {infoAbt && <InfoModal abteilungId={infoAbt} onClose={() => setInfoAbt(null)} />}
+
+      {/* Popover zur Einstellung der Kardinalität (1:n, n:1, 1:1, n:m) */}
+      {kardinalitaetMenue && (
+        <>
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => setKardinalitaetMenue(null)}
+          />
+          <div
+            className="fixed z-50 min-w-[14rem] rounded-lg border border-slate-200 bg-white p-3 shadow-xl select-none"
+            style={{
+              left: Math.max(8, Math.min(kardinalitaetMenue.x - 70, window.innerWidth - 240)),
+              top: Math.max(8, Math.min(kardinalitaetMenue.y - 10, window.innerHeight - 200)),
+            }}
+          >
+            <div className="mb-2 flex items-center justify-between border-b border-slate-100 pb-1.5">
+              <span className="text-[11px] font-bold text-slate-800">Beziehung anpassen</span>
+              <button
+                onClick={() => setKardinalitaetMenue(null)}
+                className="rounded px-1 text-xs text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="mb-2">
+              <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                Kardinalität:
+              </label>
+              <div className="grid grid-cols-2 gap-1.5">
+                {[
+                  { id: 'n:1', label: 'n : 1', desc: 'Viele zu Einem' },
+                  { id: '1:n', label: '1 : n', desc: 'Eins zu Vielen' },
+                  { id: '1:1', label: '1 : 1', desc: 'Eins zu Einem' },
+                  { id: 'n:m', label: 'n : m', desc: 'Viele zu Vielen' },
+                ].map((c) => {
+                  const isSelected = kardinalitaetMenue.conn.kardinalitaet === c.id
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => {
+                        setBeziehungKardinalitaet(
+                          kardinalitaetMenue.conn.keyKind,
+                          kardinalitaetMenue.conn.keyTableId,
+                          kardinalitaetMenue.conn.keyColumnId,
+                          c.id,
+                        )
+                        setKardinalitaetMenue(null)
+                      }}
+                      className={`flex flex-col items-center rounded border px-2 py-1 text-center transition-all cursor-pointer ${
+                        isSelected
+                          ? 'border-zollern-600 bg-zollern-50 text-zollern-800 font-bold shadow-xs'
+                          : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-300'
+                      }`}
+                    >
+                      <span className="text-xs font-bold">{c.label}</span>
+                      <span className="text-[8px] text-slate-400">{c.desc}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+            <div className="border-t border-slate-100 pt-1.5">
+              <button
+                type="button"
+                onClick={() => {
+                  loescheBeziehung(
+                    kardinalitaetMenue.conn.keyKind,
+                    kardinalitaetMenue.conn.keyTableId,
+                    kardinalitaetMenue.conn.keyColumnId,
+                  )
+                  setKardinalitaetMenue(null)
+                }}
+                className="w-full rounded px-2 py-1 text-center text-[10px] font-medium text-red-600 hover:bg-red-50 cursor-pointer"
+              >
+                ✕ Beziehung lösen / entfernen
+              </button>
+            </div>
+          </div>
+        </>
+      )}
 
       {menue && (
         <>

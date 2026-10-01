@@ -97,6 +97,8 @@ export interface TableKey {
   label?: string
   /** Manueller Versatz der Beziehungslinie in px (ziehen) */
   offset?: number
+  /** Kardinalität der Beziehung (z. B. 'n:1', '1:n', '1:1', 'n:m') */
+  kardinalitaet?: 'n:1' | '1:n' | '1:1' | 'n:m' | string
 }
 
 /** Modus einer Tabelle: 'soll' (weiß, Vorgabe) oder 'ist' (schwarz, reale Fertigungsdaten) */

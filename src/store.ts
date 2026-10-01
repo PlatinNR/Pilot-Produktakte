@@ -256,6 +256,12 @@ interface Store extends AppState {
   // Beziehungen
   loescheBeziehung: (kind: 'm' | 'n' | 's', tableId: string, columnId: string) => void
   setBeziehungOffset: (kind: 'm' | 'n' | 's', tableId: string, columnId: string, offset: number) => void
+  setBeziehungKardinalitaet: (
+    kind: 'm' | 'n' | 's',
+    tableId: string,
+    columnId: string,
+    kardinalitaet: string,
+  ) => void
 
   // Kopieren / Einfügen
   einfuegenTabelle: (
@@ -1366,6 +1372,22 @@ export const useStore = create<Store>()(
             ? {
                 ...t,
                 keys: t.keys.map((k) => (k.columnId === columnId ? { ...k, offset } : k)),
+              }
+            : t,
+        )
+      if (kind === 'm') return { produktionstabellen: setze(s.produktionstabellen) }
+      if (kind === 'n') return { nebentabellen: setze(s.nebentabellen) }
+      return { schritte: setze(s.schritte) }
+    }),
+
+  setBeziehungKardinalitaet: (kind, tableId, columnId, kardinalitaet) =>
+    set((s) => {
+      const setze = <T extends { id: string; keys: TableKey[] }>(liste: T[]): T[] =>
+        liste.map((t) =>
+          t.id === tableId
+            ? {
+                ...t,
+                keys: t.keys.map((k) => (k.columnId === columnId ? { ...k, kardinalitaet } : k)),
               }
             : t,
         )
