@@ -149,7 +149,7 @@ export function AbteilungBlock({ abteilung, filter, index }: Props) {
                       <div className="overflow-x-auto pb-1" style={{ direction: 'rtl' }}>
                         <div className="flex items-start gap-3" style={{ direction: 'ltr' }}>
                           {blockSteps.map((st) => (
-                            <div key={st.id} className="w-80 shrink-0">
+                            <div key={st.id} className="w-[28rem] shrink-0">
                               <SchrittRow schritt={st} filter={filter} />
                             </div>
                           ))}

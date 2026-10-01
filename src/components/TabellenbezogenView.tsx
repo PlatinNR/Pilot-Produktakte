@@ -1662,7 +1662,7 @@ export function TabellenbezogenView({ filter }: Props) {
                                   const bstepMaschinen = alleMaschinen.filter((m) => m.schrittId === bst.id)
                                   const agg = aggregate ? aggregateSchritt(bst, bstepMaschinen, filter) : null
                                   return (
-                                    <div key={bst.id} className="flex w-56 shrink-0 flex-col gap-2">
+                                    <div key={bst.id} className="flex w-80 shrink-0 flex-col gap-2">
                                       <EntityCard
                                         title={bst.name}
                                         onRename={(name) => renameSchritt(bst.id, name)}
