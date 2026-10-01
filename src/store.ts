@@ -17,10 +17,12 @@ import type {
   TableKey,
   TabellenKopie,
   TabellenModus,
+  TabellenRegister,
   TableRow,
 } from './types'
 import { NEBEN_SPALTEN, PRODUKTION_SPALTEN, WIEDERHOLUNG_SPALTE, emptyInfo } from './types'
 import { istInSchleife } from './utils/schleifen'
+import { DEFAULT_REGISTER_ID, getTabellenRegister } from './utils/register'
 import { uebersetze } from './lib/i18n'
 import { useSprache } from './lib/sprache'
 
@@ -204,7 +206,7 @@ interface Store extends AppState {
   setProduktionArbeitsplatz: (id: string, arbeitsplatz: string) => void
   setProduktionModus: (id: string, modus: TabellenModus) => void
   removeProduktionstabelle: (id: string) => void
-  addColumnProduktion: (tabelleId: string, name: string, type: ColumnType) => void
+  addColumnProduktion: (tabelleId: string, name: string, type: ColumnType, registerId?: string) => void
   renameColumnProduktion: (tabelleId: string, spalteId: string, name: string) => void
   changeColumnTypeProduktion: (tabelleId: string, spalteId: string, type: ColumnType) => void
   removeColumnProduktion: (tabelleId: string, spalteId: string) => void
@@ -233,7 +235,7 @@ interface Store extends AppState {
   setNebenModus: (id: string, modus: TabellenModus) => void
   removeNebentabelle: (id: string) => void
   moveNebentabelle: (id: string, richtung: 'up' | 'down') => void
-  addColumnNeben: (tabelleId: string, name: string, type: ColumnType) => void
+  addColumnNeben: (tabelleId: string, name: string, type: ColumnType, registerId?: string) => void
   renameColumnNeben: (tabelleId: string, spalteId: string, name: string) => void
   changeColumnTypeNeben: (tabelleId: string, spalteId: string, type: ColumnType) => void
   removeColumnNeben: (tabelleId: string, spalteId: string) => void
@@ -243,6 +245,13 @@ interface Store extends AppState {
   setColumnKeyNeben: (tabelleId: string, spalteId: string, keyType: KeyType | null) => void
   linkNebenFK: (tabelleId: string, spalteId: string, refTableId: string, refColumnId: string) => void
   setKeyLabelNeben: (tabelleId: string, spalteId: string, label: string) => void
+
+  // Register (Reiter) für Maschinen & Nebentabellen
+  addRegister: (tabelleId: string, name?: string) => void
+  renameRegister: (tabelleId: string, registerId: string, name: string) => void
+  removeRegister: (tabelleId: string, registerId: string) => void
+  setActiveRegister: (tabelleId: string, registerId: string | null) => void
+  moveColumnToRegister: (tabelleId: string, columnId: string, targetRegisterId: string) => void
 
   // Beziehungen
   loescheBeziehung: (kind: 'm' | 'n' | 's', tableId: string, columnId: string) => void
@@ -316,8 +325,8 @@ function arbeitsplatzVergeben(s: AppState, chainId: string): Set<string> {
   return werte
 }
 
-function addColumn(columns: TableColumn[], name: string, type: ColumnType): TableColumn[] {
-  return [...columns, { id: nextId('c'), name, type, fixed: false }]
+function addColumn(columns: TableColumn[], name: string, type: ColumnType, registerId?: string): TableColumn[] {
+  return [...columns, { id: nextId('c'), name, type, fixed: false, registerId }]
 }
 
 // seed() ist eine Funktionsdeklaration und wird gehoisted – Demo als Standard-Zustand
@@ -722,11 +731,18 @@ export const useStore = create<Store>()(
   removeProduktionstabelle: (id) =>
     set((s) => ({ produktionstabellen: s.produktionstabellen.filter((t) => t.id !== id) })),
 
-  addColumnProduktion: (tabelleId, name, type) =>
+  addColumnProduktion: (tabelleId, name, type, registerId) =>
     set((s) => ({
-      produktionstabellen: s.produktionstabellen.map((t) =>
-        t.id === tabelleId ? { ...t, columns: addColumn(t.columns, name, type) } : t,
-      ),
+      produktionstabellen: s.produktionstabellen.map((t) => {
+        if (t.id !== tabelleId) return t
+        const regId =
+          registerId ||
+          (t.activeRegisterId !== null && t.activeRegisterId !== undefined
+            ? t.activeRegisterId
+            : t.register?.[0]?.id) ||
+          DEFAULT_REGISTER_ID
+        return { ...t, columns: addColumn(t.columns, name, type, regId) }
+      }),
     })),
 
   renameColumnProduktion: (tabelleId, spalteId, name) =>
@@ -937,11 +953,18 @@ export const useStore = create<Store>()(
   removeNebentabelle: (id) =>
     set((s) => ({ nebentabellen: s.nebentabellen.filter((t) => t.id !== id) })),
 
-  addColumnNeben: (tabelleId, name, type) =>
+  addColumnNeben: (tabelleId, name, type, registerId) =>
     set((s) => ({
-      nebentabellen: s.nebentabellen.map((t) =>
-        t.id === tabelleId ? { ...t, columns: addColumn(t.columns, name, type) } : t,
-      ),
+      nebentabellen: s.nebentabellen.map((t) => {
+        if (t.id !== tabelleId) return t
+        const regId =
+          registerId ||
+          (t.activeRegisterId !== null && t.activeRegisterId !== undefined
+            ? t.activeRegisterId
+            : t.register?.[0]?.id) ||
+          DEFAULT_REGISTER_ID
+        return { ...t, columns: addColumn(t.columns, name, type, regId) }
+      }),
     })),
 
   renameColumnNeben: (tabelleId, spalteId, name) =>
@@ -1047,6 +1070,109 @@ export const useStore = create<Store>()(
           : t,
       ),
     })),
+
+  addRegister: (tabelleId, name) =>
+    set((s) => {
+      const isProd = s.produktionstabellen.some((t) => t.id === tabelleId)
+      const regId = nextId('reg')
+      const updateFn = <
+        T extends { id: string; register?: TabellenRegister[]; activeRegisterId?: string | null },
+      >(
+        t: T,
+      ): T => {
+        if (t.id !== tabelleId) return t
+        const bestehend = getTabellenRegister(t)
+        const neuerName = name?.trim() || `Register ${bestehend.length + 1}`
+        return {
+          ...t,
+          register: [...bestehend, { id: regId, name: neuerName }],
+          activeRegisterId: regId,
+        }
+      }
+      return isProd
+        ? { produktionstabellen: s.produktionstabellen.map(updateFn) }
+        : { nebentabellen: s.nebentabellen.map(updateFn) }
+    }),
+
+  renameRegister: (tabelleId, registerId, name) =>
+    set((s) => {
+      const isProd = s.produktionstabellen.some((t) => t.id === tabelleId)
+      const updateFn = <T extends { id: string; register?: TabellenRegister[] }>(t: T): T => {
+        if (t.id !== tabelleId) return t
+        const bestehend = getTabellenRegister(t)
+        return {
+          ...t,
+          register: bestehend.map((r) =>
+            r.id === registerId ? { ...r, name: name.trim() || r.name } : r,
+          ),
+        }
+      }
+      return isProd
+        ? { produktionstabellen: s.produktionstabellen.map(updateFn) }
+        : { nebentabellen: s.nebentabellen.map(updateFn) }
+    }),
+
+  removeRegister: (tabelleId, registerId) =>
+    set((s) => {
+      const isProd = s.produktionstabellen.some((t) => t.id === tabelleId)
+      const updateFn = <
+        T extends {
+          id: string
+          columns: TableColumn[]
+          register?: TabellenRegister[]
+          activeRegisterId?: string | null
+        },
+      >(
+        t: T,
+      ): T => {
+        if (t.id !== tabelleId) return t
+        const bestehend = getTabellenRegister(t)
+        const neuRegister = bestehend.filter((r) => r.id !== registerId)
+        const fallbackId = neuRegister[0]?.id || DEFAULT_REGISTER_ID
+        const neuColumns = t.columns.map((c) =>
+          c.registerId === registerId ? { ...c, registerId: fallbackId } : c,
+        )
+        const neuActive = t.activeRegisterId === registerId ? fallbackId : t.activeRegisterId
+        return {
+          ...t,
+          columns: neuColumns,
+          register: neuRegister.length > 0 ? neuRegister : undefined,
+          activeRegisterId: neuActive,
+        }
+      }
+      return isProd
+        ? { produktionstabellen: s.produktionstabellen.map(updateFn) }
+        : { nebentabellen: s.nebentabellen.map(updateFn) }
+    }),
+
+  setActiveRegister: (tabelleId, registerId) =>
+    set((s) => {
+      const isProd = s.produktionstabellen.some((t) => t.id === tabelleId)
+      const updateFn = <T extends { id: string; activeRegisterId?: string | null }>(t: T): T => {
+        if (t.id !== tabelleId) return t
+        return { ...t, activeRegisterId: registerId }
+      }
+      return isProd
+        ? { produktionstabellen: s.produktionstabellen.map(updateFn) }
+        : { nebentabellen: s.nebentabellen.map(updateFn) }
+    }),
+
+  moveColumnToRegister: (tabelleId, columnId, targetRegisterId) =>
+    set((s) => {
+      const isProd = s.produktionstabellen.some((t) => t.id === tabelleId)
+      const updateFn = <T extends { id: string; columns: TableColumn[] }>(t: T): T => {
+        if (t.id !== tabelleId) return t
+        return {
+          ...t,
+          columns: t.columns.map((c) =>
+            c.id === columnId ? { ...c, registerId: targetRegisterId } : c,
+          ),
+        }
+      }
+      return isProd
+        ? { produktionstabellen: s.produktionstabellen.map(updateFn) }
+        : { nebentabellen: s.nebentabellen.map(updateFn) }
+    }),
 
   // Kopierte Tabelle am Zielort einfügen (Schritt = Maschine, Abteilung = Nebentabelle)
   einfuegenTabelle: (kopie, ziel) => {

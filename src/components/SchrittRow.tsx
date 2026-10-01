@@ -35,6 +35,11 @@ export function SchrittRow({ schritt, filter }: Props) {
     addRowProduktion,
     updateCellProduktion,
     removeRowProduktion,
+    addRegister,
+    renameRegister,
+    removeRegister,
+    setActiveRegister,
+    moveColumnToRegister,
   } = useStore()
 
   const aggregate = isAggregateMode(filter) ? aggregateSchritt(schritt, maschinen, filter) : null
@@ -152,6 +157,13 @@ export function SchrittRow({ schritt, filter }: Props) {
                 onKopieren={() => kopiereMaschine(t.id)}
                 modus={t.modus ?? 'soll'}
                 onModusChange={(modus) => setProduktionModus(t.id, modus)}
+                register={t.register}
+                activeRegisterId={t.activeRegisterId}
+                onSelectRegister={(regId) => setActiveRegister(t.id, regId)}
+                onAddRegister={(name) => addRegister(t.id, name)}
+                onRenameRegister={(regId, name) => renameRegister(t.id, regId, name)}
+                onRemoveRegister={(regId) => removeRegister(t.id, regId)}
+                onMoveColumnToRegister={(cid, regId) => moveColumnToRegister(t.id, cid, regId)}
               />
             </div>
           )

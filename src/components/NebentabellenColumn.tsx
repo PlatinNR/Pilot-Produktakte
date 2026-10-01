@@ -25,6 +25,11 @@ export function NebentabellenColumn({ abteilungId }: Props) {
     addRowNeben,
     updateCellNeben,
     removeRowNeben,
+    addRegister,
+    renameRegister,
+    removeRegister,
+    setActiveRegister,
+    moveColumnToRegister,
   } = useStore()
 
   return (
@@ -80,6 +85,13 @@ export function NebentabellenColumn({ abteilungId }: Props) {
             onKopieren={() => kopiereNebentabelle(t.id)}
             modus={t.modus ?? 'soll'}
             onModusChange={(modus) => setNebenModus(t.id, modus)}
+            register={t.register}
+            activeRegisterId={t.activeRegisterId}
+            onSelectRegister={(regId) => setActiveRegister(t.id, regId)}
+            onAddRegister={(name) => addRegister(t.id, name)}
+            onRenameRegister={(regId, name) => renameRegister(t.id, regId, name)}
+            onRemoveRegister={(regId) => removeRegister(t.id, regId)}
+            onMoveColumnToRegister={(cid, regId) => moveColumnToRegister(t.id, cid, regId)}
             kopfExtra={
               <span className="flex items-center gap-0.5">
                 <button

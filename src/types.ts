@@ -68,6 +68,14 @@ export interface TableColumn {
   type: ColumnType
   /** Fest eingebaute Spalten (Auftragsnummer, FN, Datum) können nicht umbenannt/gelöscht werden */
   fixed: boolean
+  /** Zugehöriges Register (Reiter) – Standard: 'allgemein' */
+  registerId?: string
+}
+
+/** Ein Unterregister (Reiter) einer Tabelle zur Strukturierung von Parametern */
+export interface TabellenRegister {
+  id: string
+  name: string
 }
 
 /** Eine Zeile: Spalten-ID -> Wert */
@@ -106,6 +114,10 @@ export interface Produktionstabelle {
   keys: TableKey[]
   /** Soll- oder Ist-Tabelle (default: 'soll') */
   modus?: TabellenModus
+  /** Unterregister (Reiter) der Maschine (Default: [{ id: 'allgemein', name: 'Allgemein' }]) */
+  register?: TabellenRegister[]
+  /** Aktiver Reiter oder null wenn eingeklappt */
+  activeRegisterId?: string | null
 }
 
 /** Nebentabelle – gehört zu einer Abteilung, zeitbezogene Daten (z. B. Wachsqualität) */
@@ -122,6 +134,10 @@ export interface Nebentabelle {
   keys: TableKey[]
   /** Soll- oder Ist-Tabelle (default: 'soll') */
   modus?: TabellenModus
+  /** Unterregister (Reiter) der Nebentabelle (Default: [{ id: 'allgemein', name: 'Allgemein' }]) */
+  register?: TabellenRegister[]
+  /** Aktiver Reiter oder null wenn eingeklappt */
+  activeRegisterId?: string | null
 }
 
 /** Info-Feld (Definition) – z. B. Gewicht, Anzahl Trauben */
@@ -165,6 +181,8 @@ export interface TabellenKopie {
   keys: TableKey[]
   /** Soll- oder Ist-Tabelle (default: 'soll') */
   modus?: TabellenModus
+  register?: TabellenRegister[]
+  activeRegisterId?: string | null
   /** Ursprung – dient zum Umbiegen der Fremdschlüssel beim Einfügen */
   quelle: { schrittId?: string; abteilungId?: string }
 }

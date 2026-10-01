@@ -7,6 +7,7 @@ import type {
   TableColumn,
   TableKey,
   TabellenModus,
+  TabellenRegister,
 } from '../types'
 import { COLUMN_TYPE_LABELS, SCHRITT_TABELLE_SPALTEN } from '../types'
 import { useStore, arbeitsplatzFehlerText } from '../store'
@@ -25,6 +26,11 @@ import { einfuegenMaschine, einfuegenNebentabelle, kopiereAbteilung, kopiereMasc
 import { KeyBadge } from './KeyBadge'
 import { keyTypeOf, nextKey } from '../utils/keys'
 import { abteilungFarbe } from '../utils/colors'
+import {
+  getTabellenRegister,
+  filterColumnsByRegister,
+  countColumnsInRegister,
+} from '../utils/register'
 
 interface Props {
   filter: Filter
@@ -89,6 +95,8 @@ function ColumnRow({
   onStartDrag,
   compact,
   dark,
+  registers,
+  onMoveToRegister,
 }: {
   nodeKey: string
   registerRef: (nodeKey: string) => (el: HTMLDivElement | null) => void
@@ -101,6 +109,8 @@ function ColumnRow({
   onStartDrag: (e: React.PointerEvent) => void
   compact?: boolean
   dark?: boolean
+  registers?: TabellenRegister[]
+  onMoveToRegister?: (targetRegisterId: string) => void
 }) {
   return (
     <div
@@ -144,6 +154,24 @@ function ColumnRow({
           ))}
         </select>
       )}
+      {registers && registers.length > 1 && !col.fixed && (
+        <select
+          value={col.registerId || 'allgemein'}
+          onChange={(e) => onMoveToRegister?.(e.target.value)}
+          className={`rounded border px-0.5 py-0 text-[9px] ${
+            dark
+              ? 'border-zinc-700 bg-zinc-900 text-zinc-300'
+              : 'border-slate-200 bg-white text-slate-500'
+          }`}
+          title="In Unterregister verschieben"
+        >
+          {registers.map((r) => (
+            <option key={r.id} value={r.id}>
+              📁 {r.name}
+            </option>
+          ))}
+        </select>
+      )}
       <KeyBadge type={keyType} onClick={onCycleKey} info={nodeKey} dark={dark} />
       {keyType === 'pk' && (
         <span
@@ -181,6 +209,13 @@ interface EntityProps {
   kopfExtra?: React.ReactNode
   modus?: TabellenModus
   onModusChange?: (modus: TabellenModus) => void
+  registers?: TabellenRegister[]
+  activeRegisterId?: string | null
+  columns?: TableColumn[]
+  onSelectRegister?: (registerId: string | null) => void
+  onAddRegister?: (name?: string) => void
+  onRenameRegister?: (registerId: string, name: string) => void
+  onRemoveRegister?: (registerId: string) => void
 }
 
 function EntityCard({
@@ -199,10 +234,22 @@ function EntityCard({
   kopfExtra,
   modus = 'soll',
   onModusChange,
+  registers,
+  activeRegisterId,
+  columns,
+  onSelectRegister,
+  onAddRegister,
+  onRenameRegister,
+  onRemoveRegister,
 }: EntityProps) {
   const [addingCol, setAddingCol] = useState(false)
   const [colName, setColName] = useState('')
   const [colType, setColType] = useState<ColumnType>('text')
+  const [editingRegId, setEditingRegId] = useState<string | null>(null)
+  const [editingRegName, setEditingRegName] = useState('')
+
+  const isCollapsed = activeRegisterId === null
+  const currentActive = activeRegisterId ?? registers?.[0]?.id ?? 'allgemein'
 
   const submitColumn = () => {
     const trimmed = colName.trim()
@@ -260,6 +307,155 @@ function EntityCard({
       {typeof percent === 'number' && percent >= 0 && (
         <div className={`h-0.5 w-full ${isIst ? 'bg-zinc-800' : 'bg-slate-100'}`}>
           <div className={`h-full ${colorClass ?? 'bg-zollern-500'}`} style={{ width: `${percent}%` }} />
+        </div>
+      )}
+      {registers && registers.length > 0 && (
+        <div
+          className={`flex flex-wrap items-center justify-between gap-1 border-b px-2 py-1 text-[10px] select-none ${
+            isIst
+              ? 'border-zinc-800 bg-zinc-900/80 text-zinc-300'
+              : 'border-slate-100 bg-slate-50/80 text-slate-600'
+          }`}
+        >
+          <div className="flex flex-wrap items-center gap-1 min-w-0">
+            {registers.map((reg) => {
+              const isActive = !isCollapsed && currentActive === reg.id
+              const count = columns ? countColumnsInRegister(columns, reg.id) : undefined
+
+              return (
+                <div
+                  key={reg.id}
+                  className={`group flex items-center gap-0.5 rounded px-1.5 py-0.5 transition-all ${
+                    isActive
+                      ? isIst
+                        ? 'bg-zinc-800 text-white font-semibold ring-1 ring-zinc-700'
+                        : 'bg-white text-slate-900 font-semibold shadow-xs ring-1 ring-slate-200'
+                      : isIst
+                        ? 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200'
+                        : 'text-slate-500 hover:bg-slate-200/60 hover:text-slate-800'
+                  }`}
+                >
+                  {editingRegId === reg.id ? (
+                    <input
+                      value={editingRegName}
+                      onChange={(e) => setEditingRegName(e.target.value)}
+                      onBlur={() => {
+                        if (editingRegName.trim()) {
+                          onRenameRegister?.(reg.id, editingRegName.trim())
+                        }
+                        setEditingRegId(null)
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          if (editingRegName.trim()) {
+                            onRenameRegister?.(reg.id, editingRegName.trim())
+                          }
+                          setEditingRegId(null)
+                        }
+                        if (e.key === 'Escape') setEditingRegId(null)
+                      }}
+                      autoFocus
+                      className={`w-16 rounded border px-1 py-0 text-[10px] outline-none ${
+                        isIst ? 'border-zinc-700 bg-zinc-900 text-white' : 'border-slate-300 bg-white text-slate-800'
+                      }`}
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => onSelectRegister?.(isActive ? null : reg.id)}
+                      className="flex items-center gap-1 cursor-pointer"
+                      title={isActive ? 'Klicken zum Einklappen' : 'Reiter öffnen'}
+                    >
+                      <span className="truncate max-w-[80px]">{reg.name}</span>
+                      {typeof count === 'number' && (
+                        <span
+                          className={`text-[8px] px-1 rounded-full font-medium ${
+                            isActive
+                              ? isIst
+                                ? 'bg-zinc-700 text-zinc-200'
+                                : 'bg-slate-100 text-slate-600'
+                              : isIst
+                                ? 'bg-zinc-800 text-zinc-500'
+                                : 'bg-slate-200 text-slate-500'
+                          }`}
+                        >
+                          {count}
+                        </span>
+                      )}
+                    </button>
+                  )}
+
+                  {editingRegId !== reg.id && onRenameRegister && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setEditingRegId(reg.id)
+                        setEditingRegName(reg.name)
+                      }}
+                      className="opacity-0 group-hover:opacity-100 hover:text-zollern-500 p-0.5 text-[8px]"
+                      title="Reiter umbenennen"
+                    >
+                      ✎
+                    </button>
+                  )}
+
+                  {registers.length > 1 && editingRegId !== reg.id && onRemoveRegister && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        if (
+                          window.confirm(
+                            `Reiter "${reg.name}" löschen? Enthaltene Spalten werden in den Standard-Reiter verschoben.`
+                          )
+                        ) {
+                          onRemoveRegister(reg.id)
+                        }
+                      }}
+                      className="opacity-0 group-hover:opacity-100 hover:text-red-500 p-0.5 text-[8px]"
+                      title="Reiter löschen (Spalten bleiben erhalten)"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              )
+            })}
+
+            {onAddRegister && (
+              <button
+                type="button"
+                onClick={() => {
+                  const name = window.prompt('Name des neuen Reiters:')
+                  if (name && name.trim()) {
+                    onAddRegister(name.trim())
+                  }
+                }}
+                className={`rounded px-1 py-0.5 text-[9px] font-semibold transition-colors ${
+                  isIst
+                    ? 'text-zinc-400 hover:bg-zinc-800 hover:text-white'
+                    : 'text-slate-400 hover:bg-slate-200/60 hover:text-slate-700'
+                }`}
+                title="Neuen Reiter anlegen"
+              >
+                +
+              </button>
+            )}
+          </div>
+
+          {onSelectRegister && (
+            <button
+              type="button"
+              onClick={() => onSelectRegister(isCollapsed ? registers[0]?.id ?? 'allgemein' : null)}
+              className={`text-[9px] hover:underline shrink-0 ${
+                isIst ? 'text-zinc-400 hover:text-zinc-200' : 'text-slate-500 hover:text-slate-700'
+              }`}
+              title={isCollapsed ? 'Reiter ausklappen' : 'Reiter einklappen'}
+            >
+              {isCollapsed ? '▸ Ausklappen' : '▾ Einklappen'}
+            </button>
+          )}
         </div>
       )}
       <div>{children}</div>
@@ -660,6 +856,11 @@ export function TabellenbezogenView({ filter }: Props) {
     removeColumnNeben,
     setColumnKeyNeben,
     linkNebenFK,
+    addRegister,
+    renameRegister,
+    removeRegister,
+    setActiveRegister,
+    moveColumnToRegister,
   } = useStore()
 
   const trace = isTraceMode(filter)
@@ -1514,6 +1715,8 @@ export function TabellenbezogenView({ filter }: Props) {
                                         {bstepMaschinen.map((m, mi) => {
                                           const anteil = agg?.entries.find((e) => e.tabelle.id === m.id)
                                           const used = m.rows.some((r) => r.auftragsnummer === auftrag)
+                                          const mRegisters = getTabellenRegister(m)
+                                          const mVisibleCols = filterColumnsByRegister(m.columns, m.activeRegisterId)
                                           let opacity = 1
                                           if (trace) opacity = used ? 1 : 0.15
                                           else if (aggregate) opacity = opacityForPercent(anteil?.percent ?? 0)
@@ -1537,25 +1740,32 @@ export function TabellenbezogenView({ filter }: Props) {
                                                 onRemove={() => removeProduktionstabelle(m.id)}
                                                 percent={aggregate && agg ? (anteil?.percent ?? 0) : null}
                                                 colorClass={MASCHINEN_FARBEN[mi % MASCHINEN_FARBEN.length]}
-                                        onAddColumn={(name, type) => addColumnProduktion(m.id, name, type)}
-                                        onKopieren={() => kopiereMaschine(m.id)}
-                                        kopfExtra={
-                                          <ArbeitsplatzZeile
-                                            tabelleId={m.id}
-                                            wert={m.arbeitsplatz}
-                                            onChange={setProduktionArbeitsplatz}
-                                            dark={m.modus === 'ist'}
-                                          />
-                                        }
-                                      >
-                                        {trace && (
-                                          <VerwendetHinweis
-                                            tabelle={m}
-                                            auftrag={auftrag}
-                                            inSchleife={istInSchleife(bst.id, alleSchritte, alleBloecke)}
-                                          />
-                                        )}
-                                        {m.columns.map((c) => (
+                                                onAddColumn={(name, type) => addColumnProduktion(m.id, name, type)}
+                                                onKopieren={() => kopiereMaschine(m.id)}
+                                                registers={mRegisters}
+                                                activeRegisterId={m.activeRegisterId}
+                                                columns={m.columns}
+                                                onSelectRegister={(regId) => setActiveRegister(m.id, regId)}
+                                                onAddRegister={(name) => addRegister(m.id, name)}
+                                                onRenameRegister={(regId, name) => renameRegister(m.id, regId, name)}
+                                                onRemoveRegister={(regId) => removeRegister(m.id, regId)}
+                                                kopfExtra={
+                                                  <ArbeitsplatzZeile
+                                                    tabelleId={m.id}
+                                                    wert={m.arbeitsplatz}
+                                                    onChange={setProduktionArbeitsplatz}
+                                                    dark={m.modus === 'ist'}
+                                                  />
+                                                }
+                                              >
+                                                {trace && (
+                                                  <VerwendetHinweis
+                                                    tabelle={m}
+                                                    auftrag={auftrag}
+                                                    inSchleife={istInSchleife(bst.id, alleSchritte, alleBloecke)}
+                                                  />
+                                                )}
+                                                {mVisibleCols.map((c) => (
                                                   <ColumnRow
                                                     key={c.id}
                                                     compact
@@ -1571,6 +1781,8 @@ export function TabellenbezogenView({ filter }: Props) {
                                                       setColumnKeyProduktion(m.id, c.id, nextKey(keyTypeOf(m.keys, c.id)))
                                                     }
                                                     onStartDrag={startDrag('m', m.id, c.id, keyTypeOf(m.keys, c.id))}
+                                                    registers={mRegisters}
+                                                    onMoveToRegister={(targetRegId) => moveColumnToRegister(m.id, c.id, targetRegId)}
                                                   />
                                                 ))}
                                                 {trace && used && (
@@ -1630,6 +1842,8 @@ export function TabellenbezogenView({ filter }: Props) {
                             {stepMaschinen.map((m, mi) => {
                               const anteil = agg?.entries.find((e) => e.tabelle.id === m.id)
                               const used = m.rows.some((r) => r.auftragsnummer === auftrag)
+                              const mRegisters = getTabellenRegister(m)
+                              const mVisibleCols = filterColumnsByRegister(m.columns, m.activeRegisterId)
                               let opacity = 1
                               if (trace) opacity = used ? 1 : 0.15
                               else if (aggregate) opacity = opacityForPercent(anteil?.percent ?? 0)
@@ -1655,23 +1869,30 @@ export function TabellenbezogenView({ filter }: Props) {
                                     colorClass={MASCHINEN_FARBEN[mi % MASCHINEN_FARBEN.length]}
                                     onAddColumn={(name, type) => addColumnProduktion(m.id, name, type)}
                                     onKopieren={() => kopiereMaschine(m.id)}
+                                    registers={mRegisters}
+                                    activeRegisterId={m.activeRegisterId}
+                                    columns={m.columns}
+                                    onSelectRegister={(regId) => setActiveRegister(m.id, regId)}
+                                    onAddRegister={(name) => addRegister(m.id, name)}
+                                    onRenameRegister={(regId, name) => renameRegister(m.id, regId, name)}
+                                    onRemoveRegister={(regId) => removeRegister(m.id, regId)}
                                     kopfExtra={
                                       <ArbeitsplatzZeile
-                                          tabelleId={m.id}
-                                          wert={m.arbeitsplatz}
-                                          onChange={setProduktionArbeitsplatz}
-                                          dark={m.modus === 'ist'}
-                                        />
-                                      }
-                                    >
-                                      {trace && (
-                                        <VerwendetHinweis
-                                          tabelle={m}
-                                          auftrag={auftrag}
-                                          inSchleife={istInSchleife(st.id, alleSchritte, alleBloecke)}
-                                        />
-                                      )}
-                                      {m.columns.map((c) => (
+                                        tabelleId={m.id}
+                                        wert={m.arbeitsplatz}
+                                        onChange={setProduktionArbeitsplatz}
+                                        dark={m.modus === 'ist'}
+                                      />
+                                    }
+                                  >
+                                    {trace && (
+                                      <VerwendetHinweis
+                                        tabelle={m}
+                                        auftrag={auftrag}
+                                        inSchleife={istInSchleife(st.id, alleSchritte, alleBloecke)}
+                                      />
+                                    )}
+                                    {mVisibleCols.map((c) => (
                                       <ColumnRow
                                         key={c.id}
                                         compact
@@ -1687,6 +1908,8 @@ export function TabellenbezogenView({ filter }: Props) {
                                           setColumnKeyProduktion(m.id, c.id, nextKey(keyTypeOf(m.keys, c.id)))
                                         }
                                         onStartDrag={startDrag('m', m.id, c.id, keyTypeOf(m.keys, c.id))}
+                                        registers={mRegisters}
+                                        onMoveToRegister={(targetRegId) => moveColumnToRegister(m.id, c.id, targetRegId)}
                                       />
                                     ))}
                                     {trace && used && (
@@ -1903,62 +2126,75 @@ export function TabellenbezogenView({ filter }: Props) {
                         Keine Nebentabellen
                       </div>
                     )}
-                    {neben.map((n) => (
-                      <EntityCard
-                        key={n.id}
-                        title={n.name}
-                        modus={n.modus ?? 'soll'}
-                        onModusChange={(neu) => setNebenModus(n.id, neu)}
-                        onRename={(name) => renameNebentabelle(n.id, name)}
-                        onRemove={() => removeNebentabelle(n.id)}
-                        onAddColumn={(name, type) => addColumnNeben(n.id, name, type)}
-                        onKopieren={() => kopiereNebentabelle(n.id)}
-                        kopfExtra={
-                          <span className="flex shrink-0 items-center gap-1">
-                            <ArbeitsplatzZeile
-                              tabelleId={n.id}
-                              wert={n.arbeitsplatz}
-                              onChange={setNebenArbeitsplatz}
-                              dark={n.modus === 'ist'}
-                            />
-                            <span className="flex shrink-0 items-center gap-0.5">
-                              <button
-                                onClick={() => moveNebentabelle(n.id, 'up')}
-                                className={`rounded px-1 text-[11px] ${n.modus === 'ist' ? 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-700'}`}
-                                title="Nach oben verschieben"
-                              >
-                                ↑
-                              </button>
-                              <button
-                                onClick={() => moveNebentabelle(n.id, 'down')}
-                                className={`rounded px-1 text-[11px] ${n.modus === 'ist' ? 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-700'}`}
-                                title="Nach unten verschieben"
-                              >
-                                ↓
-                              </button>
+                    {neben.map((n) => {
+                      const nRegisters = getTabellenRegister(n)
+                      const nVisibleCols = filterColumnsByRegister(n.columns, n.activeRegisterId)
+                      return (
+                        <EntityCard
+                          key={n.id}
+                          title={n.name}
+                          modus={n.modus ?? 'soll'}
+                          onModusChange={(neu) => setNebenModus(n.id, neu)}
+                          onRename={(name) => renameNebentabelle(n.id, name)}
+                          onRemove={() => removeNebentabelle(n.id)}
+                          onAddColumn={(name, type) => addColumnNeben(n.id, name, type)}
+                          onKopieren={() => kopiereNebentabelle(n.id)}
+                          registers={nRegisters}
+                          activeRegisterId={n.activeRegisterId}
+                          columns={n.columns}
+                          onSelectRegister={(regId) => setActiveRegister(n.id, regId)}
+                          onAddRegister={(name) => addRegister(n.id, name)}
+                          onRenameRegister={(regId, name) => renameRegister(n.id, regId, name)}
+                          onRemoveRegister={(regId) => removeRegister(n.id, regId)}
+                          kopfExtra={
+                            <span className="flex shrink-0 items-center gap-1">
+                              <ArbeitsplatzZeile
+                                tabelleId={n.id}
+                                wert={n.arbeitsplatz}
+                                onChange={setNebenArbeitsplatz}
+                                dark={n.modus === 'ist'}
+                              />
+                              <span className="flex shrink-0 items-center gap-0.5">
+                                <button
+                                  onClick={() => moveNebentabelle(n.id, 'up')}
+                                  className={`rounded px-1 text-[11px] ${n.modus === 'ist' ? 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-700'}`}
+                                  title="Nach oben verschieben"
+                                >
+                                  ↑
+                                </button>
+                                <button
+                                  onClick={() => moveNebentabelle(n.id, 'down')}
+                                  className={`rounded px-1 text-[11px] ${n.modus === 'ist' ? 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-700'}`}
+                                  title="Nach unten verschieben"
+                                >
+                                  ↓
+                                </button>
+                              </span>
                             </span>
-                          </span>
-                        }
-                      >
-                        {n.columns.map((c) => (
-                          <ColumnRow
-                            key={c.id}
-                            dark={n.modus === 'ist'}
-                            nodeKey={`n:${n.id}:${c.id}`}
-                            registerRef={registerRef}
-                            col={c}
-                            keyType={keyTypeOf(n.keys, c.id)}
-                            onRename={(name) => renameColumnNeben(n.id, c.id, name)}
-                            onChangeType={(t) => changeColumnTypeNeben(n.id, c.id, t)}
-                            onRemove={() => removeColumnNeben(n.id, c.id)}
-                            onCycleKey={() =>
-                              setColumnKeyNeben(n.id, c.id, nextKey(keyTypeOf(n.keys, c.id)))
-                            }
-                            onStartDrag={startDrag('n', n.id, c.id, keyTypeOf(n.keys, c.id))}
-                          />
-                        ))}
-                      </EntityCard>
-                    ))}
+                          }
+                        >
+                          {nVisibleCols.map((c) => (
+                            <ColumnRow
+                              key={c.id}
+                              dark={n.modus === 'ist'}
+                              nodeKey={`n:${n.id}:${c.id}`}
+                              registerRef={registerRef}
+                              col={c}
+                              keyType={keyTypeOf(n.keys, c.id)}
+                              onRename={(name) => renameColumnNeben(n.id, c.id, name)}
+                              onChangeType={(t) => changeColumnTypeNeben(n.id, c.id, t)}
+                              onRemove={() => removeColumnNeben(n.id, c.id)}
+                              onCycleKey={() =>
+                                setColumnKeyNeben(n.id, c.id, nextKey(keyTypeOf(n.keys, c.id)))
+                              }
+                              onStartDrag={startDrag('n', n.id, c.id, keyTypeOf(n.keys, c.id))}
+                              registers={nRegisters}
+                              onMoveToRegister={(targetRegId) => moveColumnToRegister(n.id, c.id, targetRegId)}
+                            />
+                          ))}
+                        </EntityCard>
+                      )
+                    })}
                   </div>
                 </div>
               </div>
