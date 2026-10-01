@@ -117,6 +117,8 @@ export const EN: Record<string, string> = {
   fest: 'fixed',
 
   // --- Tabellen ---
+  Soll: 'Target',
+  Ist: 'Actual',
   'Tabelle kopieren (Spalten + Zeilen)': 'Copy table (columns + rows)',
   'Tabelle löschen': 'Delete table',
   '+ Zeile': '+ Row',

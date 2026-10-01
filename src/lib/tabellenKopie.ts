@@ -67,6 +67,7 @@ export async function kopiereMaschine(tabelleId: string): Promise<void> {
     columns: t.columns,
     rows: t.rows,
     keys: t.keys,
+    modus: t.modus ?? 'soll',
     quelle: { schrittId: t.schrittId },
   }
   const ok = await inZwischenablage(kopie)
@@ -86,6 +87,7 @@ export async function kopiereNebentabelle(tabelleId: string): Promise<void> {
     columns: t.columns,
     rows: t.rows,
     keys: t.keys,
+    modus: t.modus ?? 'soll',
     quelle: { abteilungId: t.abteilungId },
   }
   const ok = await inZwischenablage(kopie)

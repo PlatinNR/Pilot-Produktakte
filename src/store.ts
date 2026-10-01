@@ -16,6 +16,7 @@ import type {
   TableColumn,
   TableKey,
   TabellenKopie,
+  TabellenModus,
   TableRow,
 } from './types'
 import { NEBEN_SPALTEN, PRODUKTION_SPALTEN, WIEDERHOLUNG_SPALTE, emptyInfo } from './types'
@@ -201,6 +202,7 @@ interface Store extends AppState {
   addProduktionstabelle: (schrittId: string, name?: string) => void
   renameProduktionstabelle: (id: string, name: string) => void
   setProduktionArbeitsplatz: (id: string, arbeitsplatz: string) => void
+  setProduktionModus: (id: string, modus: TabellenModus) => void
   removeProduktionstabelle: (id: string) => void
   addColumnProduktion: (tabelleId: string, name: string, type: ColumnType) => void
   renameColumnProduktion: (tabelleId: string, spalteId: string, name: string) => void
@@ -228,6 +230,7 @@ interface Store extends AppState {
   addNebentabelle: (abteilungId: string, name?: string) => void
   renameNebentabelle: (id: string, name: string) => void
   setNebenArbeitsplatz: (id: string, arbeitsplatz: string) => void
+  setNebenModus: (id: string, modus: TabellenModus) => void
   removeNebentabelle: (id: string) => void
   moveNebentabelle: (id: string, richtung: 'up' | 'down') => void
   addColumnNeben: (tabelleId: string, name: string, type: ColumnType) => void
@@ -695,6 +698,7 @@ export const useStore = create<Store>()(
             columns,
             rows: [],
             keys: produktionKeys(schrittId),
+            modus: 'soll',
           },
         ],
       }
@@ -708,6 +712,11 @@ export const useStore = create<Store>()(
   setProduktionArbeitsplatz: (id, arbeitsplatz) =>
     set((s) => ({
       produktionstabellen: s.produktionstabellen.map((t) => (t.id === id ? { ...t, arbeitsplatz } : t)),
+    })),
+
+  setProduktionModus: (id, modus) =>
+    set((s) => ({
+      produktionstabellen: s.produktionstabellen.map((t) => (t.id === id ? { ...t, modus } : t)),
     })),
 
   removeProduktionstabelle: (id) =>
@@ -887,6 +896,7 @@ export const useStore = create<Store>()(
           columns: cloneSpalten(NEBEN_SPALTEN),
           rows: [],
           keys: nebenKeys(),
+          modus: 'soll',
         },
       ],
     })),
@@ -920,6 +930,9 @@ export const useStore = create<Store>()(
 
   setNebenArbeitsplatz: (id, arbeitsplatz) =>
     set((s) => ({ nebentabellen: s.nebentabellen.map((t) => (t.id === id ? { ...t, arbeitsplatz } : t)) })),
+
+  setNebenModus: (id, modus) =>
+    set((s) => ({ nebentabellen: s.nebentabellen.map((t) => (t.id === id ? { ...t, modus } : t)) })),
 
   removeNebentabelle: (id) =>
     set((s) => ({ nebentabellen: s.nebentabellen.filter((t) => t.id !== id) })),
@@ -1096,6 +1109,7 @@ export const useStore = create<Store>()(
             columns,
             rows: kopie.rows.map((r) => ({ ...r })),
             keys,
+            modus: kopie.modus ?? 'soll',
           },
         ],
       }))
@@ -1111,6 +1125,7 @@ export const useStore = create<Store>()(
             columns,
             rows: kopie.rows.map((r) => ({ ...r })),
             keys,
+            modus: kopie.modus ?? 'soll',
           },
         ],
       }))

@@ -91,6 +91,9 @@ export interface TableKey {
   offset?: number
 }
 
+/** Modus einer Tabelle: 'soll' (weiß, Vorgabe) oder 'ist' (schwarz, reale Fertigungsdaten) */
+export type TabellenModus = 'soll' | 'ist'
+
 /** Produktionstabelle (= Maschine) – gehört zu genau einem Schritt */
 export interface Produktionstabelle {
   id: string
@@ -101,6 +104,8 @@ export interface Produktionstabelle {
   columns: TableColumn[]
   rows: TableRow[]
   keys: TableKey[]
+  /** Soll- oder Ist-Tabelle (default: 'soll') */
+  modus?: TabellenModus
 }
 
 /** Nebentabelle – gehört zu einer Abteilung, zeitbezogene Daten (z. B. Wachsqualität) */
@@ -115,6 +120,8 @@ export interface Nebentabelle {
   columns: TableColumn[]
   rows: TableRow[]
   keys: TableKey[]
+  /** Soll- oder Ist-Tabelle (default: 'soll') */
+  modus?: TabellenModus
 }
 
 /** Info-Feld (Definition) – z. B. Gewicht, Anzahl Trauben */
@@ -156,6 +163,8 @@ export interface TabellenKopie {
   columns: TableColumn[]
   rows: TableRow[]
   keys: TableKey[]
+  /** Soll- oder Ist-Tabelle (default: 'soll') */
+  modus?: TabellenModus
   /** Ursprung – dient zum Umbiegen der Fremdschlüssel beim Einfügen */
   quelle: { schrittId?: string; abteilungId?: string }
 }

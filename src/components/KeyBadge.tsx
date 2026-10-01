@@ -4,19 +4,25 @@ export function KeyBadge({
   type,
   onClick,
   info,
+  dark,
 }: {
   type: KeyType | null
   onClick?: () => void
   /** Knotenschlüssel (kind:tabelleId:spalteId) für Kontextmenü */
   info?: string
+  dark?: boolean
 }) {
   const label = type === 'pk' ? 'PK' : type === 'fk' ? 'FK' : '+'
   const color =
     type === 'pk'
       ? 'bg-zollern-500 text-white'
       : type === 'fk'
-        ? 'bg-zollern-100 text-zollern-800'
-        : 'text-slate-300 hover:bg-slate-100 hover:text-slate-500'
+        ? dark
+          ? 'bg-zollern-900/80 text-zollern-200 border border-zollern-700'
+          : 'bg-zollern-100 text-zollern-800'
+        : dark
+          ? 'text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200'
+          : 'text-slate-300 hover:bg-slate-100 hover:text-slate-500'
   const title =
     type === 'pk'
       ? 'Primärschlüssel – Rechtsklick für Beziehungen'

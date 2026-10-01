@@ -16,6 +16,7 @@ export function NebentabellenColumn({ abteilungId }: Props) {
     renameNebentabelle,
     removeNebentabelle,
     setNebenArbeitsplatz,
+    setNebenModus,
     moveNebentabelle,
     addColumnNeben,
     renameColumnNeben,
@@ -77,18 +78,28 @@ export function NebentabellenColumn({ abteilungId }: Props) {
             onArbeitsplatzChange={(wert) => setNebenArbeitsplatz(t.id, wert)}
             arbeitsplatzPruefen={(wert) => arbeitsplatzFehlerText(t.id, wert)}
             onKopieren={() => kopiereNebentabelle(t.id)}
+            modus={t.modus ?? 'soll'}
+            onModusChange={(modus) => setNebenModus(t.id, modus)}
             kopfExtra={
               <span className="flex items-center gap-0.5">
                 <button
                   onClick={() => moveNebentabelle(t.id, 'up')}
-                  className="rounded px-1 text-[11px] text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                  className={`rounded px-1 text-[11px] ${
+                    t.modus === 'ist'
+                      ? 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200'
+                      : 'text-slate-400 hover:bg-slate-100 hover:text-slate-700'
+                  }`}
                   title="Nach oben verschieben"
                 >
                   ↑
                 </button>
                 <button
                   onClick={() => moveNebentabelle(t.id, 'down')}
-                  className="rounded px-1 text-[11px] text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                  className={`rounded px-1 text-[11px] ${
+                    t.modus === 'ist'
+                      ? 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200'
+                      : 'text-slate-400 hover:bg-slate-100 hover:text-slate-700'
+                  }`}
                   title="Nach unten verschieben"
                 >
                   ↓

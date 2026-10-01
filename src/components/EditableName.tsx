@@ -8,9 +8,10 @@ interface Props {
   disabled?: boolean
   /** Nur das Stift-Symbol anzeigen (ohne den Wert davor) – z. B. wenn der Name schon woanders steht */
   iconOnly?: boolean
+  dark?: boolean
 }
 
-export function EditableName({ value, onCommit, className, disabled, iconOnly }: Props) {
+export function EditableName({ value, onCommit, className, disabled, iconOnly, dark }: Props) {
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState(value)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -38,7 +39,11 @@ export function EditableName({ value, onCommit, className, disabled, iconOnly }:
       type="button"
       onClick={openEditor}
       disabled={disabled}
-      className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-400 hover:border-zollern-400 hover:text-zollern-600 disabled:opacity-40 ${
+      className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border ${
+        dark
+          ? 'border-zinc-700 bg-zinc-800 text-zinc-300 hover:border-zollern-400 hover:text-white'
+          : 'border-slate-200 bg-white text-slate-400 hover:border-zollern-400 hover:text-zollern-600'
+      } disabled:opacity-40 ${
         iconOnly ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 transition-opacity'
       }`}
       title="Bearbeiten"

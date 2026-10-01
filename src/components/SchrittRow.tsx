@@ -27,6 +27,7 @@ export function SchrittRow({ schritt, filter }: Props) {
     renameProduktionstabelle,
     removeProduktionstabelle,
     setProduktionArbeitsplatz,
+    setProduktionModus,
     addColumnProduktion,
     renameColumnProduktion,
     changeColumnTypeProduktion,
@@ -146,9 +147,11 @@ export function SchrittRow({ schritt, filter }: Props) {
                 onArbeitsplatzChange={(wert) => setProduktionArbeitsplatz(t.id, wert)}
                 arbeitsplatzPruefen={(wert) => arbeitsplatzFehlerText(t.id, wert)}
                 kopfExtra={
-                  hatEintrag ? <DurchlaufWahl tabelle={t} auftragsnummer={auftrag} kompakt /> : undefined
+                  hatEintrag ? <DurchlaufWahl tabelle={t} auftragsnummer={auftrag} kompakt dark={t.modus === 'ist'} /> : undefined
                 }
                 onKopieren={() => kopiereMaschine(t.id)}
+                modus={t.modus ?? 'soll'}
+                onModusChange={(modus) => setProduktionModus(t.id, modus)}
               />
             </div>
           )

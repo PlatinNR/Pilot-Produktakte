@@ -6,6 +6,7 @@ import type {
   Produktionstabelle,
   TableColumn,
   TableKey,
+  TabellenModus,
 } from '../types'
 import { COLUMN_TYPE_LABELS, SCHRITT_TABELLE_SPALTEN } from '../types'
 import { useStore, arbeitsplatzFehlerText } from '../store'
@@ -87,6 +88,7 @@ function ColumnRow({
   onCycleKey,
   onStartDrag,
   compact,
+  dark,
 }: {
   nodeKey: string
   registerRef: (nodeKey: string) => (el: HTMLDivElement | null) => void
@@ -98,12 +100,13 @@ function ColumnRow({
   onCycleKey: () => void
   onStartDrag: (e: React.PointerEvent) => void
   compact?: boolean
+  dark?: boolean
 }) {
   return (
     <div
       ref={registerRef(nodeKey)}
       data-column-node={nodeKey}
-      className={`flex items-center gap-1 border-t border-slate-50 ${compact ? 'px-1.5 py-0.5' : 'px-2 py-1'}`}
+      className={`flex items-center gap-1 border-t ${dark ? 'border-zinc-800' : 'border-slate-50'} ${compact ? 'px-1.5 py-0.5' : 'px-2 py-1'}`}
     >
       {keyType === 'fk' && (
         <span
@@ -113,12 +116,13 @@ function ColumnRow({
         />
       )}
       {col.fixed ? (
-        <span className={`min-w-0 flex-1 font-medium text-slate-700 ${compact ? 'text-[10px]' : 'text-[11px]'}`}>{col.name}</span>
+        <span className={`min-w-0 flex-1 font-medium ${dark ? 'text-zinc-200' : 'text-slate-700'} ${compact ? 'text-[10px]' : 'text-[11px]'}`}>{col.name}</span>
       ) : (
         <EditableName
           value={col.name}
           onCommit={onRename}
-          className={`min-w-0 flex-1 bg-transparent text-slate-700 outline-none ${compact ? 'text-[10px]' : 'text-[11px]'}`}
+          dark={dark}
+          className={`min-w-0 flex-1 bg-transparent ${dark ? 'text-zinc-200' : 'text-slate-700'} outline-none ${compact ? 'text-[10px]' : 'text-[11px]'}`}
         />
       )}
       {/* Bei der Fertigungsauftrag-Nummer wird der Typ nicht angezeigt */}
@@ -126,7 +130,11 @@ function ColumnRow({
         <select
           value={col.type}
           onChange={(e) => onChangeType(e.target.value as ColumnType)}
-          className="rounded border border-slate-200 px-0.5 py-0 text-[9px] text-slate-500"
+          className={`rounded border px-0.5 py-0 text-[9px] ${
+            dark
+              ? 'border-zinc-700 bg-zinc-900 text-zinc-300'
+              : 'border-slate-200 bg-white text-slate-500'
+          }`}
           title="Spaltentyp"
         >
           {(Object.keys(COLUMN_TYPE_LABELS) as ColumnType[]).map((t) => (
@@ -136,7 +144,7 @@ function ColumnRow({
           ))}
         </select>
       )}
-      <KeyBadge type={keyType} onClick={onCycleKey} info={nodeKey} />
+      <KeyBadge type={keyType} onClick={onCycleKey} info={nodeKey} dark={dark} />
       {keyType === 'pk' && (
         <span
           onPointerDown={onStartDrag}
@@ -145,7 +153,7 @@ function ColumnRow({
         />
       )}
       {!col.fixed && (
-        <button onClick={onRemove} className="text-slate-300 hover:text-red-500" title="Spalte löschen">
+        <button onClick={onRemove} className={dark ? 'text-zinc-500 hover:text-red-400' : 'text-slate-300 hover:text-red-500'} title="Spalte löschen">
           ✕
         </button>
       )}
@@ -171,6 +179,8 @@ interface EntityProps {
   onKopieren?: () => void
   /** Zusätzliches Element im Kopf (z. B. AP-Nummer) */
   kopfExtra?: React.ReactNode
+  modus?: TabellenModus
+  onModusChange?: (modus: TabellenModus) => void
 }
 
 function EntityCard({
@@ -187,6 +197,8 @@ function EntityCard({
   betont = false,
   onKopieren,
   kopfExtra,
+  modus = 'soll',
+  onModusChange,
 }: EntityProps) {
   const [addingCol, setAddingCol] = useState(false)
   const [colName, setColName] = useState('')
@@ -200,36 +212,38 @@ function EntityCard({
     setColType('text')
     setAddingCol(false)
   }
-  const rahmenKlasse =
+  const isIst = modus === 'ist'
+  const rahmenKlasse = isIst ? 'border-zinc-800 bg-zinc-950 text-white shadow-sm ring-1 ring-zinc-800' :
     rahmen === 'extern'
       ? 'border-purple-400 bg-purple-50 ring-2 ring-purple-300'
       : betont
         ? 'border-zollern-300 bg-white shadow-md'
         : 'border-slate-200 bg-white'
-  const titelKlasse = betont
+  const titelKlasse = isIst ? (compact ? 'text-[11px] font-semibold text-white' : 'text-xs font-semibold text-white') : betont
     ? 'text-sm font-bold text-zollern-800'
     : compact
       ? 'text-[11px] font-semibold text-slate-700'
       : 'text-xs font-semibold text-slate-700'
   return (
     <div className={`overflow-hidden rounded-lg border shadow-sm ${rahmenKlasse}`}>
-      <div className={`flex items-center gap-1.5 border-b border-slate-100 ${compact ? 'px-1.5 py-0.5' : 'px-2 py-1.5'}`}>
-        <span className={`shrink-0 rounded-full bg-zollern-500 ${betont ? 'h-2.5 w-2.5' : 'h-2 w-2'}`} />
+      <div className={`flex items-center gap-1.5 border-b ${isIst ? 'border-zinc-800' : 'border-slate-100'} ${compact ? 'px-1.5 py-0.5' : 'px-2 py-1.5'}`}>
+        <span className={`shrink-0 rounded-full ${isIst ? 'bg-amber-400' : 'bg-zollern-500'} ${betont ? 'h-2.5 w-2.5' : 'h-2 w-2'}`} />
         <EditableName
           value={title}
           onCommit={onRename}
+          dark={isIst}
           className={`min-w-0 flex-1 bg-transparent outline-none ${titelKlasse}`}
         />
         {kopfExtra}
         {typeof percent === 'number' && percent >= 0 && (
-          <span className="shrink-0 rounded-full bg-zollern-50 px-1.5 py-0.5 text-[10px] font-bold text-zollern-700">
+          <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${isIst ? 'bg-zinc-800 text-zinc-300' : 'bg-zollern-50 text-zollern-700'}`}>
             {formatPercent(percent)}
           </span>
         )}
         {onKopieren && (
           <button
             onClick={onKopieren}
-            className="shrink-0 rounded px-1 text-xs text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+            className={`shrink-0 rounded px-1 text-xs ${isIst ? 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-700'}`}
             title="Tabelle kopieren (Spalten + Zeilen)"
           >
             ⧉
@@ -237,26 +251,26 @@ function EntityCard({
         )}
         <button
           onClick={onRemove}
-          className="shrink-0 rounded px-1 text-xs text-slate-400 hover:bg-red-50 hover:text-red-600"
+          className={`shrink-0 rounded px-1 text-xs ${isIst ? 'text-zinc-400 hover:bg-zinc-800 hover:text-red-400' : 'text-slate-400 hover:bg-red-50 hover:text-red-600'}`}
           title="Löschen"
         >
           ✕
         </button>
       </div>
       {typeof percent === 'number' && percent >= 0 && (
-        <div className="h-0.5 w-full bg-slate-100">
+        <div className={`h-0.5 w-full ${isIst ? 'bg-zinc-800' : 'bg-slate-100'}`}>
           <div className={`h-full ${colorClass ?? 'bg-zollern-500'}`} style={{ width: `${percent}%` }} />
         </div>
       )}
       <div>{children}</div>
       {onAddColumn && (
-        <div className="border-t border-slate-100">
+        <div className={`border-t ${isIst ? 'border-zinc-800' : 'border-slate-100'}`}>
           {addingCol ? (
             <div className="flex items-center gap-1 px-2 py-1">
               <input
                 value={colName}
                 onChange={(e) => setColName(e.target.value)}
-                className="min-w-0 flex-1 rounded border border-slate-200 px-1.5 py-0.5 text-[10px]"
+                className={`min-w-0 flex-1 rounded border px-1.5 py-0.5 text-[10px] ${isIst ? 'border-zinc-700 bg-zinc-900 text-white placeholder-zinc-500' : 'border-slate-200 bg-white text-slate-800'}`}
                 autoFocus
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') submitColumn()
@@ -266,7 +280,7 @@ function EntityCard({
               <select
                 value={colType}
                 onChange={(e) => setColType(e.target.value as ColumnType)}
-                className="rounded border border-slate-200 px-0.5 py-0.5 text-[10px]"
+                className={`rounded border px-0.5 py-0.5 text-[10px] ${isIst ? 'border-zinc-700 bg-zinc-900 text-zinc-200' : 'border-slate-200 bg-white text-slate-700'}`}
               >
                 <option value="text">Text</option>
                 <option value="number">Zahl</option>
@@ -275,14 +289,14 @@ function EntityCard({
               <button onClick={submitColumn} className="rounded bg-zollern-700 px-1.5 py-0.5 text-[10px] text-white hover:bg-zollern-800">
                 ✓
               </button>
-              <button onClick={() => setAddingCol(false)} className="rounded px-1 text-slate-400 hover:text-slate-600">
+              <button onClick={() => setAddingCol(false)} className={`rounded px-1 ${isIst ? 'text-zinc-400 hover:text-zinc-200' : 'text-slate-400 hover:text-slate-600'}`}>
                 ✕
               </button>
             </div>
           ) : (
             <button
               onClick={() => setAddingCol(true)}
-              className="w-full px-2 py-1 text-left text-[10px] font-medium text-zollern-700 hover:bg-zollern-50"
+              className={`w-full px-2 py-1 text-left text-[10px] font-medium ${isIst ? 'text-zinc-300 hover:bg-zinc-900' : 'text-zollern-700 hover:bg-zollern-50'}`}
             >
               + Feld
             </button>
@@ -290,6 +304,38 @@ function EntityCard({
         </div>
       )}
       {footer}
+      {onModusChange && (
+        <div className={`flex justify-end border-t px-2 py-1 ${isIst ? 'border-zinc-800' : 'border-slate-100'}`}>
+          <div className={`inline-flex items-center rounded p-0.5 text-[9px] font-medium ${
+            isIst ? 'bg-zinc-900 border border-zinc-700/80' : 'bg-slate-100 border border-slate-200'
+          }`}>
+            <button
+              type="button"
+              onClick={() => onModusChange('soll')}
+              className={`rounded px-1.5 py-0.5 transition-colors ${
+                !isIst
+                  ? 'bg-white text-slate-800 shadow-sm font-semibold'
+                  : 'text-zinc-400 hover:text-zinc-200'
+              }`}
+              title="Soll-Tabelle (Vorgabe/Planung)"
+            >
+              Soll
+            </button>
+            <button
+              type="button"
+              onClick={() => onModusChange('ist')}
+              className={`rounded px-1.5 py-0.5 transition-colors ${
+                isIst
+                  ? 'bg-zinc-800 text-white shadow-sm font-semibold'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+              title="Ist-Tabelle (Erfassung/Rückmeldung - Dunkelmodus)"
+            >
+              Ist
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -488,7 +534,11 @@ function VerwendetHinweis({
   if (!inSchleife || anzahl === 0) return null
   return (
     <div
-      className="border-t border-orange-100 bg-orange-50 px-2 py-0.5 text-[10px] font-semibold text-orange-700"
+      className={`border-t px-2 py-0.5 text-[10px] font-semibold ${
+        tabelle.modus === 'ist'
+          ? 'border-orange-950 bg-orange-950/40 text-orange-400'
+          : 'border-orange-100 bg-orange-50 text-orange-700'
+      }`}
       title="So oft wurde die Maschine für diesen Fertigungsauftrag verwendet"
     >
       {anzahl}× verwendet
@@ -496,15 +546,17 @@ function VerwendetHinweis({
   )
 }
 
-/** Arbeitsplatz-Nummer einer Maschine – klein im Kopf („AP"), gilt für alle Einträge. */
+/** Arbeitsplatz-Nummer einer Maschine – klein im Kopf („AP“), gilt für alle Einträge. */
 function ArbeitsplatzZeile({
   tabelleId,
   wert,
   onChange,
+  dark,
 }: {
   tabelleId: string
   wert?: string
   onChange: (id: string, wert: string) => void
+  dark?: boolean
 }) {
   const [draft, setDraft] = useState(wert ?? '')
   const [fehler, setFehler] = useState<string | null>(null)
@@ -523,20 +575,26 @@ function ArbeitsplatzZeile({
     if (!f) onChange(tabelleId, v)
   }
 
+  const inputKlasse = dark
+    ? fehler
+      ? 'border-red-500 bg-zinc-900 text-red-300 focus:border-red-400'
+      : draft
+        ? 'border-zinc-700 bg-zinc-900 text-zinc-100 focus:border-zinc-500'
+        : 'border-amber-600/60 bg-zinc-900 text-zinc-400 focus:border-amber-500'
+    : fehler
+      ? 'border-red-400 text-red-600 focus:border-zollern-400'
+      : draft
+        ? 'border-slate-200 text-slate-700 focus:border-zollern-400'
+        : 'border-red-300 text-slate-500 focus:border-zollern-400'
+
   return (
     <span className="flex shrink-0 items-center gap-0.5">
-      <span className="text-[9px] font-bold uppercase tracking-wide text-slate-400">AP</span>
+      <span className={`text-[9px] font-bold uppercase tracking-wide ${dark ? 'text-zinc-400' : 'text-slate-400'}`}>AP</span>
       <input
         value={draft}
         onChange={(e) => aendern(e.target.value)}
         placeholder="Nr."
-        className={`w-14 rounded border px-1 py-0.5 text-[10px] outline-none focus:border-zollern-400 ${
-          fehler
-            ? 'border-red-400 text-red-600'
-            : draft
-              ? 'border-slate-200 text-slate-700'
-              : 'border-red-300 text-slate-500'
-        }`}
+        className={`w-14 rounded border px-1 py-0.5 text-[10px] outline-none ${inputKlasse}`}
         title={
           fehler ?? (draft ? 'Arbeitsplatz-Nummer (gilt für alle Einträge)' : 'Arbeitsplatz-Nummer fehlt')
         }
@@ -581,6 +639,7 @@ export function TabellenbezogenView({ filter }: Props) {
     renameProduktionstabelle,
     removeProduktionstabelle,
     setProduktionArbeitsplatz,
+    setProduktionModus,
     addColumnProduktion,
     renameColumnProduktion,
     changeColumnTypeProduktion,
@@ -591,6 +650,7 @@ export function TabellenbezogenView({ filter }: Props) {
     renameNebentabelle,
     removeNebentabelle,
     setNebenArbeitsplatz,
+    setNebenModus,
     moveNebentabelle,
     loescheBeziehung,
     setBeziehungOffset,
@@ -1471,6 +1531,8 @@ export function TabellenbezogenView({ filter }: Props) {
                                               <EntityCard
                                                 compact
                                                 title={m.name}
+                                                modus={m.modus ?? 'soll'}
+                                                onModusChange={(neu) => setProduktionModus(m.id, neu)}
                                                 onRename={(name) => renameProduktionstabelle(m.id, name)}
                                                 onRemove={() => removeProduktionstabelle(m.id)}
                                                 percent={aggregate && agg ? (anteil?.percent ?? 0) : null}
@@ -1482,6 +1544,7 @@ export function TabellenbezogenView({ filter }: Props) {
                                             tabelleId={m.id}
                                             wert={m.arbeitsplatz}
                                             onChange={setProduktionArbeitsplatz}
+                                            dark={m.modus === 'ist'}
                                           />
                                         }
                                       >
@@ -1496,6 +1559,7 @@ export function TabellenbezogenView({ filter }: Props) {
                                                   <ColumnRow
                                                     key={c.id}
                                                     compact
+                                                    dark={m.modus === 'ist'}
                                                     nodeKey={`m:${m.id}:${c.id}`}
                                                     registerRef={registerRef}
                                                     col={c}
@@ -1515,6 +1579,7 @@ export function TabellenbezogenView({ filter }: Props) {
                                                       tabelle={m}
                                                       auftragsnummer={auftrag}
                                                       kompakt
+                                                      dark={m.modus === 'ist'}
                                                     />
                                                   </div>
                                                 )}
@@ -1582,6 +1647,8 @@ export function TabellenbezogenView({ filter }: Props) {
                                   <EntityCard
                                     compact
                                     title={m.name}
+                                    modus={m.modus ?? 'soll'}
+                                    onModusChange={(neu) => setProduktionModus(m.id, neu)}
                                     onRename={(name) => renameProduktionstabelle(m.id, name)}
                                     onRemove={() => removeProduktionstabelle(m.id)}
                                     percent={aggregate && agg ? (anteil?.percent ?? 0) : null}
@@ -1593,6 +1660,7 @@ export function TabellenbezogenView({ filter }: Props) {
                                           tabelleId={m.id}
                                           wert={m.arbeitsplatz}
                                           onChange={setProduktionArbeitsplatz}
+                                          dark={m.modus === 'ist'}
                                         />
                                       }
                                     >
@@ -1607,6 +1675,7 @@ export function TabellenbezogenView({ filter }: Props) {
                                       <ColumnRow
                                         key={c.id}
                                         compact
+                                        dark={m.modus === 'ist'}
                                         nodeKey={`m:${m.id}:${c.id}`}
                                         registerRef={registerRef}
                                         col={c}
@@ -1622,7 +1691,7 @@ export function TabellenbezogenView({ filter }: Props) {
                                     ))}
                                     {trace && used && (
                                       <div className="px-2 py-1.5">
-                                        <DurchlaufWahl tabelle={m} auftragsnummer={auftrag} kompakt />
+                                        <DurchlaufWahl tabelle={m} auftragsnummer={auftrag} kompakt dark={m.modus === 'ist'} />
                                       </div>
                                     )}
                                   </EntityCard>
@@ -1838,6 +1907,8 @@ export function TabellenbezogenView({ filter }: Props) {
                       <EntityCard
                         key={n.id}
                         title={n.name}
+                        modus={n.modus ?? 'soll'}
+                        onModusChange={(neu) => setNebenModus(n.id, neu)}
                         onRename={(name) => renameNebentabelle(n.id, name)}
                         onRemove={() => removeNebentabelle(n.id)}
                         onAddColumn={(name, type) => addColumnNeben(n.id, name, type)}
@@ -1848,18 +1919,19 @@ export function TabellenbezogenView({ filter }: Props) {
                               tabelleId={n.id}
                               wert={n.arbeitsplatz}
                               onChange={setNebenArbeitsplatz}
+                              dark={n.modus === 'ist'}
                             />
                             <span className="flex shrink-0 items-center gap-0.5">
                               <button
                                 onClick={() => moveNebentabelle(n.id, 'up')}
-                                className="rounded px-1 text-[11px] text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                                className={`rounded px-1 text-[11px] ${n.modus === 'ist' ? 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-700'}`}
                                 title="Nach oben verschieben"
                               >
                                 ↑
                               </button>
                               <button
                                 onClick={() => moveNebentabelle(n.id, 'down')}
-                                className="rounded px-1 text-[11px] text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                                className={`rounded px-1 text-[11px] ${n.modus === 'ist' ? 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-700'}`}
                                 title="Nach unten verschieben"
                               >
                                 ↓
@@ -1871,6 +1943,7 @@ export function TabellenbezogenView({ filter }: Props) {
                         {n.columns.map((c) => (
                           <ColumnRow
                             key={c.id}
+                            dark={n.modus === 'ist'}
                             nodeKey={`n:${n.id}:${c.id}`}
                             registerRef={registerRef}
                             col={c}

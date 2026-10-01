@@ -7,6 +7,7 @@ interface Props {
   tabelle: Produktionstabelle
   auftragsnummer: string
   kompakt?: boolean
+  dark?: boolean
 }
 
 /**
@@ -14,7 +15,7 @@ interface Props {
  * - Schleifen-Wiederholungen (Spalte „Wiederholung") sind wählbar
  * - Mehrere Durchläufe an derselben Maschine sind wählbar
  */
-export function DurchlaufWahl({ tabelle, auftragsnummer, kompakt = false }: Props) {
+export function DurchlaufWahl({ tabelle, auftragsnummer, kompakt = false, dark = false }: Props) {
   const t = useT()
   const sprache = useAktuelleSprache()
   const [wdhIndex, setWdhIndex] = useState(0)
@@ -34,12 +35,12 @@ export function DurchlaufWahl({ tabelle, auftragsnummer, kompakt = false }: Prop
 
   return (
     <div
-      className={`rounded-lg border border-zollern-200 bg-zollern-50/70 ${
-        kompakt ? 'px-1.5 py-1' : 'px-2.5 py-1.5'
-      }`}
+      className={`rounded-lg border ${
+        dark ? 'border-zinc-750 bg-zinc-900/90 text-white' : 'border-zollern-200 bg-zollern-50/70'
+      } ${kompakt ? 'px-1.5 py-1' : 'px-2.5 py-1.5'}`}
     >
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[9px] font-semibold uppercase tracking-wide text-slate-500">
+        <span className={`text-[9px] font-semibold uppercase tracking-wide ${dark ? 'text-zinc-400' : 'text-slate-500'}`}>
           {t('Werte des Auftrags')}
         </span>
         {wdhWerte.length > 1 && aktiveWdh && (
@@ -50,7 +51,9 @@ export function DurchlaufWahl({ tabelle, auftragsnummer, kompakt = false }: Prop
                 setWdhIndex(Math.max(0, wdhWerte.indexOf(e.target.value)))
                 setRunIndex(0)
               }}
-              className="rounded border border-slate-200 bg-white px-1 py-0.5 text-[10px] text-slate-700"
+              className={`rounded border px-1 py-0.5 text-[10px] ${
+                dark ? 'border-zinc-700 bg-zinc-800 text-zinc-100' : 'border-slate-200 bg-white text-slate-700'
+              }`}
               title={t('Wiederholung der Schleife wählen')}
             >
               {wdhWerte.map((w) => (
@@ -67,7 +70,9 @@ export function DurchlaufWahl({ tabelle, auftragsnummer, kompakt = false }: Prop
             <select
               value={aktiverIndex}
               onChange={(e) => setRunIndex(Number(e.target.value))}
-              className="rounded border border-slate-200 bg-white px-1 py-0.5 text-[10px] text-slate-700"
+              className={`rounded border px-1 py-0.5 text-[10px] ${
+                dark ? 'border-zinc-700 bg-zinc-800 text-zinc-100' : 'border-slate-200 bg-white text-slate-700'
+              }`}
               title={t('Werte eines anderen Durchlaufs anzeigen')}
             >
               {gefiltert.map((_, i) => (
@@ -83,8 +88,8 @@ export function DurchlaufWahl({ tabelle, auftragsnummer, kompakt = false }: Prop
       <div className={`mt-1 grid gap-x-3 gap-y-0.5 ${kompakt ? 'grid-cols-2' : 'grid-cols-2 md:grid-cols-3'}`}>
         {spalten.map((c) => (
           <div key={c.id} className="flex items-baseline gap-1 text-xs">
-            <span className="shrink-0 text-slate-400">{spaltenName(c, sprache)}:</span>
-            <span className="truncate font-semibold text-slate-800">{aktiv[c.id] || '–'}</span>
+            <span className={`shrink-0 ${dark ? 'text-zinc-400' : 'text-slate-400'}`}>{spaltenName(c, sprache)}:</span>
+            <span className={`truncate font-semibold ${dark ? 'text-white' : 'text-slate-800'}`}>{aktiv[c.id] || '–'}</span>
           </div>
         ))}
       </div>
