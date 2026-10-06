@@ -64,7 +64,11 @@ export function EditableName({ value, onCommit, className, disabled, iconOnly, d
         editButton
       ) : (
         <span className={`group inline-flex min-w-0 items-center gap-1.5 ${className}`}>
-          <span className="min-w-0 flex-1 truncate">
+          <span
+            onClick={openEditor}
+            className={`min-w-0 flex-1 truncate ${!disabled ? 'cursor-pointer hover:underline decoration-dotted' : ''}`}
+            title={!disabled ? 'Klicken zum Bearbeiten' : undefined}
+          >
             {value || <span className="italic text-slate-400">—</span>}
           </span>
           {!disabled && editButton}

@@ -848,7 +848,7 @@ function ArbeitsplatzZeile({
         value={draft}
         onChange={(e) => aendern(e.target.value)}
         placeholder="Nr."
-        className={`w-14 rounded border px-1 py-0.5 text-[10px] outline-none ${inputKlasse}`}
+        className={`w-12 rounded border px-1 py-0.5 text-[10px] outline-none ${inputKlasse}`}
         title={
           fehler ?? (draft ? 'Arbeitsplatz-Nummer (gilt für alle Einträge)' : 'Arbeitsplatz-Nummer fehlt')
         }
@@ -1052,19 +1052,38 @@ export function TabellenbezogenView({ filter }: Props) {
   const moveNebenToStep = (nebenId: string, dir: 'up' | 'down') => {
     const t = alleNeben.find((x) => x.id === nebenId)
     if (!t) return
-    const deptSteps = alleSchritte
-      .filter((s) => s.abteilungId === t.abteilungId)
-      .sort((x, y) => x.position - y.position)
-    if (deptSteps.length === 0) return
-    const currentStepId = t.schrittId ?? deptSteps[0]?.id
-    const idx = deptSteps.findIndex((s) => s.id === currentStepId)
+    const schritte = alleSchritte.filter((s) => s.abteilungId === t.abteilungId)
+    const bloecke = alleBloecke.filter((b) => b.abteilungId === t.abteilungId)
+
+    const rowTargets: { pos: number; stepId: string; blockId?: string }[] = []
+    for (const st of schritte.filter((s) => !s.blockId)) {
+      rowTargets.push({ pos: st.position, stepId: st.id })
+    }
+    for (const b of bloecke) {
+      const bSteps = schritte.filter((s) => s.blockId === b.id).sort((x, y) => x.position - y.position)
+      if (bSteps.length > 0) {
+        rowTargets.push({ pos: b.position, stepId: bSteps[0].id, blockId: b.id })
+      }
+    }
+    rowTargets.sort((a, b) => a.pos - b.pos)
+    if (rowTargets.length === 0) return
+
+    const currentStep = schritte.find((s) => s.id === t.schrittId)
+    let idx = -1
+    if (currentStep) {
+      if (currentStep.blockId) {
+        idx = rowTargets.findIndex((r) => r.blockId === currentStep.blockId)
+      } else {
+        idx = rowTargets.findIndex((r) => r.stepId === currentStep.id)
+      }
+    }
     if (idx < 0) {
-      setNebenSchritt(nebenId, deptSteps[0].id)
+      setNebenSchritt(nebenId, rowTargets[0].stepId)
       return
     }
     const targetIdx = dir === 'up' ? idx - 1 : idx + 1
-    if (targetIdx >= 0 && targetIdx < deptSteps.length) {
-      setNebenSchritt(nebenId, deptSteps[targetIdx].id)
+    if (targetIdx >= 0 && targetIdx < rowTargets.length) {
+      setNebenSchritt(nebenId, rowTargets[targetIdx].stepId)
     }
   }
 
@@ -1687,7 +1706,10 @@ export function TabellenbezogenView({ filter }: Props) {
                       ⧉ Einfügen
                     </button>
                     <button
-                      onClick={() => addNebentabelle(a.id)}
+                      onClick={() => {
+                        const firstStep = schritte[0]?.id
+                        addNebentabelle(a.id, undefined, firstStep)
+                      }}
                       className="rounded bg-slate-700 px-2 py-0.5 text-[11px] font-medium text-white hover:bg-slate-800"
                       title="Neue Prozessbezogene Tabelle anlegen"
                     >
@@ -2061,60 +2083,38 @@ export function TabellenbezogenView({ filter }: Props) {
                                   onAddRegister={(name) => addRegister(n.id, name)}
                                   onRenameRegister={(regId, name) => renameRegister(n.id, regId, name)}
                                   onRemoveRegister={(regId) => removeRegister(n.id, regId)}
-                                  unterzeile={
-                                    <div className="flex w-full flex-col gap-1">
-                                      <div className="flex items-center justify-between gap-1">
-                                        <ArbeitsplatzZeile
-                                          tabelleId={n.id}
-                                          wert={n.arbeitsplatz}
-                                          onChange={setNebenArbeitsplatz}
-                                          dark={n.modus === 'ist'}
-                                        />
-                                        <span className="flex shrink-0 items-center gap-0.5">
-                                          <button
-                                            onClick={() => moveNebenToStep(n.id, 'up')}
-                                            className={`rounded px-1 text-[11px] ${
-                                              n.modus === 'ist'
-                                                ? 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200'
-                                                : 'text-slate-400 hover:bg-slate-100 hover:text-slate-700'
-                                            }`}
-                                            title="Zum vorherigen Schritt verschieben"
-                                          >
-                                            ↑
-                                          </button>
-                                          <button
-                                            onClick={() => moveNebenToStep(n.id, 'down')}
-                                            className={`rounded px-1 text-[11px] ${
-                                              n.modus === 'ist'
-                                                ? 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200'
-                                                : 'text-slate-400 hover:bg-slate-100 hover:text-slate-700'
-                                            }`}
-                                            title="Zum nächsten Schritt verschieben"
-                                          >
-                                            ↓
-                                          </button>
-                                        </span>
-                                      </div>
-                                      <div className="flex items-center gap-1">
-                                        <span className="text-[9px] font-semibold uppercase text-slate-400">Schritt:</span>
-                                        <select
-                                          value={n.schrittId ?? ''}
-                                          onChange={(e) => setNebenSchritt(n.id, e.target.value || null)}
-                                          className={`min-w-0 flex-1 truncate rounded border px-1 py-0.5 text-[10px] ${
+                                  kopfExtra={
+                                    <div className="flex shrink-0 items-center gap-1">
+                                      <ArbeitsplatzZeile
+                                        tabelleId={n.id}
+                                        wert={n.arbeitsplatz}
+                                        onChange={setNebenArbeitsplatz}
+                                        dark={n.modus === 'ist'}
+                                      />
+                                      <span className="flex shrink-0 items-center gap-0.5">
+                                        <button
+                                          onClick={() => moveNebenToStep(n.id, 'up')}
+                                          className={`rounded px-1 text-[11px] ${
                                             n.modus === 'ist'
-                                              ? 'border-zinc-700 bg-zinc-800 text-zinc-200'
-                                              : 'border-slate-300 bg-white text-slate-700'
+                                              ? 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200'
+                                              : 'text-slate-400 hover:bg-slate-100 hover:text-slate-700'
                                           }`}
-                                          title="Zugeordneter Schritt für diese Prozess-Tabelle"
+                                          title="Zum vorherigen Schritt verschieben"
                                         >
-                                          <option value="">(Kein Schritt)</option>
-                                          {schritte.map((s) => (
-                                            <option key={s.id} value={s.id}>
-                                              {s.name}
-                                            </option>
-                                          ))}
-                                        </select>
-                                      </div>
+                                          ↑
+                                        </button>
+                                        <button
+                                          onClick={() => moveNebenToStep(n.id, 'down')}
+                                          className={`rounded px-1 text-[11px] ${
+                                            n.modus === 'ist'
+                                              ? 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200'
+                                              : 'text-slate-400 hover:bg-slate-100 hover:text-slate-700'
+                                          }`}
+                                          title="Zum nächsten Schritt verschieben"
+                                        >
+                                          ↓
+                                        </button>
+                                      </span>
                                     </div>
                                   }
                                 >
@@ -2143,9 +2143,28 @@ export function TabellenbezogenView({ filter }: Props) {
                             )
                           })}
                           {blockNeben.length === 0 && (
-                            <div className="col-span-2 flex h-24 items-center justify-center rounded-lg border border-dashed border-slate-200 bg-white/40 text-[11px] text-slate-400">
-                              Keine Prozess-Tabellen im Block
-                            </div>
+                            <button
+                              onClick={() => {
+                                const firstBStep = blockSteps[0]?.id
+                                addNebentabelle(a.id, undefined, firstBStep)
+                              }}
+                              className="col-span-2 flex h-20 items-center justify-center rounded-lg border border-dashed border-slate-200 bg-white/40 text-[11px] font-medium text-slate-400 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-600 transition-colors"
+                              title="Prozessbezogene Tabelle für diesen Block anlegen"
+                            >
+                              + Prozess-Tabelle zuweisen
+                            </button>
+                          )}
+                          {blockNeben.length === 1 && (
+                            <button
+                              onClick={() => {
+                                const firstBStep = blockSteps[0]?.id
+                                addNebentabelle(a.id, undefined, firstBStep)
+                              }}
+                              className="flex h-20 items-center justify-center rounded-lg border border-dashed border-slate-200 bg-white/40 text-[10px] font-medium text-slate-400 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-600 transition-colors"
+                              title="Zweite Prozessbezogene Tabelle für diesen Block anlegen"
+                            >
+                              + 2. Tabelle
+                            </button>
                           )}
                         </div>
                       </Fragment>
@@ -2466,59 +2485,37 @@ export function TabellenbezogenView({ filter }: Props) {
                                 onRenameRegister={(regId, name) => renameRegister(n.id, regId, name)}
                                 onRemoveRegister={(regId) => removeRegister(n.id, regId)}
                                 kopfExtra={
-                                  <div className="flex w-full flex-col gap-1">
-                                    <div className="flex items-center justify-between gap-1">
-                                      <ArbeitsplatzZeile
-                                        tabelleId={n.id}
-                                        wert={n.arbeitsplatz}
-                                        onChange={setNebenArbeitsplatz}
-                                        dark={n.modus === 'ist'}
-                                      />
-                                      <span className="flex shrink-0 items-center gap-0.5">
-                                        <button
-                                          onClick={() => moveNebenToStep(n.id, 'up')}
-                                          className={`rounded px-1 text-[11px] ${
-                                            n.modus === 'ist'
-                                              ? 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200'
-                                              : 'text-slate-400 hover:bg-slate-100 hover:text-slate-700'
-                                          }`}
-                                          title="Zum vorherigen Schritt verschieben"
-                                        >
-                                          ↑
-                                        </button>
-                                        <button
-                                          onClick={() => moveNebenToStep(n.id, 'down')}
-                                          className={`rounded px-1 text-[11px] ${
-                                            n.modus === 'ist'
-                                              ? 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200'
-                                              : 'text-slate-400 hover:bg-slate-100 hover:text-slate-700'
-                                          }`}
-                                          title="Zum nächsten Schritt verschieben"
-                                        >
-                                          ↓
-                                        </button>
-                                      </span>
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                      <span className="text-[9px] font-semibold uppercase text-slate-400">Schritt:</span>
-                                      <select
-                                        value={n.schrittId ?? ''}
-                                        onChange={(e) => setNebenSchritt(n.id, e.target.value || null)}
-                                        className={`min-w-0 flex-1 truncate rounded border px-1 py-0.5 text-[10px] ${
+                                  <div className="flex shrink-0 items-center gap-1">
+                                    <ArbeitsplatzZeile
+                                      tabelleId={n.id}
+                                      wert={n.arbeitsplatz}
+                                      onChange={setNebenArbeitsplatz}
+                                      dark={n.modus === 'ist'}
+                                    />
+                                    <span className="flex shrink-0 items-center gap-0.5">
+                                      <button
+                                        onClick={() => moveNebenToStep(n.id, 'up')}
+                                        className={`rounded px-1 text-[11px] ${
                                           n.modus === 'ist'
-                                            ? 'border-zinc-700 bg-zinc-800 text-zinc-200'
-                                            : 'border-slate-300 bg-white text-slate-700'
-                                          }`}
-                                        title="Zugeordneter Schritt für diese Prozess-Tabelle"
+                                            ? 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200'
+                                            : 'text-slate-400 hover:bg-slate-100 hover:text-slate-700'
+                                        }`}
+                                        title="Zum vorherigen Schritt verschieben"
                                       >
-                                        <option value="">(Kein Schritt)</option>
-                                        {schritte.map((s) => (
-                                          <option key={s.id} value={s.id}>
-                                            {s.name}
-                                          </option>
-                                        ))}
-                                      </select>
-                                    </div>
+                                        ↑
+                                      </button>
+                                      <button
+                                        onClick={() => moveNebenToStep(n.id, 'down')}
+                                        className={`rounded px-1 text-[11px] ${
+                                          n.modus === 'ist'
+                                            ? 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200'
+                                            : 'text-slate-400 hover:bg-slate-100 hover:text-slate-700'
+                                        }`}
+                                        title="Zum nächsten Schritt verschieben"
+                                      >
+                                        ↓
+                                      </button>
+                                    </span>
                                   </div>
                                 }
                               >
