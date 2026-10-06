@@ -90,9 +90,10 @@ export async function kopiereNebentabelle(tabelleId: string): Promise<void> {
     rows: t.rows,
     keys: t.keys,
     modus: t.modus ?? 'soll',
+    schrittId: t.schrittId,
     register: t.register ? t.register.map((r) => ({ ...r })) : undefined,
     activeRegisterId: t.activeRegisterId,
-    quelle: { abteilungId: t.abteilungId },
+    quelle: { abteilungId: t.abteilungId, schrittId: t.schrittId ?? undefined },
   }
   const ok = await inZwischenablage(kopie)
   setStatus(ok ? tt('{name} kopiert', { name: t.name }) : tt('{name} kopiert (App-Ablage)', { name: t.name }))
@@ -118,7 +119,7 @@ export async function einfuegenMaschine(schrittId: string): Promise<void> {
 }
 
 /** Fügt eine kopierte Nebentabelle in der Abteilung ein. */
-export async function einfuegenNebentabelle(abteilungId: string): Promise<void> {
+export async function einfuegenNebentabelle(abteilungId: string, schrittId?: string | null): Promise<void> {
   const kopie = await ausZwischenablage<TabellenKopie>('produktakte-tabelle')
   if (!kopie) {
     setStatus(tt('Zwischenablage leer oder unbekanntes Format'))
@@ -128,7 +129,7 @@ export async function einfuegenNebentabelle(abteilungId: string): Promise<void> 
     setStatus(tt('Zwischenablage enthält keine Nebentabelle'))
     return
   }
-  const res = useStore.getState().einfuegenTabelle(kopie, { art: 'nebentabelle', abteilungId })
+  const res = useStore.getState().einfuegenTabelle(kopie, { art: 'nebentabelle', abteilungId, schrittId })
   setStatus(
     res.arbeitsplatzGeleert
       ? tt('Tabelle eingefügt – Arbeitsplatz war belegt, bitte neu zuweisen')

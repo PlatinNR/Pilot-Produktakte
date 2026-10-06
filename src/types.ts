@@ -126,6 +126,8 @@ export interface Produktionstabelle {
 export interface Nebentabelle {
   id: string
   abteilungId: string
+  /** Zugehöriger Schritt (Prozessbezogene Zuordnung) */
+  schrittId?: string | null
   name: string
   /** Feste Arbeitsplatz-Nummer – gilt für alle Einträge der Nebentabelle */
   arbeitsplatz: string
@@ -183,6 +185,7 @@ export interface TabellenKopie {
   keys: TableKey[]
   /** Soll- oder Ist-Tabelle (default: 'soll') */
   modus?: TabellenModus
+  schrittId?: string | null
   register?: TabellenRegister[]
   activeRegisterId?: string | null
   /** Ursprung – dient zum Umbiegen der Fremdschlüssel beim Einfügen */

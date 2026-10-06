@@ -48,14 +48,6 @@ function opacityForPercent(percent: number): number {
   return Math.max(0.1, percent / 100)
 }
 
-function ColumnLabel({ children }: { children: string }) {
-  return (
-    <div className="mb-2 border-b border-slate-200 pb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-      {children}
-    </div>
-  )
-}
-
 function orthogonalPath(x1: number, y1: number, x2: number, y2: number): string {
   const midX = (x1 + x2) / 2
   return `M ${x1} ${y1} H ${midX} V ${y2} H ${x2}`
@@ -904,7 +896,7 @@ export function TabellenbezogenView({ filter }: Props) {
     removeNebentabelle,
     setNebenArbeitsplatz,
     setNebenModus,
-    moveNebentabelle,
+    setNebenSchritt,
     loescheBeziehung,
     setBeziehungOffset,
     addColumnNeben,
@@ -1046,6 +1038,25 @@ export function TabellenbezogenView({ filter }: Props) {
       return t ? keyTypeOf(t.keys, columnId) : null
     }
     return null
+  }
+
+  const moveNebenToStep = (nebenId: string, dir: 'up' | 'down') => {
+    const t = alleNeben.find((x) => x.id === nebenId)
+    if (!t) return
+    const deptSteps = alleSchritte
+      .filter((s) => s.abteilungId === t.abteilungId && !s.blockId)
+      .sort((x, y) => x.position - y.position)
+    if (deptSteps.length === 0) return
+    const currentStepId = t.schrittId ?? deptSteps[0]?.id
+    const idx = deptSteps.findIndex((s) => s.id === currentStepId)
+    if (idx < 0) {
+      setNebenSchritt(nebenId, deptSteps[0].id)
+      return
+    }
+    const targetIdx = dir === 'up' ? idx - 1 : idx + 1
+    if (targetIdx >= 0 && targetIdx < deptSteps.length) {
+      setNebenSchritt(nebenId, deptSteps[targetIdx].id)
+    }
   }
 
   const startDrag =
@@ -1597,700 +1608,935 @@ export function TabellenbezogenView({ filter }: Props) {
                 </button>
               </div>
 
-              <div className="flex items-start gap-8">
-                {/* Produktionsstellen + Produktionskette als Schritt-Zeilen */}
-                <div className="min-w-0 flex-1">
-                  <div className="grid grid-cols-[minmax(0,1fr)_20rem] items-start gap-x-6 gap-y-5">
-                    <ColumnLabel>Produktionsstellen</ColumnLabel>
-                    <ColumnLabel>Produktionskette</ColumnLabel>
+                            <div
+                className="grid items-start gap-x-6 gap-y-6"
+                style={{ gridTemplateColumns: 'minmax(0, 30fr) minmax(0, 20fr) minmax(0, 50fr)' }}
+              >
+                {/* Spaltenüberschriften: 30% Prozessbezogene Daten | 20% Produktionskette | 50% Produktbezogene Daten */}
+                <div className="flex items-center justify-between border-b border-slate-200 pb-1">
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                    Prozessbezogene Daten
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => einfuegenNebentabelle(a.id)}
+                      className="rounded border border-slate-300 px-2 py-0.5 text-[11px] text-slate-500 hover:bg-slate-100"
+                      title="Kopierte Prozess-Tabelle hier einfügen"
+                    >
+                      ⧉ Einfügen
+                    </button>
+                    <button
+                      onClick={() => addNebentabelle(a.id)}
+                      className="rounded bg-slate-700 px-2 py-0.5 text-[11px] font-medium text-white hover:bg-slate-800"
+                      title="Neue Prozessbezogene Tabelle anlegen"
+                    >
+                      + Prozess-Tabelle
+                    </button>
+                  </div>
+                </div>
 
-                    {renderItems.map((item, i) => {
-                      if (item.type === 'block') {
-                        // Rechts verankert: der erste (älteste) Schritt steht rechts, neue kommen nach links
-                        const blockSteps = schritte
-                          .filter((x) => x.blockId === item.block.id)
-                          .sort((x, y) => y.position - x.position)
-                        return (
-                          <div
-                            key={`block-${item.block.id}`}
-                            ref={registerRef(`bc:${item.block.id}`)}
-                            className="col-span-2 rounded-lg border border-zollern-200 bg-zollern-50/40 p-2"
+                <div className="border-b border-slate-200 pb-1">
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                    Produktionskette
+                  </div>
+                </div>
+
+                <div className="border-b border-slate-200 pb-1">
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                    Produktbezogene Daten
+                  </div>
+                </div>
+
+                {renderItems.map((item) => {
+                  if (item.type === 'block') {
+                    // Rechts verankert: der erste (älteste) Schritt steht rechts, neue kommen nach links
+                    const blockSteps = schritte
+                      .filter((x) => x.blockId === item.block.id)
+                      .sort((x, y) => y.position - x.position)
+                    return (
+                      <div
+                        key={`block-${item.block.id}`}
+                        ref={registerRef(`bc:${item.block.id}`)}
+                        className="col-span-3 rounded-lg border border-zollern-200 bg-zollern-50/40 p-3"
+                      >
+                        <div ref={registerRef(`b:${item.block.id}`)} className="mb-2 flex items-center gap-2">
+                          <span className="h-2 w-2 rounded-full bg-zollern-400" />
+                          <span className="text-[9px] font-semibold uppercase tracking-wide text-zollern-500">
+                            Variabler Block
+                          </span>
+                          <EditableName
+                            value={item.block.name}
+                            onCommit={(name) => renameBearbeitungsblock(item.block.id, name)}
+                            className="min-w-0 flex-1 text-xs font-semibold text-zollern-800 outline-none"
+                          />
+                          <button
+                            onClick={() => moveBearbeitungsblock(item.block.id, 'up')}
+                            className="rounded px-1 text-slate-400 hover:bg-slate-100"
+                            title="Block nach oben"
                           >
-                            <div ref={registerRef(`b:${item.block.id}`)} className="mb-2 flex items-center gap-2">
-                              <span className="h-2 w-2 rounded-full bg-zollern-400" />
-                              <span className="text-[9px] font-semibold uppercase tracking-wide text-zollern-500">
-                                Variabler Block
-                              </span>
-                              <EditableName
-                                value={item.block.name}
-                                onCommit={(name) => renameBearbeitungsblock(item.block.id, name)}
-                                className="min-w-0 flex-1 text-xs font-semibold text-zollern-800 outline-none"
-                              />
-                              <button
-                                onClick={() => moveBearbeitungsblock(item.block.id, 'up')}
-                                className="rounded px-1 text-slate-400 hover:bg-slate-100"
-                                title="Block nach oben"
-                              >
-                                ↑
-                              </button>
-                              <button
-                                onClick={() => moveBearbeitungsblock(item.block.id, 'down')}
-                                className="rounded px-1 text-slate-400 hover:bg-slate-100"
-                                title="Block nach unten"
-                              >
-                                ↓
-                              </button>
-                              <button
-                                onClick={() => addSchritt(a.id, item.block.id)}
-                                className="rounded bg-zollern-700 px-2 py-0.5 text-[11px] font-medium text-white hover:bg-zollern-800"
-                              >
-                                + Schritt
-                              </button>
-                              <button
-                                onClick={() => removeBearbeitungsblock(item.block.id)}
-                                className="rounded px-1 text-slate-400 hover:text-red-500"
-                                title="Block löschen"
-                              >
-                                ✕
-                              </button>
-                            </div>
+                            ↑
+                          </button>
+                          <button
+                            onClick={() => moveBearbeitungsblock(item.block.id, 'down')}
+                            className="rounded px-1 text-slate-400 hover:bg-slate-100"
+                            title="Block nach unten"
+                          >
+                            ↓
+                          </button>
+                          <button
+                            onClick={() => addSchritt(a.id, item.block.id)}
+                            className="rounded bg-zollern-700 px-2 py-0.5 text-[11px] font-medium text-white hover:bg-zollern-800"
+                          >
+                            + Schritt
+                          </button>
+                          <button
+                            onClick={() => removeBearbeitungsblock(item.block.id)}
+                            className="rounded px-1 text-slate-400 hover:text-red-500"
+                            title="Block löschen"
+                          >
+                            ✕
+                          </button>
+                        </div>
 
-                            {/* Schritte als Spalten, rechts verankert (neue Schritte kommen nach links) */}
-                            <div className="overflow-x-auto pb-1" style={{ direction: 'rtl' }}>
-                              <div className="flex items-start gap-3" style={{ direction: 'ltr' }}>
-                                {blockSteps.map((bst) => {
-                                  const bstepMaschinen = alleMaschinen.filter((m) => m.schrittId === bst.id)
-                                  const agg = aggregate ? aggregateSchritt(bst, bstepMaschinen, filter) : null
-                                  return (
-                                    <div key={bst.id} className="flex w-80 shrink-0 flex-col gap-2">
-                                      <EntityCard
-                                        title={bst.name}
-                                        onRename={(name) => renameSchritt(bst.id, name)}
-                                        onRemove={() => removeSchritt(bst.id)}
-                                        onAddColumn={(name, type) => addColumnSchritt(bst.id, name, type)}
-                                        rahmen='normal'
-                                        betont
-                                        kopfExtra={
-                                          <span className="flex shrink-0 items-center gap-0.5">
-                                            <button
-                                              onClick={() => moveBlockSchritt(bst.id, 'links')}
-                                              className="rounded px-1 text-[11px] text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-                                              title="Nach links verschieben"
-                                            >
-                                              ◀
-                                            </button>
-                                            <button
-                                              onClick={() => moveBlockSchritt(bst.id, 'rechts')}
-                                              className="rounded px-1 text-[11px] text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-                                              title="Nach rechts verschieben"
-                                            >
-                                              ▶
-                                            </button>
-                                          </span>
-                                        }
-                                      >
-                                        {SCHRITT_TABELLE_SPALTEN.map((c) => (
-                                          <div
-                                            key={c.id}
-                                            ref={registerRef(`s:${bst.id}:${c.id}`)}
-                                            data-column-node={`s:${bst.id}:${c.id}`}
-                                            className="flex items-center gap-1 border-t border-slate-50 px-2 py-1"
-                                          >
-                                            <span className="min-w-0 flex-1 text-[10px] font-medium text-slate-700">
-                                              {c.name}
-                                            </span>
-                                            {c.id !== 'auftragsnummer' && (
-                                              <span className="text-[8px] uppercase text-slate-400">
-                                                {c.type}
-                                              </span>
-                                            )}
-                                            {c.id === 'auftragsnummer' && (
-                                              <KeyBadge type="pk" info={`s:${bst.id}:${c.id}`} />
-                                            )}
-                                            {c.id === 'auftragsnummer' && (
-                                              <span
-                                                onPointerDown={startDrag('s', bst.id, 'auftragsnummer', 'pk')}
-                                                className="h-3 w-3 shrink-0 cursor-grab rounded-full bg-emerald-500 hover:bg-emerald-600"
-                                                title="Primärschlüssel – ziehen, um zu verbinden"
+                        {/* Schritte als Spalten, rechts verankert (neue Schritte kommen nach links) */}
+                        <div className="overflow-x-auto pb-1" style={{ direction: 'rtl' }}>
+                          <div className="flex items-start gap-3" style={{ direction: 'ltr' }}>
+                            {blockSteps.map((bst) => {
+                              const bstepMaschinen = alleMaschinen.filter((m) => m.schrittId === bst.id)
+                              const bstepNeben = neben.filter((n) => n.schrittId === bst.id)
+                              const agg = aggregate ? aggregateSchritt(bst, bstepMaschinen, filter) : null
+                              return (
+                                <div key={bst.id} className="flex w-96 shrink-0 flex-col gap-2">
+                                  {/* Zugeordnete Prozessbezogene Tabellen für diesen Blockschritt */}
+                                  {bstepNeben.map((n) => {
+                                    const nRegisters = getTabellenRegister(n)
+                                    const nVisibleCols = filterColumnsByRegister(n.columns, n.activeRegisterId)
+                                    return (
+                                      <div key={n.id} ref={registerRef(`nc:${n.id}`)} className="min-w-0">
+                                        <EntityCard
+                                          compact
+                                          title={n.name}
+                                          modus={n.modus ?? 'soll'}
+                                          onModusChange={(neu) => setNebenModus(n.id, neu)}
+                                          onRename={(name) => renameNebentabelle(n.id, name)}
+                                          onRemove={() => removeNebentabelle(n.id)}
+                                          onAddColumn={(name, type) => addColumnNeben(n.id, name, type)}
+                                          onKopieren={() => kopiereNebentabelle(n.id)}
+                                          registers={nRegisters}
+                                          activeRegisterId={n.activeRegisterId}
+                                          columns={n.columns}
+                                          onSelectRegister={(regId) => setActiveRegister(n.id, regId)}
+                                          onAddRegister={(name) => addRegister(n.id, name)}
+                                          onRenameRegister={(regId, name) => renameRegister(n.id, regId, name)}
+                                          onRemoveRegister={(regId) => removeRegister(n.id, regId)}
+                                          kopfExtra={
+                                            <div className="flex w-full items-center justify-between gap-1">
+                                              <ArbeitsplatzZeile
+                                                tabelleId={n.id}
+                                                wert={n.arbeitsplatz}
+                                                onChange={setNebenArbeitsplatz}
+                                                dark={n.modus === 'ist'}
                                               />
-                                            )}
-                                          </div>
-                                        ))}
-                                        {bst.columns.map((c) => (
-                                          <ColumnRow
-                                            key={c.id}
-                                            nodeKey={`s:${bst.id}:${c.id}`}
-                                            registerRef={registerRef}
-                                            col={c}
-                                            keyType={keyTypeOf(bst.keys, c.id)}
-                                            onRename={(name) => renameColumnSchritt(bst.id, c.id, name)}
-                                            onChangeType={(t) => changeColumnTypeSchritt(bst.id, c.id, t)}
-                                            onRemove={() => removeColumnSchritt(bst.id, c.id)}
-                                            onCycleKey={() =>
-                                              setColumnKeySchritt(bst.id, c.id, nextKey(keyTypeOf(bst.keys, c.id)))
-                                            }
-                                            onStartDrag={startDrag('s', bst.id, c.id, keyTypeOf(bst.keys, c.id))}
+                                              <select
+                                                value={n.schrittId ?? ''}
+                                                onChange={(e) => setNebenSchritt(n.id, e.target.value || null)}
+                                                className={`max-w-[100px] truncate rounded border px-1 py-0.5 text-[10px] ${
+                                                  n.modus === 'ist'
+                                                    ? 'border-zinc-700 bg-zinc-800 text-zinc-200'
+                                                    : 'border-slate-300 bg-white text-slate-700'
+                                                }`}
+                                                title="Schritt zuordnen"
+                                              >
+                                                <option value="">(Kein Schritt)</option>
+                                                {schritte.map((s) => (
+                                                  <option key={s.id} value={s.id}>
+                                                    {s.name}
+                                                  </option>
+                                                ))}
+                                              </select>
+                                            </div>
+                                          }
+                                        >
+                                          {nVisibleCols.map((c) => (
+                                            <ColumnRow
+                                              key={c.id}
+                                              compact
+                                              dark={n.modus === 'ist'}
+                                              nodeKey={`n:${n.id}:${c.id}`}
+                                              registerRef={registerRef}
+                                              col={c}
+                                              keyType={keyTypeOf(n.keys, c.id)}
+                                              onRename={(name) => renameColumnNeben(n.id, c.id, name)}
+                                              onChangeType={(t) => changeColumnTypeNeben(n.id, c.id, t)}
+                                              onRemove={() => removeColumnNeben(n.id, c.id)}
+                                              onCycleKey={() =>
+                                                setColumnKeyNeben(n.id, c.id, nextKey(keyTypeOf(n.keys, c.id)))
+                                              }
+                                              onStartDrag={startDrag('n', n.id, c.id, keyTypeOf(n.keys, c.id))}
+                                              registers={nRegisters}
+                                              onMoveToRegister={(targetRegId) => moveColumnToRegister(n.id, c.id, targetRegId)}
+                                            />
+                                          ))}
+                                        </EntityCard>
+                                      </div>
+                                    )
+                                  })}
+
+                                  <EntityCard
+                                    title={bst.name}
+                                    onRename={(name) => renameSchritt(bst.id, name)}
+                                    onRemove={() => removeSchritt(bst.id)}
+                                    onAddColumn={(name, type) => addColumnSchritt(bst.id, name, type)}
+                                    rahmen='normal'
+                                    betont
+                                    kopfExtra={
+                                      <span className="flex shrink-0 items-center gap-0.5">
+                                        <button
+                                          onClick={() => moveBlockSchritt(bst.id, 'links')}
+                                          className="rounded px-1 text-[11px] text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                                          title="Nach links verschieben"
+                                        >
+                                          ◀
+                                        </button>
+                                        <button
+                                          onClick={() => moveBlockSchritt(bst.id, 'rechts')}
+                                          className="rounded px-1 text-[11px] text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                                          title="Nach rechts verschieben"
+                                        >
+                                          ▶
+                                        </button>
+                                      </span>
+                                    }
+                                  >
+                                    {SCHRITT_TABELLE_SPALTEN.map((c) => (
+                                      <div
+                                        key={c.id}
+                                        ref={registerRef(`s:${bst.id}:${c.id}`)}
+                                        data-column-node={`s:${bst.id}:${c.id}`}
+                                        className="flex items-center gap-1 border-t border-slate-50 px-2 py-1"
+                                      >
+                                        <span className="min-w-0 flex-1 text-[10px] font-medium text-slate-700">
+                                          {c.name}
+                                        </span>
+                                        {c.id !== 'auftragsnummer' && (
+                                          <span className="text-[8px] uppercase text-slate-400">
+                                            {c.type}
+                                          </span>
+                                        )}
+                                        {c.id === 'auftragsnummer' && (
+                                          <KeyBadge type="pk" info={`s:${bst.id}:${c.id}`} />
+                                        )}
+                                        {c.id === 'auftragsnummer' && (
+                                          <span
+                                            onPointerDown={startDrag('s', bst.id, 'auftragsnummer', 'pk')}
+                                            className="h-3 w-3 shrink-0 cursor-grab rounded-full bg-emerald-500 hover:bg-emerald-600"
+                                            title="Primärschlüssel – ziehen, um zu verbinden"
                                           />
-                                        ))}
-                                        {/* Zugehörigkeit + Überspringbar + Schleife (wie fester Schritt) */}
-                                        <div className="border-t border-slate-100 bg-slate-50/60 px-2 py-1.5">
-                                          <div className="mb-1 flex items-center gap-1">
-                                            <span className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">
-                                              Zugehörigkeit
-                                            </span>
-                                            <select
-                                              value={bst.blockId ?? ''}
-                                              onChange={(e) => setSchrittBlock(bst.id, e.target.value || null)}
-                                              className="min-w-0 flex-1 rounded border border-slate-200 bg-white px-1 py-0.5 text-[10px] text-slate-700"
-                                              title="Schritt in einen anderen Block oder als festen Schritt verschieben"
-                                            >
-                                              <option value="">fester Schritt</option>
+                                        )}
+                                      </div>
+                                    ))}
+                                    {bst.columns.map((c) => (
+                                      <ColumnRow
+                                        key={c.id}
+                                        nodeKey={`s:${bst.id}:${c.id}`}
+                                        registerRef={registerRef}
+                                        col={c}
+                                        keyType={keyTypeOf(bst.keys, c.id)}
+                                        onRename={(name) => renameColumnSchritt(bst.id, c.id, name)}
+                                        onChangeType={(t) => changeColumnTypeSchritt(bst.id, c.id, t)}
+                                        onRemove={() => removeColumnSchritt(bst.id, c.id)}
+                                        onCycleKey={() =>
+                                          setColumnKeySchritt(bst.id, c.id, nextKey(keyTypeOf(bst.keys, c.id)))
+                                        }
+                                        onStartDrag={startDrag('s', bst.id, c.id, keyTypeOf(bst.keys, c.id))}
+                                      />
+                                    ))}
+                                    {/* Zugehörigkeit + Überspringbar + Schleife (wie fester Schritt) */}
+                                    <div className="border-t border-slate-100 bg-slate-50/60 px-2 py-1.5">
+                                      <div className="mb-1 flex items-center gap-1">
+                                        <span className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">
+                                          Zugehörigkeit
+                                        </span>
+                                        <select
+                                          value={bst.blockId ?? ''}
+                                          onChange={(e) => setSchrittBlock(bst.id, e.target.value || null)}
+                                          className="min-w-0 flex-1 rounded border border-slate-200 bg-white px-1 py-0.5 text-[10px] text-slate-700"
+                                          title="Schritt in einen anderen Block oder als festen Schritt verschieben"
+                                        >
+                                          <option value="">fester Schritt</option>
+                                          {bloecke.map((b) => (
+                                            <option key={b.id} value={b.id}>
+                                              {b.name}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      </div>
+                                      <label className="mb-1 flex items-center gap-1.5 text-[10px] text-slate-600">
+                                        <input
+                                          type="checkbox"
+                                          checked={bst.optional}
+                                          onChange={(e) => setSchrittOptional(bst.id, e.target.checked)}
+                                          className="h-3 w-3 accent-zollern-600"
+                                        />
+                                        optional (überspringbar, wenn kein Eintrag)
+                                      </label>
+                                      <div className="mb-1 flex items-center gap-1">
+                                        <span className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">
+                                          Schleife
+                                        </span>
+                                        <select
+                                          value={bst.loopTargetId ?? ''}
+                                          onChange={(e) =>
+                                            setSchrittLoop(bst.id, e.target.value || null, bst.loopCondition)
+                                          }
+                                          className="min-w-0 flex-1 rounded border border-slate-200 bg-white px-1 py-0.5 text-[10px] text-slate-700"
+                                          title="Ziel für Rücksprung: Schritt oder variabler Block"
+                                        >
+                                          <option value="">kein Rücksprung</option>
+                                          <optgroup label="Schritte">
+                                            {schritte
+                                              .filter((x) => x.id !== bst.id)
+                                              .map((x) => (
+                                                <option key={x.id} value={x.id}>
+                                                  {x.name}
+                                                </option>
+                                              ))}
+                                          </optgroup>
+                                          {bloecke.length > 0 && (
+                                            <optgroup label="Variable Blöcke">
                                               {bloecke.map((b) => (
                                                 <option key={b.id} value={b.id}>
                                                   {b.name}
                                                 </option>
                                               ))}
-                                            </select>
-                                          </div>
-                                          <label className="mb-1 flex items-center gap-1.5 text-[10px] text-slate-600">
-                                            <input
-                                              type="checkbox"
-                                              checked={bst.optional}
-                                              onChange={(e) => setSchrittOptional(bst.id, e.target.checked)}
-                                              className="h-3 w-3 accent-zollern-600"
-                                            />
-                                            optional (überspringbar, wenn kein Eintrag)
-                                          </label>
-                                          <div className="mb-1 flex items-center gap-1">
-                                            <span className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">
-                                              Schleife
-                                            </span>
-                                            <select
-                                              value={bst.loopTargetId ?? ''}
-                                              onChange={(e) =>
-                                                setSchrittLoop(bst.id, e.target.value || null, bst.loopCondition)
-                                              }
-                                              className="min-w-0 flex-1 rounded border border-slate-200 bg-white px-1 py-0.5 text-[10px] text-slate-700"
-                                              title="Ziel für Rücksprung: Schritt oder variabler Block"
-                                            >
-                                              <option value="">kein Rücksprung</option>
-                                              <optgroup label="Schritte">
-                                                {schritte
-                                                  .filter((x) => x.id !== bst.id)
-                                                  .map((x) => (
-                                                    <option key={x.id} value={x.id}>
-                                                      {x.name}
-                                                    </option>
-                                                  ))}
-                                              </optgroup>
-                                              {bloecke.length > 0 && (
-                                                <optgroup label="Variable Blöcke">
-                                                  {bloecke.map((b) => (
-                                                    <option key={b.id} value={b.id}>
-                                                      {b.name}
-                                                    </option>
-                                                  ))}
-                                                </optgroup>
-                                              )}
-                                            </select>
-                                            {bst.loopTargetId && (
-                                              <button
-                                                onClick={() => setSchrittLoop(bst.id, null, null)}
-                                                className="shrink-0 rounded px-1 text-slate-400 hover:text-red-500"
-                                                title="Schleife entfernen"
-                                              >
-                                                ✕
-                                                        </button>
-                                                      )}
-                                                    </div>
-                                                  </div>
-                                                </EntityCard>
-                                      <div className="flex flex-col gap-2">
-                                        {bstepMaschinen.map((m, mi) => {
-                                          const anteil = agg?.entries.find((e) => e.tabelle.id === m.id)
-                                          const used = m.rows.some((r) => r.auftragsnummer === auftrag)
-                                          const mRegisters = getTabellenRegister(m)
-                                          const mVisibleCols = filterColumnsByRegister(m.columns, m.activeRegisterId)
-                                          let opacity = 1
-                                          if (trace) opacity = used ? 1 : 0.15
-                                          else if (aggregate) opacity = opacityForPercent(anteil?.percent ?? 0)
-                                          return (
-                                            <div
-                                              key={m.id}
-                                              ref={registerRef(`mc:${m.id}`)}
-                                              className="rounded-lg"
-                                              style={{
-                                                opacity,
-                                                outline: trace && used ? '2px solid #F56405' : 'none',
-                                                outlineOffset: '1px',
-                                              }}
-                                            >
-                                              <EntityCard
-                                                compact
-                                                title={m.name}
-                                                modus={m.modus ?? 'soll'}
-                                                onModusChange={(neu) => setProduktionModus(m.id, neu)}
-                                                onRename={(name) => renameProduktionstabelle(m.id, name)}
-                                                onRemove={() => removeProduktionstabelle(m.id)}
-                                                percent={aggregate && agg ? (anteil?.percent ?? 0) : null}
-                                                colorClass={MASCHINEN_FARBEN[mi % MASCHINEN_FARBEN.length]}
-                                                onAddColumn={(name, type) => addColumnProduktion(m.id, name, type)}
-                                                onKopieren={() => kopiereMaschine(m.id)}
-                                                registers={mRegisters}
-                                                activeRegisterId={m.activeRegisterId}
-                                                columns={m.columns}
-                                                onSelectRegister={(regId) => setActiveRegister(m.id, regId)}
-                                                onAddRegister={(name) => addRegister(m.id, name)}
-                                                onRenameRegister={(regId, name) => renameRegister(m.id, regId, name)}
-                                                onRemoveRegister={(regId) => removeRegister(m.id, regId)}
-                                                kopfExtra={
-                                                  <ArbeitsplatzZeile
-                                                    tabelleId={m.id}
-                                                    wert={m.arbeitsplatz}
-                                                    onChange={setProduktionArbeitsplatz}
-                                                    dark={m.modus === 'ist'}
-                                                  />
-                                                }
-                                              >
-                                                {trace && (
-                                                  <VerwendetHinweis
-                                                    tabelle={m}
-                                                    auftrag={auftrag}
-                                                    inSchleife={istInSchleife(bst.id, alleSchritte, alleBloecke)}
-                                                  />
-                                                )}
-                                                {mVisibleCols.map((c) => (
-                                                  <ColumnRow
-                                                    key={c.id}
-                                                    compact
-                                                    dark={m.modus === 'ist'}
-                                                    nodeKey={`m:${m.id}:${c.id}`}
-                                                    registerRef={registerRef}
-                                                    col={c}
-                                                    keyType={keyTypeOf(m.keys, c.id)}
-                                                    onRename={(name) => renameColumnProduktion(m.id, c.id, name)}
-                                                    onChangeType={(t) => changeColumnTypeProduktion(m.id, c.id, t)}
-                                                    onRemove={() => removeColumnProduktion(m.id, c.id)}
-                                                    onCycleKey={() =>
-                                                      setColumnKeyProduktion(m.id, c.id, nextKey(keyTypeOf(m.keys, c.id)))
-                                                    }
-                                                    onStartDrag={startDrag('m', m.id, c.id, keyTypeOf(m.keys, c.id))}
-                                                    registers={mRegisters}
-                                                    onMoveToRegister={(targetRegId) => moveColumnToRegister(m.id, c.id, targetRegId)}
-                                                  />
-                                                ))}
-                                                {trace && used && (
-                                                  <div className="px-2 py-1.5">
-                                                    <DurchlaufWahl
-                                                      tabelle={m}
-                                                      auftragsnummer={auftrag}
-                                                      kompakt
-                                                      dark={m.modus === 'ist'}
-                                                    />
-                                                  </div>
-                                                )}
-                                              </EntityCard>
-                                            </div>
-                                          )
-                                        })}
-                                        <div className="flex min-h-[2.5rem] flex-col items-center justify-center gap-0.5 rounded-lg border-2 border-dashed border-slate-200">
+                                            </optgroup>
+                                          )}
+                                        </select>
+                                        {bst.loopTargetId && (
                                           <button
-                                            onClick={() => addProduktionstabelle(bst.id)}
-                                            className="text-[11px] text-slate-400 hover:text-zollern-600"
+                                            onClick={() => setSchrittLoop(bst.id, null, null)}
+                                            className="shrink-0 rounded px-1 text-slate-400 hover:text-red-500"
+                                            title="Schleife entfernen"
                                           >
-                                            + Arbeitsplatz
+                                            ✕
                                           </button>
-                                          <button
-                                            onClick={() => einfuegenMaschine(bst.id)}
-                                            className="text-[10px] text-slate-400 hover:text-zollern-600"
-                                            title="Kopierte Maschinentabelle hier einfügen"
-                                          >
-                                            ⧉ Einfügen
-                                          </button>
-                                        </div>
+                                        )}
                                       </div>
                                     </div>
-                                  )
-                                })}
-                                {blockSteps.length === 0 && (
-                                  <div className="flex min-h-[5rem] w-full items-center justify-center rounded-lg border-2 border-dashed border-slate-200 text-sm text-slate-400">
-                                    + Schritt über den Button oben hinzufügen
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        )
-                      }
-                      const st = item.st
-                      const stepMaschinen = alleMaschinen.filter((m) => m.schrittId === st.id)
-                      const agg = aggregate ? aggregateSchritt(st, stepMaschinen, filter) : null
-                      const matchedRows = stepMaschinen.flatMap((m) => m.rows)
-                      const matched = aggregate
-                        ? matchedRows.filter((r) => r.fn === filter.fn.trim() || r.datum === filter.datum).length
-                        : 0
-                      return (
-                        <Fragment key={st.id}>
-                          {/* Maschinen dieses Schritts */}
-                          <div className="grid grid-cols-2 content-start items-start gap-4 self-start lg:grid-cols-3 2xl:grid-cols-4">
-                            {stepMaschinen.map((m, mi) => {
-                              const anteil = agg?.entries.find((e) => e.tabelle.id === m.id)
-                              const used = m.rows.some((r) => r.auftragsnummer === auftrag)
-                              const mRegisters = getTabellenRegister(m)
-                              const mVisibleCols = filterColumnsByRegister(m.columns, m.activeRegisterId)
-                              let opacity = 1
-                              if (trace) opacity = used ? 1 : 0.15
-                              else if (aggregate) opacity = opacityForPercent(anteil?.percent ?? 0)
-                              return (
-                                <div
-                                  key={m.id}
-                                  ref={registerRef(`mc:${m.id}`)}
-                                  className="rounded-lg"
-                                  style={{
-                                    opacity,
-                                    outline: trace && used ? '2px solid #F56405' : 'none',
-                                    outlineOffset: '1px',
-                                  }}
-                                >
-                                  <EntityCard
-                                    compact
-                                    title={m.name}
-                                    modus={m.modus ?? 'soll'}
-                                    onModusChange={(neu) => setProduktionModus(m.id, neu)}
-                                    onRename={(name) => renameProduktionstabelle(m.id, name)}
-                                    onRemove={() => removeProduktionstabelle(m.id)}
-                                    percent={aggregate && agg ? (anteil?.percent ?? 0) : null}
-                                    colorClass={MASCHINEN_FARBEN[mi % MASCHINEN_FARBEN.length]}
-                                    onAddColumn={(name, type) => addColumnProduktion(m.id, name, type)}
-                                    onKopieren={() => kopiereMaschine(m.id)}
-                                    registers={mRegisters}
-                                    activeRegisterId={m.activeRegisterId}
-                                    columns={m.columns}
-                                    onSelectRegister={(regId) => setActiveRegister(m.id, regId)}
-                                    onAddRegister={(name) => addRegister(m.id, name)}
-                                    onRenameRegister={(regId, name) => renameRegister(m.id, regId, name)}
-                                    onRemoveRegister={(regId) => removeRegister(m.id, regId)}
-                                    kopfExtra={
-                                      <ArbeitsplatzZeile
-                                        tabelleId={m.id}
-                                        wert={m.arbeitsplatz}
-                                        onChange={setProduktionArbeitsplatz}
-                                        dark={m.modus === 'ist'}
-                                      />
-                                    }
-                                  >
-                                    {trace && (
-                                      <VerwendetHinweis
-                                        tabelle={m}
-                                        auftrag={auftrag}
-                                        inSchleife={istInSchleife(st.id, alleSchritte, alleBloecke)}
-                                      />
-                                    )}
-                                    {mVisibleCols.map((c) => (
-                                      <ColumnRow
-                                        key={c.id}
-                                        compact
-                                        dark={m.modus === 'ist'}
-                                        nodeKey={`m:${m.id}:${c.id}`}
-                                        registerRef={registerRef}
-                                        col={c}
-                                        keyType={keyTypeOf(m.keys, c.id)}
-                                        onRename={(name) => renameColumnProduktion(m.id, c.id, name)}
-                                        onChangeType={(t) => changeColumnTypeProduktion(m.id, c.id, t)}
-                                        onRemove={() => removeColumnProduktion(m.id, c.id)}
-                                        onCycleKey={() =>
-                                          setColumnKeyProduktion(m.id, c.id, nextKey(keyTypeOf(m.keys, c.id)))
-                                        }
-                                        onStartDrag={startDrag('m', m.id, c.id, keyTypeOf(m.keys, c.id))}
-                                        registers={mRegisters}
-                                        onMoveToRegister={(targetRegId) => moveColumnToRegister(m.id, c.id, targetRegId)}
-                                      />
-                                    ))}
-                                    {trace && used && (
-                                      <div className="px-2 py-1.5">
-                                        <DurchlaufWahl tabelle={m} auftragsnummer={auftrag} kompakt dark={m.modus === 'ist'} />
-                                      </div>
-                                    )}
                                   </EntityCard>
+                                  <div className="flex flex-col gap-2">
+                                    {bstepMaschinen.map((m, mi) => {
+                                      const anteil = agg?.entries.find((e) => e.tabelle.id === m.id)
+                                      const used = m.rows.some((r) => r.auftragsnummer === auftrag)
+                                      const mRegisters = getTabellenRegister(m)
+                                      const mVisibleCols = filterColumnsByRegister(m.columns, m.activeRegisterId)
+                                      let opacity = 1
+                                      if (trace) opacity = used ? 1 : 0.15
+                                      else if (aggregate) opacity = opacityForPercent(anteil?.percent ?? 0)
+                                      return (
+                                        <div
+                                          key={m.id}
+                                          ref={registerRef(`mc:${m.id}`)}
+                                          className="rounded-lg"
+                                          style={{
+                                            opacity,
+                                            outline: trace && used ? '2px solid #F56405' : 'none',
+                                            outlineOffset: '1px',
+                                          }}
+                                        >
+                                          <EntityCard
+                                            compact
+                                            title={m.name}
+                                            modus={m.modus ?? 'soll'}
+                                            onModusChange={(neu) => setProduktionModus(m.id, neu)}
+                                            onRename={(name) => renameProduktionstabelle(m.id, name)}
+                                            onRemove={() => removeProduktionstabelle(m.id)}
+                                            percent={aggregate && agg ? (anteil?.percent ?? 0) : null}
+                                            colorClass={MASCHINEN_FARBEN[mi % MASCHINEN_FARBEN.length]}
+                                            onAddColumn={(name, type) => addColumnProduktion(m.id, name, type)}
+                                            onKopieren={() => kopiereMaschine(m.id)}
+                                            registers={mRegisters}
+                                            activeRegisterId={m.activeRegisterId}
+                                            columns={m.columns}
+                                            onSelectRegister={(regId) => setActiveRegister(m.id, regId)}
+                                            onAddRegister={(name) => addRegister(m.id, name)}
+                                            onRenameRegister={(regId, name) => renameRegister(m.id, regId, name)}
+                                            onRemoveRegister={(regId) => removeRegister(m.id, regId)}
+                                            kopfExtra={
+                                              <ArbeitsplatzZeile
+                                                tabelleId={m.id}
+                                                wert={m.arbeitsplatz}
+                                                onChange={setProduktionArbeitsplatz}
+                                                dark={m.modus === 'ist'}
+                                              />
+                                            }
+                                          >
+                                            {trace && (
+                                              <VerwendetHinweis
+                                                tabelle={m}
+                                                auftrag={auftrag}
+                                                inSchleife={istInSchleife(bst.id, alleSchritte, alleBloecke)}
+                                              />
+                                            )}
+                                            {mVisibleCols.map((c) => (
+                                              <ColumnRow
+                                                key={c.id}
+                                                compact
+                                                dark={m.modus === 'ist'}
+                                                nodeKey={`m:${m.id}:${c.id}`}
+                                                registerRef={registerRef}
+                                                col={c}
+                                                keyType={keyTypeOf(m.keys, c.id)}
+                                                onRename={(name) => renameColumnProduktion(m.id, c.id, name)}
+                                                onChangeType={(t) => changeColumnTypeProduktion(m.id, c.id, t)}
+                                                onRemove={() => removeColumnProduktion(m.id, c.id)}
+                                                onCycleKey={() =>
+                                                  setColumnKeyProduktion(m.id, c.id, nextKey(keyTypeOf(m.keys, c.id)))
+                                                }
+                                                onStartDrag={startDrag('m', m.id, c.id, keyTypeOf(m.keys, c.id))}
+                                                registers={mRegisters}
+                                                onMoveToRegister={(targetRegId) => moveColumnToRegister(m.id, c.id, targetRegId)}
+                                              />
+                                            ))}
+                                            {trace && used && (
+                                              <div className="px-2 py-1.5">
+                                                <DurchlaufWahl
+                                                  tabelle={m}
+                                                  auftragsnummer={auftrag}
+                                                  kompakt
+                                                  dark={m.modus === 'ist'}
+                                                />
+                                              </div>
+                                            )}
+                                          </EntityCard>
+                                        </div>
+                                      )
+                                    })}
+                                    <div className="flex min-h-[2.5rem] flex-wrap items-center justify-center gap-1 rounded-lg border-2 border-dashed border-slate-200 p-1">
+                                      <button
+                                        onClick={() => addProduktionstabelle(bst.id)}
+                                        className="rounded px-2 py-0.5 text-[11px] text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                                      >
+                                        + Arbeitsplatz
+                                      </button>
+                                      <button
+                                        onClick={() => addNebentabelle(a.id, undefined, bst.id)}
+                                        className="rounded px-2 py-0.5 text-[11px] text-indigo-600 hover:bg-indigo-50"
+                                        title="Prozess-Tabelle diesem Schritt zuordnen"
+                                      >
+                                        + Prozess
+                                      </button>
+                                      <button
+                                        onClick={() => einfuegenMaschine(bst.id)}
+                                        className="rounded px-1.5 py-0.5 text-[10px] text-slate-400 hover:text-slate-600"
+                                        title="Kopierte Maschinentabelle hier einfügen"
+                                      >
+                                        ⧉ Einfügen
+                                      </button>
+                                    </div>
+                                  </div>
                                 </div>
                               )
                             })}
+                            {blockSteps.length === 0 && (
+                              <div className="rounded border border-dashed border-zollern-300 px-4 py-8 text-center text-xs text-zollern-600">
+                                Keine Schritte im Block. Klicke oben auf „+ Schritt“.
+                              </div>
+                            )}
                           </div>
+                        </div>
+                      </div>
+                    )
+                  }
 
-                          {/* Schritt-Tabelle */}
-                          <div ref={registerRef(`sc:${st.id}`)}>
-                            <EntityCard
-                              title={st.name}
-                              onRename={(name) => renameSchritt(st.id, name)}
-                              onRemove={() => removeSchritt(st.id)}
-                              percent={aggregate && matchedRows.length > 0 ? (matched / matchedRows.length) * 100 : null}
-                              onAddColumn={(name, type) => addColumnSchritt(st.id, name, type)}
-                              rahmen='normal'
-                              betont
-                            footer={
-                              <div className="flex items-center justify-between gap-1 border-t border-slate-100 px-2 py-1">
-                                <div className="flex items-center gap-1">
-                                  <button
-                                    onClick={() => addProduktionstabelle(st.id)}
-                                    className="rounded border border-slate-300 px-2 py-0.5 text-[11px] text-slate-600 hover:bg-slate-100"
-                                  >
-                                    + Arbeitsplatz
-                                  </button>
-                                  <button
-                                    onClick={() => einfuegenMaschine(st.id)}
-                                    className="rounded border border-slate-300 px-2 py-0.5 text-[11px] text-slate-500 hover:bg-slate-100"
-                                    title="Kopierte Maschinentabelle hier einfügen"
-                                  >
-                                    ⧉ Einfügen
-                                  </button>
-                                </div>
+                  const st = item.st
+                  const festeSchritte = schritte.filter((x) => !x.blockId)
+                  const stepIndex = festeSchritte.findIndex((s) => s.id === st.id)
+                  const stepNeben = neben.filter((n) => {
+                    if (n.schrittId === st.id) return true
+                    if (!n.schrittId || !schritte.some((s) => s.id === n.schrittId)) {
+                      return stepIndex === 0
+                    }
+                    return false
+                  })
+                  const stepMaschinen = alleMaschinen.filter((m) => m.schrittId === st.id)
+                  const agg = aggregate ? aggregateSchritt(st, stepMaschinen, filter) : null
+                  const matchedRows = stepMaschinen.flatMap((m) => m.rows)
+                  const matched = aggregate
+                    ? matchedRows.filter((r) => r.fn === filter.fn.trim() || r.datum === filter.datum).length
+                    : 0
+                                    return (
+                    <Fragment key={st.id}>
+                      {/* 1. Prozessbezogene Daten dieses Schritts (30% - Platz für 2 Tabellen nebeneinander) */}
+                      <div className="grid grid-cols-2 content-start items-start gap-2 self-start">
+                        {stepNeben.map((n) => {
+                          const nRegisters = getTabellenRegister(n)
+                          const nVisibleCols = filterColumnsByRegister(n.columns, n.activeRegisterId)
+                          return (
+                            <div key={n.id} ref={registerRef(`nc:${n.id}`)} className="min-w-0">
+                              <EntityCard
+                                compact
+                                title={n.name}
+                                modus={n.modus ?? 'soll'}
+                                onModusChange={(neu) => setNebenModus(n.id, neu)}
+                                onRename={(name) => renameNebentabelle(n.id, name)}
+                                onRemove={() => removeNebentabelle(n.id)}
+                                onAddColumn={(name, type) => addColumnNeben(n.id, name, type)}
+                                onKopieren={() => kopiereNebentabelle(n.id)}
+                                registers={nRegisters}
+                                activeRegisterId={n.activeRegisterId}
+                                columns={n.columns}
+                                onSelectRegister={(regId) => setActiveRegister(n.id, regId)}
+                                onAddRegister={(name) => addRegister(n.id, name)}
+                                onRenameRegister={(regId, name) => renameRegister(n.id, regId, name)}
+                                onRemoveRegister={(regId) => removeRegister(n.id, regId)}
+                                kopfExtra={
+                                  <div className="flex w-full flex-col gap-1">
+                                    <div className="flex items-center justify-between gap-1">
+                                      <ArbeitsplatzZeile
+                                        tabelleId={n.id}
+                                        wert={n.arbeitsplatz}
+                                        onChange={setNebenArbeitsplatz}
+                                        dark={n.modus === 'ist'}
+                                      />
+                                      <span className="flex shrink-0 items-center gap-0.5">
+                                        <button
+                                          onClick={() => moveNebenToStep(n.id, 'up')}
+                                          className={`rounded px-1 text-[11px] ${
+                                            n.modus === 'ist'
+                                              ? 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200'
+                                              : 'text-slate-400 hover:bg-slate-100 hover:text-slate-700'
+                                          }`}
+                                          title="Zum vorherigen Schritt verschieben"
+                                        >
+                                          ↑
+                                        </button>
+                                        <button
+                                          onClick={() => moveNebenToStep(n.id, 'down')}
+                                          className={`rounded px-1 text-[11px] ${
+                                            n.modus === 'ist'
+                                              ? 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200'
+                                              : 'text-slate-400 hover:bg-slate-100 hover:text-slate-700'
+                                          }`}
+                                          title="Zum nächsten Schritt verschieben"
+                                        >
+                                          ↓
+                                        </button>
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                      <span className="text-[9px] font-semibold uppercase text-slate-400">Schritt:</span>
+                                      <select
+                                        value={n.schrittId ?? ''}
+                                        onChange={(e) => setNebenSchritt(n.id, e.target.value || null)}
+                                        className={`min-w-0 flex-1 truncate rounded border px-1 py-0.5 text-[10px] ${
+                                          n.modus === 'ist'
+                                            ? 'border-zinc-700 bg-zinc-800 text-zinc-200'
+                                            : 'border-slate-300 bg-white text-slate-700'
+                                        }`}
+                                        title="Zugeordneter Schritt für diese Prozess-Tabelle"
+                                      >
+                                        <option value="">(Kein Schritt)</option>
+                                        {schritte.map((s) => (
+                                          <option key={s.id} value={s.id}>
+                                            {s.name}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                  </div>
+                                }
+                              >
+                                {nVisibleCols.map((c) => (
+                                  <ColumnRow
+                                    key={c.id}
+                                    compact
+                                    dark={n.modus === 'ist'}
+                                    nodeKey={`n:${n.id}:${c.id}`}
+                                    registerRef={registerRef}
+                                    col={c}
+                                    keyType={keyTypeOf(n.keys, c.id)}
+                                    onRename={(name) => renameColumnNeben(n.id, c.id, name)}
+                                    onChangeType={(t) => changeColumnTypeNeben(n.id, c.id, t)}
+                                    onRemove={() => removeColumnNeben(n.id, c.id)}
+                                    onCycleKey={() =>
+                                      setColumnKeyNeben(n.id, c.id, nextKey(keyTypeOf(n.keys, c.id)))
+                                    }
+                                    onStartDrag={startDrag('n', n.id, c.id, keyTypeOf(n.keys, c.id))}
+                                    registers={nRegisters}
+                                    onMoveToRegister={(targetRegId) => moveColumnToRegister(n.id, c.id, targetRegId)}
+                                  />
+                                ))}
+                              </EntityCard>
+                            </div>
+                          )
+                        })}
+                        {stepNeben.length === 0 && (
+                          <button
+                            onClick={() => addNebentabelle(a.id, undefined, st.id)}
+                            className="col-span-2 flex h-20 items-center justify-center rounded-lg border border-dashed border-slate-200 bg-white/40 text-[11px] font-medium text-slate-400 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-600 transition-colors"
+                            title="Prozessbezogene Tabelle für diesen Schritt anlegen"
+                          >
+                            + Prozess-Tabelle zuweisen
+                          </button>
+                        )}
+                        {stepNeben.length === 1 && (
+                          <button
+                            onClick={() => addNebentabelle(a.id, undefined, st.id)}
+                            className="flex h-20 items-center justify-center rounded-lg border border-dashed border-slate-200 bg-white/40 text-[10px] font-medium text-slate-400 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-600 transition-colors"
+                            title="Zweite Prozessbezogene Tabelle für diesen Schritt anlegen"
+                          >
+                            + 2. Tabelle
+                          </button>
+                        )}
+                      </div>
+
+                      {/* 2. Produktionskette (Schritt-Karte, 20%) */}
+                      <div ref={registerRef(`sc:${st.id}`)} className="self-start">
+                        <EntityCard
+                          title={st.name}
+                          onRename={(name) => renameSchritt(st.id, name)}
+                          onRemove={() => removeSchritt(st.id)}
+                          percent={aggregate && matchedRows.length > 0 ? (matched / matchedRows.length) * 100 : null}
+                          onAddColumn={(name, type) => addColumnSchritt(st.id, name, type)}
+                          rahmen='normal'
+                          betont
+                          footer={
+                            <div className="flex flex-col gap-1.5 border-t border-slate-100 px-2 py-1.5">
+                              <div className="flex flex-wrap items-center gap-1">
+                                <button
+                                  onClick={() => addProduktionstabelle(st.id)}
+                                  className="rounded bg-slate-700 px-2 py-0.5 text-[11px] font-medium text-white hover:bg-slate-800"
+                                  title="Neuen Arbeitsplatz für diesen Schritt anlegen"
+                                >
+                                  + Arbeitsplatz
+                                </button>
+                                <button
+                                  onClick={() => addNebentabelle(a.id, undefined, st.id)}
+                                  className="rounded border border-indigo-300 bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-700 hover:bg-indigo-100"
+                                  title="Neue Prozess-Tabelle für diesen Schritt anlegen"
+                                >
+                                  + Prozess
+                                </button>
+                                <button
+                                  onClick={() => einfuegenMaschine(st.id)}
+                                  className="rounded border border-slate-300 px-2 py-0.5 text-[11px] text-slate-500 hover:bg-slate-100"
+                                  title="Kopierte Maschinentabelle hier einfügen"
+                                >
+                                  ⧉ Einfügen
+                                </button>
+                              </div>
+                              <div className="flex items-center justify-between gap-1">
+                                <span className="text-[10px] text-slate-400">Reihenfolge:</span>
                                 <div className="flex items-center gap-1">
                                   <button
                                     onClick={() => moveSchritt(st.id, 'up')}
-                                    disabled={i === 0}
-                                    className="rounded px-1 text-slate-400 hover:bg-slate-100 disabled:opacity-30"
+                                    disabled={stepIndex === 0}
+                                    className="rounded px-1.5 py-0.5 text-xs text-slate-500 hover:bg-slate-100 disabled:opacity-30"
                                     title="Schritt nach oben"
                                   >
                                     ↑
                                   </button>
                                   <button
                                     onClick={() => moveSchritt(st.id, 'down')}
-                                    disabled={i === schritte.length - 1}
-                                    className="rounded px-1 text-slate-400 hover:bg-slate-100 disabled:opacity-30"
+                                    disabled={stepIndex === festeSchritte.length - 1}
+                                    className="rounded px-1.5 py-0.5 text-xs text-slate-500 hover:bg-slate-100 disabled:opacity-30"
                                     title="Schritt nach unten"
                                   >
                                     ↓
                                   </button>
                                 </div>
                               </div>
-                            }
-                          >
-                            {SCHRITT_TABELLE_SPALTEN.map((c) => (
-                              <div
-                                key={c.id}
-                                ref={registerRef(`s:${st.id}:${c.id}`)}
-                                data-column-node={`s:${st.id}:${c.id}`}
-                                className="flex items-center gap-1 border-t border-slate-50 px-2 py-1"
-                              >
-                                <span className="min-w-0 flex-1 text-[11px] font-medium text-slate-700">
-                                  {c.name}
-                                </span>
-                                {c.id !== 'auftragsnummer' && (
-                                  <span className="text-[9px] uppercase text-slate-400">{c.type}</span>
-                                )}
-                                {c.id === 'auftragsnummer' && (
-                                  <KeyBadge type="pk" info={`s:${st.id}:${c.id}`} />
-                                )}
-                                {c.id === 'auftragsnummer' && (
-                                  <span
-                                    onPointerDown={startDrag('s', st.id, 'auftragsnummer', 'pk')}
-                                    className="h-3 w-3 shrink-0 cursor-grab rounded-full bg-emerald-500 hover:bg-emerald-600"
-                                    title="Primärschlüssel – ziehen, um mit einem Fremdschlüssel zu verbinden"
-                                  />
-                                )}
-                              </div>
-                            ))}
-                            {st.columns.map((c) => (
-                              <ColumnRow
-                                key={c.id}
-                                nodeKey={`s:${st.id}:${c.id}`}
-                                registerRef={registerRef}
-                                col={c}
-                                keyType={keyTypeOf(st.keys, c.id)}
-                                onRename={(name) => renameColumnSchritt(st.id, c.id, name)}
-                                onChangeType={(t) => changeColumnTypeSchritt(st.id, c.id, t)}
-                                onRemove={() => removeColumnSchritt(st.id, c.id)}
-                                onCycleKey={() =>
-                                  setColumnKeySchritt(st.id, c.id, nextKey(keyTypeOf(st.keys, c.id)))
-                                }
-                                onStartDrag={startDrag('s', st.id, c.id, keyTypeOf(st.keys, c.id))}
-                              />
-                            ))}
-                            {/* Überspringbar (optional) + Schleife (Rücksprung mit Bedingung) */}
-                            <div className="border-t border-slate-100 bg-slate-50/60 px-2 py-1.5">
-                              <div className="mb-1 flex items-center gap-1">
-                                <span className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">
-                                  Zugehörigkeit
-                                </span>
-                                <select
-                                  value={st.blockId ?? ''}
-                                  onChange={(e) => setSchrittBlock(st.id, e.target.value || null)}
-                                  className="min-w-0 flex-1 rounded border border-slate-200 bg-white px-1 py-0.5 text-[10px] text-slate-700"
-                                  title="Schritt in einen Variablen Block verschieben"
-                                >
-                                  <option value="">fester Schritt</option>
-                                  {bloecke.map((b) => (
-                                    <option key={b.id} value={b.id}>
-                                      {b.name}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-                              <label className="mb-1 flex items-center gap-1.5 text-[10px] text-slate-600">
-                                <input
-                                  type="checkbox"
-                                  checked={st.optional}
-                                  onChange={(e) => setSchrittOptional(st.id, e.target.checked)}
-                                  className="h-3 w-3 accent-zollern-600"
-                                />
-                                optional (überspringbar, wenn kein Eintrag)
-                              </label>
-                              <div className="mb-1 flex items-center gap-1">
-                                <span className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">
-                                  Schleife
-                                </span>
-                                <select
-                                  value={st.loopTargetId ?? ''}
-                                  onChange={(e) =>
-                                    setSchrittLoop(st.id, e.target.value || null, st.loopCondition)
-                                  }
-                                  className="min-w-0 flex-1 rounded border border-slate-200 bg-white px-1 py-0.5 text-[10px] text-slate-700"
-                                  title="Ziel für Rücksprung: Schritt oder variabler Block"
-                                >
-                                  <option value="">kein Rücksprung</option>
-                                  <optgroup label="Schritte">
-                                    {schritte
-                                      .filter((x) => x.id !== st.id)
-                                      .map((x) => (
-                                        <option key={x.id} value={x.id}>
-                                          {x.name}
-                                        </option>
-                                      ))}
-                                  </optgroup>
-                                  {bloecke.length > 0 && (
-                                    <optgroup label="Variable Blöcke">
-                                      {bloecke.map((b) => (
-                                        <option key={b.id} value={b.id}>
-                                          {b.name}
-                                        </option>
-                                      ))}
-                                    </optgroup>
-                                  )}
-                                </select>
-                                {st.loopTargetId && (
-                                  <button
-                                    onClick={() => setSchrittLoop(st.id, null, null)}
-                                    className="shrink-0 rounded px-1 text-slate-400 hover:text-red-500"
-                                    title="Schleife entfernen"
-                                  >
-                                    ✕
-                                  </button>
-                                )}
-                              </div>
                             </div>
-                            </EntityCard>
-                          </div>
-                        </Fragment>
-                      )
-                    })}
-
-                    {schritte.length === 0 && (
-                      <div className="col-span-2 rounded-lg border border-dashed border-slate-300 px-3 py-6 text-center text-sm text-slate-400">
-                        Keine Schritte
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Unterstützungsprozesse */}
-                <div className="w-80 shrink-0 xl:w-96">
-                  <div className="mb-2 border-b border-slate-200 pb-1">
-                    <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                      Unterstützungsprozess
-                    </div>
-                    <div className="mt-1 flex flex-wrap items-center gap-1">
-                      <button
-                        onClick={() => einfuegenNebentabelle(a.id)}
-                        className="rounded border border-slate-300 px-2 py-0.5 text-[11px] text-slate-500 hover:bg-slate-100"
-                        title="Kopierte Nebentabelle hier einfügen"
-                      >
-                        ⧉ Einfügen
-                      </button>
-                      <button
-                        onClick={() => addNebentabelle(a.id)}
-                        className="rounded border border-slate-300 px-2 py-0.5 text-[11px] text-slate-600 hover:bg-slate-100"
-                      >
-                        + Unterstützungsprozess
-                      </button>
-                    </div>
-                  </div>
-                  <div className="flex flex-col gap-3">
-                    {neben.length === 0 && (
-                      <div className="rounded-lg border border-dashed border-slate-300 px-3 py-4 text-center text-xs text-slate-400">
-                        Keine Nebentabellen
-                      </div>
-                    )}
-                    {neben.map((n) => {
-                      const nRegisters = getTabellenRegister(n)
-                      const nVisibleCols = filterColumnsByRegister(n.columns, n.activeRegisterId)
-                      return (
-                        <EntityCard
-                          key={n.id}
-                          title={n.name}
-                          modus={n.modus ?? 'soll'}
-                          onModusChange={(neu) => setNebenModus(n.id, neu)}
-                          onRename={(name) => renameNebentabelle(n.id, name)}
-                          onRemove={() => removeNebentabelle(n.id)}
-                          onAddColumn={(name, type) => addColumnNeben(n.id, name, type)}
-                          onKopieren={() => kopiereNebentabelle(n.id)}
-                          registers={nRegisters}
-                          activeRegisterId={n.activeRegisterId}
-                          columns={n.columns}
-                          onSelectRegister={(regId) => setActiveRegister(n.id, regId)}
-                          onAddRegister={(name) => addRegister(n.id, name)}
-                          onRenameRegister={(regId, name) => renameRegister(n.id, regId, name)}
-                          onRemoveRegister={(regId) => removeRegister(n.id, regId)}
-                          kopfExtra={
-                            <span className="flex shrink-0 items-center gap-1">
-                              <ArbeitsplatzZeile
-                                tabelleId={n.id}
-                                wert={n.arbeitsplatz}
-                                onChange={setNebenArbeitsplatz}
-                                dark={n.modus === 'ist'}
-                              />
-                              <span className="flex shrink-0 items-center gap-0.5">
-                                <button
-                                  onClick={() => moveNebentabelle(n.id, 'up')}
-                                  className={`rounded px-1 text-[11px] ${n.modus === 'ist' ? 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-700'}`}
-                                  title="Nach oben verschieben"
-                                >
-                                  ↑
-                                </button>
-                                <button
-                                  onClick={() => moveNebentabelle(n.id, 'down')}
-                                  className={`rounded px-1 text-[11px] ${n.modus === 'ist' ? 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-700'}`}
-                                  title="Nach unten verschieben"
-                                >
-                                  ↓
-                                </button>
-                              </span>
-                            </span>
                           }
                         >
-                          {nVisibleCols.map((c) => (
+                          {SCHRITT_TABELLE_SPALTEN.map((c) => (
+                            <div
+                              key={c.id}
+                              ref={registerRef(`s:${st.id}:${c.id}`)}
+                              data-column-node={`s:${st.id}:${c.id}`}
+                              className="flex items-center gap-1 border-t border-slate-50 px-2 py-1"
+                            >
+                              <span className="min-w-0 flex-1 text-[10px] font-medium text-slate-700">
+                                {c.name}
+                              </span>
+                              {c.id !== 'auftragsnummer' && (
+                                <span className="text-[8px] uppercase text-slate-400">
+                                  {c.type}
+                                </span>
+                              )}
+                              {c.id === 'auftragsnummer' && (
+                                <KeyBadge type="pk" info={`s:${st.id}:${c.id}`} />
+                              )}
+                              {c.id === 'auftragsnummer' && (
+                                <span
+                                  onPointerDown={startDrag('s', st.id, 'auftragsnummer', 'pk')}
+                                  className="h-3 w-3 shrink-0 cursor-grab rounded-full bg-emerald-500 hover:bg-emerald-600"
+                                  title="Primärschlüssel – ziehen, um mit einem Fremdschlüssel zu verbinden"
+                                />
+                              )}
+                            </div>
+                          ))}
+                          {st.columns.map((c) => (
                             <ColumnRow
                               key={c.id}
-                              dark={n.modus === 'ist'}
-                              nodeKey={`n:${n.id}:${c.id}`}
+                              nodeKey={`s:${st.id}:${c.id}`}
                               registerRef={registerRef}
                               col={c}
-                              keyType={keyTypeOf(n.keys, c.id)}
-                              onRename={(name) => renameColumnNeben(n.id, c.id, name)}
-                              onChangeType={(t) => changeColumnTypeNeben(n.id, c.id, t)}
-                              onRemove={() => removeColumnNeben(n.id, c.id)}
+                              keyType={keyTypeOf(st.keys, c.id)}
+                              onRename={(name) => renameColumnSchritt(st.id, c.id, name)}
+                              onChangeType={(t) => changeColumnTypeSchritt(st.id, c.id, t)}
+                              onRemove={() => removeColumnSchritt(st.id, c.id)}
                               onCycleKey={() =>
-                                setColumnKeyNeben(n.id, c.id, nextKey(keyTypeOf(n.keys, c.id)))
+                                setColumnKeySchritt(st.id, c.id, nextKey(keyTypeOf(st.keys, c.id)))
                               }
-                              onStartDrag={startDrag('n', n.id, c.id, keyTypeOf(n.keys, c.id))}
-                              registers={nRegisters}
-                              onMoveToRegister={(targetRegId) => moveColumnToRegister(n.id, c.id, targetRegId)}
+                              onStartDrag={startDrag('s', st.id, c.id, keyTypeOf(st.keys, c.id))}
                             />
                           ))}
+                          {/* Überspringbar (optional) + Schleife (Rücksprung mit Bedingung) */}
+                          <div className="border-t border-slate-100 bg-slate-50/60 px-2 py-1.5">
+                            <div className="mb-1 flex items-center gap-1">
+                              <span className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">
+                                Zugehörigkeit
+                              </span>
+                              <select
+                                value={st.blockId ?? ''}
+                                onChange={(e) => setSchrittBlock(st.id, e.target.value || null)}
+                                className="min-w-0 flex-1 rounded border border-slate-200 bg-white px-1 py-0.5 text-[10px] text-slate-700"
+                                title="Schritt in einen Variablen Block verschieben"
+                              >
+                                <option value="">fester Schritt</option>
+                                {bloecke.map((b) => (
+                                  <option key={b.id} value={b.id}>
+                                    {b.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <label className="mb-1 flex items-center gap-1.5 text-[10px] text-slate-600">
+                              <input
+                                type="checkbox"
+                                checked={st.optional}
+                                onChange={(e) => setSchrittOptional(st.id, e.target.checked)}
+                                className="h-3 w-3 accent-zollern-600"
+                              />
+                              optional (überspringbar, wenn kein Eintrag)
+                            </label>
+                            <div className="mb-1 flex items-center gap-1">
+                              <span className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">
+                                Schleife
+                              </span>
+                              <select
+                                value={st.loopTargetId ?? ''}
+                                onChange={(e) =>
+                                  setSchrittLoop(st.id, e.target.value || null, st.loopCondition)
+                                }
+                                className="min-w-0 flex-1 rounded border border-slate-200 bg-white px-1 py-0.5 text-[10px] text-slate-700"
+                                title="Ziel für Rücksprung: Schritt oder variabler Block"
+                              >
+                                <option value="">kein Rücksprung</option>
+                                <optgroup label="Schritte">
+                                  {schritte
+                                    .filter((x) => x.id !== st.id)
+                                    .map((x) => (
+                                      <option key={x.id} value={x.id}>
+                                        {x.name}
+                                      </option>
+                                    ))}
+                                </optgroup>
+                                {bloecke.length > 0 && (
+                                  <optgroup label="Variable Blöcke">
+                                    {bloecke.map((b) => (
+                                      <option key={b.id} value={b.id}>
+                                        {b.name}
+                                      </option>
+                                    ))}
+                                  </optgroup>
+                                )}
+                              </select>
+                              {st.loopTargetId && (
+                                <button
+                                  onClick={() => setSchrittLoop(st.id, null, null)}
+                                  className="shrink-0 rounded px-1 text-slate-400 hover:text-red-500"
+                                  title="Schleife entfernen"
+                                >
+                                  ✕
+                                </button>
+                              )}
+                            </div>
+                          </div>
                         </EntityCard>
-                      )
-                    })}
-                  </div>
-                </div>
+                      </div>
+
+                      {/* 3. Produktbezogene Daten dieses Schritts (50%) */}
+                      <div className="grid grid-cols-2 content-start items-start gap-3 self-start lg:grid-cols-2 2xl:grid-cols-3">
+                        {stepMaschinen.map((m, mi) => {
+                          const anteil = agg?.entries.find((e) => e.tabelle.id === m.id)
+                          const used = m.rows.some((r) => r.auftragsnummer === auftrag)
+                          const mRegisters = getTabellenRegister(m)
+                          const mVisibleCols = filterColumnsByRegister(m.columns, m.activeRegisterId)
+                          let opacity = 1
+                          if (trace) opacity = used ? 1 : 0.15
+                          else if (aggregate) opacity = opacityForPercent(anteil?.percent ?? 0)
+                          return (
+                            <div
+                              key={m.id}
+                              ref={registerRef(`mc:${m.id}`)}
+                              className="rounded-lg"
+                              style={{
+                                opacity,
+                                outline: trace && used ? '2px solid #F56405' : 'none',
+                                outlineOffset: '1px',
+                              }}
+                            >
+                              <EntityCard
+                                compact
+                                title={m.name}
+                                modus={m.modus ?? 'soll'}
+                                onModusChange={(neu) => setProduktionModus(m.id, neu)}
+                                onRename={(name) => renameProduktionstabelle(m.id, name)}
+                                onRemove={() => removeProduktionstabelle(m.id)}
+                                percent={aggregate && agg ? (anteil?.percent ?? 0) : null}
+                                colorClass={MASCHINEN_FARBEN[mi % MASCHINEN_FARBEN.length]}
+                                onAddColumn={(name, type) => addColumnProduktion(m.id, name, type)}
+                                onKopieren={() => kopiereMaschine(m.id)}
+                                registers={mRegisters}
+                                activeRegisterId={m.activeRegisterId}
+                                columns={m.columns}
+                                onSelectRegister={(regId) => setActiveRegister(m.id, regId)}
+                                onAddRegister={(name) => addRegister(m.id, name)}
+                                onRenameRegister={(regId, name) => renameRegister(m.id, regId, name)}
+                                onRemoveRegister={(regId) => removeRegister(m.id, regId)}
+                                kopfExtra={
+                                  <ArbeitsplatzZeile
+                                    tabelleId={m.id}
+                                    wert={m.arbeitsplatz}
+                                    onChange={setProduktionArbeitsplatz}
+                                    dark={m.modus === 'ist'}
+                                  />
+                                }
+                              >
+                                {trace && (
+                                  <VerwendetHinweis
+                                    tabelle={m}
+                                    auftrag={auftrag}
+                                    inSchleife={istInSchleife(st.id, alleSchritte, alleBloecke)}
+                                  />
+                                )}
+                                {mVisibleCols.map((c) => (
+                                  <ColumnRow
+                                    key={c.id}
+                                    compact
+                                    dark={m.modus === 'ist'}
+                                    nodeKey={`m:${m.id}:${c.id}`}
+                                    registerRef={registerRef}
+                                    col={c}
+                                    keyType={keyTypeOf(m.keys, c.id)}
+                                    onRename={(name) => renameColumnProduktion(m.id, c.id, name)}
+                                    onChangeType={(t) => changeColumnTypeProduktion(m.id, c.id, t)}
+                                    onRemove={() => removeColumnProduktion(m.id, c.id)}
+                                    onCycleKey={() =>
+                                      setColumnKeyProduktion(m.id, c.id, nextKey(keyTypeOf(m.keys, c.id)))
+                                    }
+                                    onStartDrag={startDrag('m', m.id, c.id, keyTypeOf(m.keys, c.id))}
+                                    registers={mRegisters}
+                                    onMoveToRegister={(targetRegId) => moveColumnToRegister(m.id, c.id, targetRegId)}
+                                  />
+                                ))}
+                                {trace && used && (
+                                  <div className="px-2 py-1.5">
+                                    <DurchlaufWahl tabelle={m} auftragsnummer={auftrag} kompakt dark={m.modus === 'ist'} />
+                                  </div>
+                                )}
+                              </EntityCard>
+                            </div>
+                          )
+                        })}
+                        {stepMaschinen.length === 0 && (
+                          <button
+                            onClick={() => addProduktionstabelle(st.id)}
+                            className="col-span-2 flex h-20 items-center justify-center rounded-lg border border-dashed border-slate-200 bg-white/40 text-[11px] font-medium text-slate-400 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-600 transition-colors"
+                            title="Arbeitsplatz für diesen Schritt anlegen"
+                          >
+                            + Arbeitsplatz anlegen
+                          </button>
+                        )}
+                      </div>
+                    </Fragment>
+                  )
+                })}
+
+                {renderItems.length === 0 && (
+                  <>
+                    <div className="grid grid-cols-2 content-start items-start gap-2 self-start">
+                      {neben.map((n) => {
+                        const nRegisters = getTabellenRegister(n)
+                        const nVisibleCols = filterColumnsByRegister(n.columns, n.activeRegisterId)
+                        return (
+                          <div key={n.id} ref={registerRef(`nc:${n.id}`)} className="min-w-0">
+                            <EntityCard
+                              compact
+                              title={n.name}
+                              modus={n.modus ?? 'soll'}
+                              onModusChange={(neu) => setNebenModus(n.id, neu)}
+                              onRename={(name) => renameNebentabelle(n.id, name)}
+                              onRemove={() => removeNebentabelle(n.id)}
+                              onAddColumn={(name, type) => addColumnNeben(n.id, name, type)}
+                              onKopieren={() => kopiereNebentabelle(n.id)}
+                              registers={nRegisters}
+                              activeRegisterId={n.activeRegisterId}
+                              columns={n.columns}
+                              onSelectRegister={(regId) => setActiveRegister(n.id, regId)}
+                              onAddRegister={(name) => addRegister(n.id, name)}
+                              onRenameRegister={(regId, name) => renameRegister(n.id, regId, name)}
+                              onRemoveRegister={(regId) => removeRegister(n.id, regId)}
+                              kopfExtra={
+                                <ArbeitsplatzZeile
+                                  tabelleId={n.id}
+                                  wert={n.arbeitsplatz}
+                                  onChange={setNebenArbeitsplatz}
+                                  dark={n.modus === 'ist'}
+                                />
+                              }
+                            >
+                              {nVisibleCols.map((c) => (
+                                <ColumnRow
+                                  key={c.id}
+                                  compact
+                                  dark={n.modus === 'ist'}
+                                  nodeKey={`n:${n.id}:${c.id}`}
+                                  registerRef={registerRef}
+                                  col={c}
+                                  keyType={keyTypeOf(n.keys, c.id)}
+                                  onRename={(name) => renameColumnNeben(n.id, c.id, name)}
+                                  onChangeType={(t) => changeColumnTypeNeben(n.id, c.id, t)}
+                                  onRemove={() => removeColumnNeben(n.id, c.id)}
+                                  onCycleKey={() =>
+                                    setColumnKeyNeben(n.id, c.id, nextKey(keyTypeOf(n.keys, c.id)))
+                                  }
+                                  onStartDrag={startDrag('n', n.id, c.id, keyTypeOf(n.keys, c.id))}
+                                  registers={nRegisters}
+                                  onMoveToRegister={(targetRegId) => moveColumnToRegister(n.id, c.id, targetRegId)}
+                                />
+                              ))}
+                            </EntityCard>
+                          </div>
+                        )
+                      })}
+                      {neben.length === 0 && (
+                        <div className="col-span-2 rounded-lg border border-dashed border-slate-300 px-3 py-6 text-center text-xs text-slate-400">
+                          Keine Prozess-Tabellen
+                        </div>
+                      )}
+                    </div>
+                    <div className="rounded-lg border border-dashed border-slate-300 px-3 py-6 text-center text-sm text-slate-400">
+                      Keine Schritte
+                    </div>
+                    <div className="rounded-lg border border-dashed border-slate-300 px-3 py-6 text-center text-sm text-slate-400">
+                      Keine Arbeitsplätze
+                    </div>
+                  </>
+                )}
               </div>
             </section>
           )

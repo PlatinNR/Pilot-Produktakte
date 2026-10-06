@@ -229,10 +229,11 @@ interface Store extends AppState {
   setKeyLabelProduktion: (tabelleId: string, spalteId: string, label: string) => void
 
   // Nebentabellen
-  addNebentabelle: (abteilungId: string, name?: string) => void
+  addNebentabelle: (abteilungId: string, name?: string, schrittId?: string | null) => void
   renameNebentabelle: (id: string, name: string) => void
   setNebenArbeitsplatz: (id: string, arbeitsplatz: string) => void
   setNebenModus: (id: string, modus: TabellenModus) => void
+  setNebenSchritt: (id: string, schrittId: string | null) => void
   removeNebentabelle: (id: string) => void
   moveNebentabelle: (id: string, richtung: 'up' | 'down') => void
   addColumnNeben: (tabelleId: string, name: string, type: ColumnType, registerId?: string) => void
@@ -266,7 +267,9 @@ interface Store extends AppState {
   // Kopieren / Einfügen
   einfuegenTabelle: (
     kopie: TabellenKopie,
-    ziel: { art: 'maschine'; schrittId: string } | { art: 'nebentabelle'; abteilungId: string },
+    ziel:
+      | { art: 'maschine'; schrittId: string }
+      | { art: 'nebentabelle'; abteilungId: string; schrittId?: string | null },
   ) => { arbeitsplatzGeleert: boolean }
   fuegeAbteilungEin: (chainId: string, kopie: AbteilungKopie) => { arbeitsplatzGeleert: boolean }
 }
@@ -899,13 +902,14 @@ export const useStore = create<Store>()(
     })),
 
   // --- Nebentabellen ---
-  addNebentabelle: (abteilungId, name) =>
+  addNebentabelle: (abteilungId, name, schrittId) =>
     set((s) => ({
       nebentabellen: [
         ...s.nebentabellen,
         {
           id: nextId('n'),
           abteilungId,
+          schrittId: schrittId ?? null,
           name: name ?? t('Neue Nebentabelle'),
           arbeitsplatz: '',
           position:
@@ -955,6 +959,11 @@ export const useStore = create<Store>()(
 
   setNebenModus: (id, modus) =>
     set((s) => ({ nebentabellen: s.nebentabellen.map((t) => (t.id === id ? { ...t, modus } : t)) })),
+
+  setNebenSchritt: (id, schrittId) =>
+    set((s) => ({
+      nebentabellen: s.nebentabellen.map((t) => (t.id === id ? { ...t, schrittId: schrittId ?? null } : t)),
+    })),
 
   removeNebentabelle: (id) =>
     set((s) => ({ nebentabellen: s.nebentabellen.filter((t) => t.id !== id) })),
@@ -1246,12 +1255,14 @@ export const useStore = create<Store>()(
         ],
       }))
     } else if (kopie.art === 'nebentabelle' && ziel.art === 'nebentabelle') {
+      const schrittId = ziel.schrittId ?? kopie.schrittId ?? null
       set((st) => ({
         nebentabellen: [
           ...st.nebentabellen,
           {
             id: nextId('n'),
             abteilungId: ziel.abteilungId,
+            schrittId,
             name,
             arbeitsplatz,
             columns,
@@ -1781,6 +1792,7 @@ function seed(): AppState {
     {
       id: 'n-wachsqualitaet',
       abteilungId: 'abt-wachs',
+      schrittId: 's-spritzen',
       name: 'Wachsqualität',
       arbeitsplatz: '201',
       columns: [...cloneSpalten(NEBEN_SPALTEN), { id: 'c-qual', name: 'Qualitätswert', type: 'number', fixed: false }],
