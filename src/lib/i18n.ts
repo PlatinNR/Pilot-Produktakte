@@ -211,7 +211,8 @@ export const EN: Record<string, string> = {
   'Strg + Z: letzte Änderung rückgängig': 'Ctrl + Z: undo last change',
 
   // --- Filterleiste ---
-  'Fertigungsauftrag (Leitende Nummer)': 'Production order (leading number)',
+  FAUF: 'FAUF',
+  'Fertigungsauftrag (Leitende Nummer)': 'FAUF',
   'Datum (ein Tag)': 'Date (one day)',
   Zurücksetzen: 'Reset',
   'Trace: Weg des Auftrags': 'Trace: path of the order',

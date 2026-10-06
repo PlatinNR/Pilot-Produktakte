@@ -1185,16 +1185,27 @@ export function TabellenbezogenView({ filter }: Props) {
   for (const n of alleNeben) kindByTableId.set(n.id, 'n')
 
   const lines: RawLineDef[] = []
+  const seenStepFauf = new Set<string>()
+
   for (const m of alleMaschinen) {
     for (const k of m.keys) {
       if (k.type !== 'fk' || !k.refTableId || !k.refColumnId) continue
       const targetKind = kindByTableId.get(k.refTableId)
       if (!targetKind) continue
+
+      if (targetKind === 's') {
+        // Zwischen Produktarbeitsplatz und Schritt nur noch den Fertigungsauftrag (FAUF) darstellen
+        if (k.columnId !== 'auftragsnummer' || k.refColumnId !== 'auftragsnummer') continue
+        // Pro Schritt maximal 1 FAUF-Verbindung anzeigen
+        if (seenStepFauf.has(k.refTableId)) continue
+        seenStepFauf.add(k.refTableId)
+      }
+
       const colName = m.columns.find((c) => c.id === k.columnId)?.name ?? k.columnId
       lines.push({
         sourceKey: `m:${m.id}:${k.columnId}`,
         targetKey: `${targetKind}:${k.refTableId}:${k.refColumnId}`,
-        label: k.label ?? colName,
+        label: targetKind === 's' ? 'FAUF' : (k.label ?? colName),
         n1: true,
         kardinalitaet: (k.kardinalitaet as any) || (k.columnId === 'datum' ? '1:1' : 'n:1'),
         keyKind: 'm',
@@ -1243,11 +1254,18 @@ export function TabellenbezogenView({ filter }: Props) {
       if (k.type !== 'fk' || !k.refTableId || !k.refColumnId) continue
       const targetKind = kindByTableId.get(k.refTableId)
       if (!targetKind) continue
+
+      if (targetKind === 'm') {
+        if (k.columnId !== 'auftragsnummer' || k.refColumnId !== 'auftragsnummer') continue
+        if (seenStepFauf.has(st.id)) continue
+        seenStepFauf.add(st.id)
+      }
+
       const colName = st.columns.find((c) => c.id === k.columnId)?.name ?? k.columnId
       lines.push({
         sourceKey: `s:${st.id}:${k.columnId}`,
         targetKey: `${targetKind}:${k.refTableId}:${k.refColumnId}`,
-        label: k.label ?? colName,
+        label: targetKind === 'm' ? 'FAUF' : (k.label ?? colName),
         n1: true,
         kardinalitaet: (k.kardinalitaet as any) || '1:n',
         keyKind: 's',
@@ -1255,6 +1273,26 @@ export function TabellenbezogenView({ filter }: Props) {
         keyColumnId: k.columnId,
         offset: k.offset ?? 0,
       })
+    }
+  }
+  // Mindestens eine Verbindung des Fertigungsauftrags (FAUF) je Schritt mit Arbeitsplätzen garantieren
+  for (const st of alleSchritte) {
+    if (!seenStepFauf.has(st.id)) {
+      const firstM = alleMaschinen.find((m) => m.schrittId === st.id)
+      if (firstM) {
+        seenStepFauf.add(st.id)
+        lines.push({
+          sourceKey: `m:${firstM.id}:auftragsnummer`,
+          targetKey: `s:${st.id}:auftragsnummer`,
+          label: 'FAUF',
+          n1: true,
+          kardinalitaet: 'n:1',
+          keyKind: 'm',
+          keyTableId: firstM.id,
+          keyColumnId: 'auftragsnummer',
+          offset: 0,
+        })
+      }
     }
   }
   // Schleifen (Rücksprünge mit Bedingung) – Ziel kann ein Schritt oder ein variabler Block sein

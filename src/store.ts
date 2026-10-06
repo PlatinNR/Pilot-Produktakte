@@ -705,6 +705,7 @@ export const useStore = create<Store>()(
       const columns = inSchleife
         ? [...cloneSpalten(PRODUKTION_SPALTEN), { ...WIEDERHOLUNG_SPALTE }]
         : cloneSpalten(PRODUKTION_SPALTEN)
+      const hatBereitsMaschine = s.produktionstabellen.some((m) => m.schrittId === schrittId)
       return {
         produktionstabellen: [
           ...s.produktionstabellen,
@@ -715,7 +716,7 @@ export const useStore = create<Store>()(
             arbeitsplatz: '',
             columns,
             rows: [],
-            keys: produktionKeys(schrittId),
+            keys: hatBereitsMaschine ? [] : produktionKeys(schrittId),
             modus: 'soll',
           },
         ],
@@ -738,7 +739,40 @@ export const useStore = create<Store>()(
     })),
 
   removeProduktionstabelle: (id) =>
-    set((s) => ({ produktionstabellen: s.produktionstabellen.filter((t) => t.id !== id) })),
+    set((s) => {
+      const removed = s.produktionstabellen.find((t) => t.id === id)
+      const rest = s.produktionstabellen.filter((t) => t.id !== id)
+      if (removed) {
+        const hatteSchrittFk = removed.keys.some(
+          (k) => k.type === 'fk' && k.refTableId === removed.schrittId && k.columnId === 'auftragsnummer',
+        )
+        if (hatteSchrittFk) {
+          const nextMachine = rest.find((t) => t.schrittId === removed.schrittId)
+          if (nextMachine && !nextMachine.keys.some((k) => k.type === 'fk' && k.refTableId === removed.schrittId)) {
+            return {
+              produktionstabellen: rest.map((t) =>
+                t.id === nextMachine.id
+                  ? {
+                      ...t,
+                      keys: [
+                        ...t.keys,
+                        {
+                          id: nextId('k'),
+                          columnId: 'auftragsnummer',
+                          type: 'fk' as const,
+                          refTableId: removed.schrittId,
+                          refColumnId: 'auftragsnummer',
+                        },
+                      ],
+                    }
+                  : t,
+              ),
+            }
+          }
+        }
+      }
+      return { produktionstabellen: rest }
+    }),
 
   addColumnProduktion: (tabelleId, name, type, registerId) =>
     set((s) => ({
@@ -1407,7 +1441,7 @@ export const useStore = create<Store>()(
     }),
     {
       name: 'digitale-produktakte',
-      version: 19,
+      version: 20,
       migrate: (persisted, version) => {
         let p = persisted as Partial<AppState> & {
           abteilungen?: (Abteilung & { chainId?: string; parentId?: string | null; sequence?: 'fixed' | 'variable' })[]
@@ -1691,6 +1725,28 @@ export const useStore = create<Store>()(
             })),
           } as typeof p
         }
+        if (version < 20) {
+          // Beziehung zwischen Produktarbeitsplätzen und Schritt: nur 1 FAUF-Verbindung pro Schritt behalten
+          const stepFaufVergeben = new Set<string>()
+          p = {
+            ...p,
+            produktionstabellen: (p.produktionstabellen ?? []).map((t) => {
+              const keys = (t.keys ?? []).filter((k) => {
+                if (k.type === 'fk' && k.refTableId === t.schrittId) {
+                  if (k.columnId === 'auftragsnummer' && k.refColumnId === 'auftragsnummer') {
+                    if (!stepFaufVergeben.has(t.schrittId)) {
+                      stepFaufVergeben.add(t.schrittId)
+                      return true
+                    }
+                  }
+                  return false
+                }
+                return true
+              })
+              return { ...t, keys }
+            }),
+          } as typeof p
+        }
         return p as AppState
       },
       partialize: (s) => ({
@@ -1744,15 +1800,18 @@ function seed(): AppState {
         arbeitsplatz: String(arbeitsplatzNr),
         columns: [...cloneSpalten(PRODUKTION_SPALTEN), { ...druckSpalte, id: `c-druck-${s.id}-${i + 1}` }],
         rows: [],
-        keys: [
-          {
-            id: `k-${s.id}-${i + 1}`,
-            columnId: 'auftragsnummer',
-            type: 'fk',
-            refTableId: s.id,
-            refColumnId: 'auftragsnummer',
-          },
-        ],
+        keys:
+          i === 0
+            ? [
+                {
+                  id: `k-${s.id}-${i + 1}`,
+                  columnId: 'auftragsnummer',
+                  type: 'fk',
+                  refTableId: s.id,
+                  refColumnId: 'auftragsnummer',
+                },
+              ]
+            : [],
       })
     }
   }

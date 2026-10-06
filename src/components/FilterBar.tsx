@@ -18,7 +18,7 @@ export function FilterBar({ filter, onChange, onClear }: Props) {
     <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
       <div className="flex flex-wrap items-end gap-3 px-4 py-3">
         <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">
-          {t('Fertigungsauftrag (Leitende Nummer)')}
+          {t('FAUF')}
           <input
             value={filter.auftragsnummer}
             onChange={(e) => set({ auftragsnummer: e.target.value })}
