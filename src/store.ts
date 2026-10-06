@@ -908,7 +908,7 @@ export const useStore = create<Store>()(
           id: nextId('n'),
           abteilungId,
           schrittId: schrittId ?? null,
-          name: name ?? t('Neue Nebentabelle'),
+          name: name ?? t('Neue Prozess-Tabelle'),
           arbeitsplatz: '',
           position:
             Math.max(

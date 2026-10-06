@@ -235,6 +235,7 @@ export const EN: Record<string, string> = {
   'Schritt {n}': 'Step {n}',
   'Neue Maschine': 'New machine',
   'Neue Nebentabelle': 'New support process',
+  'Neue Prozess-Tabelle': 'New process table',
   'Neues Feld': 'New field',
   'Zeitbezogene Daten der Abteilung (z. B. Wachsqualität).':
     'Time-related data of the department (e.g. wax quality).',

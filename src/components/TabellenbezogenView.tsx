@@ -199,6 +199,7 @@ interface EntityProps {
   onKopieren?: () => void
   /** Zusätzliches Element im Kopf (z. B. AP-Nummer) */
   kopfExtra?: React.ReactNode
+  unterzeile?: React.ReactNode
   modus?: TabellenModus
   onModusChange?: (modus: TabellenModus) => void
   registers?: TabellenRegister[]
@@ -224,6 +225,7 @@ function EntityCard({
   betont = false,
   onKopieren,
   kopfExtra,
+  unterzeile,
   modus = 'soll',
   onModusChange,
   registers,
@@ -265,36 +267,43 @@ function EntityCard({
       : 'text-xs font-semibold text-slate-700'
   return (
     <div className={`overflow-hidden rounded-lg border shadow-sm ${rahmenKlasse}`}>
-      <div className={`flex items-center gap-1.5 border-b ${isIst ? 'border-zinc-800' : 'border-slate-100'} ${compact ? 'px-1.5 py-0.5' : 'px-2 py-1.5'}`}>
-        <span className={`shrink-0 rounded-full ${isIst ? 'bg-amber-400' : 'bg-zollern-500'} ${betont ? 'h-2.5 w-2.5' : 'h-2 w-2'}`} />
-        <EditableName
-          value={title}
-          onCommit={onRename}
-          dark={isIst}
-          className={`min-w-0 flex-1 bg-transparent outline-none ${titelKlasse}`}
-        />
-        {kopfExtra}
-        {typeof percent === 'number' && percent >= 0 && (
-          <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${isIst ? 'bg-zinc-800 text-zinc-300' : 'bg-zollern-50 text-zollern-700'}`}>
-            {formatPercent(percent)}
-          </span>
-        )}
-        {onKopieren && (
+      <div className={`border-b ${isIst ? 'border-zinc-800' : 'border-slate-100'} ${compact ? 'px-2 py-1' : 'px-2.5 py-1.5'}`}>
+        <div className="flex items-center gap-1.5">
+          <span className={`shrink-0 rounded-full ${isIst ? 'bg-amber-400' : 'bg-zollern-500'} ${betont ? 'h-2.5 w-2.5' : 'h-2 w-2'}`} />
+          <EditableName
+            value={title}
+            onCommit={onRename}
+            dark={isIst}
+            className={`min-w-0 flex-1 bg-transparent font-bold outline-none ${titelKlasse}`}
+          />
+          {kopfExtra}
+          {typeof percent === 'number' && percent >= 0 && (
+            <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${isIst ? 'bg-zinc-800 text-zinc-300' : 'bg-zollern-50 text-zollern-700'}`}>
+              {formatPercent(percent)}
+            </span>
+          )}
+          {onKopieren && (
+            <button
+              onClick={onKopieren}
+              className={`shrink-0 rounded px-1 text-xs ${isIst ? 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-700'}`}
+              title="Tabelle kopieren (Spalten + Zeilen)"
+            >
+              ⧉
+            </button>
+          )}
           <button
-            onClick={onKopieren}
-            className={`shrink-0 rounded px-1 text-xs ${isIst ? 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-700'}`}
-            title="Tabelle kopieren (Spalten + Zeilen)"
+            onClick={onRemove}
+            className={`shrink-0 rounded px-1 text-xs ${isIst ? 'text-zinc-400 hover:bg-zinc-800 hover:text-red-400' : 'text-slate-400 hover:bg-red-50 hover:text-red-600'}`}
+            title="Löschen"
           >
-            ⧉
+            ✕
           </button>
+        </div>
+        {unterzeile && (
+          <div className={`mt-1 border-t pt-1 ${isIst ? 'border-zinc-800 text-zinc-300' : 'border-slate-100 text-slate-600'}`}>
+            {unterzeile}
+          </div>
         )}
-        <button
-          onClick={onRemove}
-          className={`shrink-0 rounded px-1 text-xs ${isIst ? 'text-zinc-400 hover:bg-zinc-800 hover:text-red-400' : 'text-slate-400 hover:bg-red-50 hover:text-red-600'}`}
-          title="Löschen"
-        >
-          ✕
-        </button>
       </div>
       {typeof percent === 'number' && percent >= 0 && (
         <div className={`h-0.5 w-full ${isIst ? 'bg-zinc-800' : 'bg-slate-100'}`}>
@@ -2000,7 +2009,7 @@ export function TabellenbezogenView({ filter }: Props) {
                               <div key={n.id} ref={registerRef(`nc:${n.id}`)} className="min-w-0">
                                 <EntityCard
                                   compact
-                                  title={n.name}
+                                  title={n.name || 'Prozess-Tabelle'}
                                   modus={n.modus ?? 'soll'}
                                   onModusChange={(neu) => setNebenModus(n.id, neu)}
                                   onRename={(name) => renameNebentabelle(n.id, name)}
@@ -2014,7 +2023,7 @@ export function TabellenbezogenView({ filter }: Props) {
                                   onAddRegister={(name) => addRegister(n.id, name)}
                                   onRenameRegister={(regId, name) => renameRegister(n.id, regId, name)}
                                   onRemoveRegister={(regId) => removeRegister(n.id, regId)}
-                                  kopfExtra={
+                                  unterzeile={
                                     <div className="flex w-full flex-col gap-1">
                                       <div className="flex items-center justify-between gap-1">
                                         <ArbeitsplatzZeile
@@ -2404,7 +2413,7 @@ export function TabellenbezogenView({ filter }: Props) {
                             <div key={n.id} ref={registerRef(`nc:${n.id}`)} className="min-w-0">
                               <EntityCard
                                 compact
-                                title={n.name}
+                                title={n.name || 'Prozess-Tabelle'}
                                 modus={n.modus ?? 'soll'}
                                 onModusChange={(neu) => setNebenModus(n.id, neu)}
                                 onRename={(name) => renameNebentabelle(n.id, name)}
@@ -2538,7 +2547,7 @@ export function TabellenbezogenView({ filter }: Props) {
                           <div key={n.id} ref={registerRef(`nc:${n.id}`)} className="min-w-0">
                             <EntityCard
                               compact
-                              title={n.name}
+                              title={n.name || 'Prozess-Tabelle'}
                               modus={n.modus ?? 'soll'}
                               onModusChange={(neu) => setNebenModus(n.id, neu)}
                               onRename={(name) => renameNebentabelle(n.id, name)}
