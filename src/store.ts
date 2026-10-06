@@ -803,7 +803,7 @@ export const useStore = create<Store>()(
     })),
 
   /** Fügt einen Fertigungsauftrag bei den gewählten Maschinen ein (mit den benutzten Werten). */
-  addProdukt: (auftragsnummer, fn, datum, werte) =>
+  addProdukt: (auftragsnummer, _fn, datum, werte) =>
     set((s) => ({
       produktionstabellen: s.produktionstabellen.map((t) => {
         const eintrag = werte.find((w) => w.tabelleId === t.id)
@@ -822,7 +822,6 @@ export const useStore = create<Store>()(
           const zeile: TableRow = {
             ...emptyRow(columns),
             auftragsnummer,
-            fn,
             datum: d.datum || datum,
             zeit: d.zeit,
           }
@@ -830,7 +829,6 @@ export const useStore = create<Store>()(
           for (const c of columns) {
             if (
               c.id === 'auftragsnummer' ||
-              c.id === 'fn' ||
               c.id === 'datum' ||
               c.id === 'zeit' ||
               c.id === 'wdh'
@@ -1409,7 +1407,7 @@ export const useStore = create<Store>()(
     }),
     {
       name: 'digitale-produktakte',
-      version: 18,
+      version: 19,
       migrate: (persisted, version) => {
         let p = persisted as Partial<AppState> & {
           abteilungen?: (Abteilung & { chainId?: string; parentId?: string | null; sequence?: 'fixed' | 'variable' })[]
@@ -1679,6 +1677,20 @@ export const useStore = create<Store>()(
           })
           p = { ...p, nebentabellen: neben18 } as typeof p
         }
+        if (version < 19) {
+          // FN wird nicht mehr in Maschinen (Produktionstabellen) gespeichert
+          p = {
+            ...p,
+            produktionstabellen: (p.produktionstabellen ?? []).map((t) => ({
+              ...t,
+              columns: t.columns.filter((c) => c.id !== 'fn'),
+              rows: t.rows.map((r) => {
+                const { fn: _fn, ...rest } = r
+                return rest
+              }),
+            })),
+          } as typeof p
+        }
         return p as AppState
       },
       partialize: (s) => ({
@@ -1756,36 +1768,36 @@ function seed(): AppState {
   }
 
   assign('s-spritzen', 1, [
-    { auftragsnummer: 'AUF-1001', fn: 'F-100', datum: '2026-08-26', 'c-druck-s-spritzen-1': '52' },
-    { auftragsnummer: 'AUF-1003', fn: 'F-200', datum: '2026-08-26', 'c-druck-s-spritzen-1': '55' },
-    { auftragsnummer: 'AUF-1004', fn: 'F-200', datum: '2026-08-26', 'c-druck-s-spritzen-1': '54' },
+    { auftragsnummer: 'AUF-1001', datum: '2026-08-26', 'c-druck-s-spritzen-1': '52' },
+    { auftragsnummer: 'AUF-1003', datum: '2026-08-26', 'c-druck-s-spritzen-1': '55' },
+    { auftragsnummer: 'AUF-1004', datum: '2026-08-26', 'c-druck-s-spritzen-1': '54' },
   ])
   assign('s-spritzen', 2, [
-    { auftragsnummer: 'AUF-1002', fn: 'F-100', datum: '2026-08-26', 'c-druck-s-spritzen-2': '51' },
-    { auftragsnummer: 'AUF-1005', fn: 'F-200', datum: '2026-08-26', 'c-druck-s-spritzen-2': '53' },
+    { auftragsnummer: 'AUF-1002', datum: '2026-08-26', 'c-druck-s-spritzen-2': '51' },
+    { auftragsnummer: 'AUF-1005', datum: '2026-08-26', 'c-druck-s-spritzen-2': '53' },
   ])
   assign('s-spritzen', 3, [
-    { auftragsnummer: 'AUF-1006', fn: 'F-300', datum: '2026-08-27', 'c-druck-s-spritzen-3': '50' },
+    { auftragsnummer: 'AUF-1006', datum: '2026-08-27', 'c-druck-s-spritzen-3': '50' },
   ])
-  assign('s-modellieren', 1, [{ auftragsnummer: 'AUF-1002', fn: 'F-100', datum: '2026-08-26' }])
+  assign('s-modellieren', 1, [{ auftragsnummer: 'AUF-1002', datum: '2026-08-26' }])
   assign('s-modellieren', 2, [
-    { auftragsnummer: 'AUF-1001', fn: 'F-100', datum: '2026-08-26' },
-    { auftragsnummer: 'AUF-1004', fn: 'F-200', datum: '2026-08-26' },
-    { auftragsnummer: 'AUF-1005', fn: 'F-200', datum: '2026-08-26' },
+    { auftragsnummer: 'AUF-1001', datum: '2026-08-26' },
+    { auftragsnummer: 'AUF-1004', datum: '2026-08-26' },
+    { auftragsnummer: 'AUF-1005', datum: '2026-08-26' },
   ])
   assign('s-modellieren', 3, [
-    { auftragsnummer: 'AUF-1003', fn: 'F-200', datum: '2026-08-26' },
-    { auftragsnummer: 'AUF-1006', fn: 'F-300', datum: '2026-08-27' },
+    { auftragsnummer: 'AUF-1003', datum: '2026-08-26' },
+    { auftragsnummer: 'AUF-1006', datum: '2026-08-27' },
   ])
   assign('s-reinigen', 1, [
-    { auftragsnummer: 'AUF-1001', fn: 'F-100', datum: '2026-08-26' },
-    { auftragsnummer: 'AUF-1004', fn: 'F-200', datum: '2026-08-26' },
-    { auftragsnummer: 'AUF-1005', fn: 'F-200', datum: '2026-08-26' },
+    { auftragsnummer: 'AUF-1001', datum: '2026-08-26' },
+    { auftragsnummer: 'AUF-1004', datum: '2026-08-26' },
+    { auftragsnummer: 'AUF-1005', datum: '2026-08-26' },
   ])
-  assign('s-reinigen', 2, [{ auftragsnummer: 'AUF-1002', fn: 'F-100', datum: '2026-08-26' }])
+  assign('s-reinigen', 2, [{ auftragsnummer: 'AUF-1002', datum: '2026-08-26' }])
   assign('s-reinigen', 3, [
-    { auftragsnummer: 'AUF-1003', fn: 'F-200', datum: '2026-08-26' },
-    { auftragsnummer: 'AUF-1006', fn: 'F-300', datum: '2026-08-27' },
+    { auftragsnummer: 'AUF-1003', datum: '2026-08-26' },
+    { auftragsnummer: 'AUF-1006', datum: '2026-08-27' },
   ])
 
   const nebentabellen: Nebentabelle[] = [

@@ -229,7 +229,6 @@ export interface ChainData {
 /** Standardspalten jeder Produktionstabelle (Auftragsnummer = Leitende Nummer) */
 export const PRODUKTION_SPALTEN: TableColumn[] = [
   { id: 'auftragsnummer', name: 'Fertigungsauftrag', type: 'text', fixed: true },
-  { id: 'fn', name: 'FN', type: 'text', fixed: true },
   { id: 'datum', name: 'Datum', type: 'date', fixed: true },
   { id: 'zeit', name: 'Uhrzeit', type: 'time', fixed: true },
 ]
