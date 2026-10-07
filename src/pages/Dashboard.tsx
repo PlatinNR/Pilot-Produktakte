@@ -2,19 +2,16 @@ import { useState } from 'react'
 import type { Filter } from '../types'
 import { EMPTY_FILTER } from '../types'
 import { useStore } from '../store'
-import { isTraceMode } from '../utils/aggregate'
 import { loadFromCloud, saveAllChains, useSyncStatus } from '../lib/sync'
 import { fuegeAbteilungEin } from '../lib/tabellenKopie'
 import { useSprache, useT } from '../lib/sprache'
 import { FilterBar } from '../components/FilterBar'
-import { TraceView } from '../components/TraceView'
-import { AbteilungBlock } from '../components/AbteilungBlock'
 import { TabellenbezogenView } from '../components/TabellenbezogenView'
 import { ProduktHinzufuegenView } from '../components/ProduktHinzufuegenView'
 import { ProduktinfoPanel } from '../components/ProduktinfoPanel'
 import { EditableName } from '../components/EditableName'
 
-type View = 'zusammen' | 'tabellen' | 'produkt'
+type View = 'tabellen' | 'produkt'
 
 export function Dashboard() {
   const alleAbteilungen = useStore((s) => s.abteilungen)
@@ -30,7 +27,7 @@ export function Dashboard() {
   const sprache = useSprache((s) => s.sprache)
   const setSprache = useSprache((s) => s.setSprache)
   const [filter, setFilter] = useState<Filter>(EMPTY_FILTER)
-  const [view, setView] = useState<View>('zusammen')
+  const [view, setView] = useState<View>('tabellen')
   const [produktinfoOffen, setProduktinfoOffen] = useState(false)
   const [hinweis, setHinweis] = useState<string | null>(null)
 
@@ -215,16 +212,6 @@ export function Dashboard() {
 
       <div className="flex border-b border-slate-200">
         <button
-          onClick={() => setView('zusammen')}
-          className={`px-4 py-2 text-sm font-medium ${
-            view === 'zusammen'
-              ? 'border-b-2 border-zollern-500 text-zollern-700'
-              : 'text-slate-500 hover:text-slate-700'
-          }`}
-        >
-          {t('Zusammengefasst')}
-        </button>
-        <button
           onClick={() => setView('tabellen')}
           className={`px-4 py-2 text-sm font-medium ${
             view === 'tabellen'
@@ -232,7 +219,7 @@ export function Dashboard() {
               : 'text-slate-500 hover:text-slate-700'
           }`}
         >
-          {t('Tabellenbezogen')}
+          {t('Productionview')}
         </button>
         <button
           onClick={() => setView('produkt')}
@@ -270,24 +257,6 @@ export function Dashboard() {
 
       {view === 'produkt' ? (
         <ProduktHinzufuegenView />
-      ) : view === 'zusammen' ? (
-        <>
-          {isTraceMode(filter) && <TraceView auftragsnummer={filter.auftragsnummer.trim()} />}
-
-          <div className="flex flex-col gap-4">
-            {abteilungen.length === 0 && (
-              <button
-                onClick={() => addAbteilung()}
-                className="flex min-h-[10rem] items-center justify-center rounded-xl border-2 border-dashed border-slate-300 text-slate-400 hover:border-zollern-400 hover:bg-zollern-50 hover:text-zollern-700"
-              >
-                {t('+ Erste Abteilung hinzufügen')}
-              </button>
-            )}
-            {abteilungen.map((a, i) => (
-              <AbteilungBlock key={a.id} abteilung={a} filter={filter} index={i} />
-            ))}
-          </div>
-        </>
       ) : (
         <TabellenbezogenView filter={filter} />
       )}
