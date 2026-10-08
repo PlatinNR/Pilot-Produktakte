@@ -267,8 +267,9 @@ function EntityCard({
       : 'text-xs font-semibold text-slate-700'
   return (
     <div className={`overflow-hidden rounded-lg border shadow-sm ${rahmenKlasse}`}>
-      <div className={`border-b ${isIst ? 'border-zinc-800' : 'border-slate-100'} ${compact ? 'px-2 py-1' : 'px-2.5 py-1.5'}`}>
-        <div className="flex items-center gap-1.5">
+      <div className={`border-b ${isIst ? 'border-zinc-800' : 'border-slate-100'} ${compact ? 'px-2 py-1.5' : 'px-2.5 py-2'}`}>
+        {/* Imaginäre Zeile darüber: Name / Titel des Arbeitsplatzes / der Tabelle */}
+        <div className="flex items-center gap-1.5 min-w-0">
           <span className={`shrink-0 rounded-full ${isIst ? 'bg-amber-400' : 'bg-zollern-500'} ${betont ? 'h-2.5 w-2.5' : 'h-2 w-2'}`} />
           <EditableName
             value={title}
@@ -276,29 +277,60 @@ function EntityCard({
             dark={isIst}
             className={`min-w-0 flex-1 bg-transparent font-bold outline-none ${titelKlasse}`}
           />
-          {kopfExtra}
           {typeof percent === 'number' && percent >= 0 && (
             <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${isIst ? 'bg-zinc-800 text-zinc-300' : 'bg-zollern-50 text-zollern-700'}`}>
               {formatPercent(percent)}
             </span>
           )}
-          {onKopieren && (
-            <button
-              onClick={onKopieren}
-              className={`shrink-0 rounded px-1 text-xs ${isIst ? 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-700'}`}
-              title="Tabelle kopieren (Spalten + Zeilen)"
-            >
-              ⧉
-            </button>
+          {!kopfExtra && (
+            <div className="flex shrink-0 items-center gap-0.5">
+              {onKopieren && (
+                <button
+                  onClick={onKopieren}
+                  className={`shrink-0 rounded px-1 text-xs ${isIst ? 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-700'}`}
+                  title="Tabelle kopieren (Spalten + Zeilen)"
+                >
+                  ⧉
+                </button>
+              )}
+              <button
+                onClick={onRemove}
+                className={`shrink-0 rounded px-1 text-xs ${isIst ? 'text-zinc-400 hover:bg-zinc-800 hover:text-red-400' : 'text-slate-400 hover:bg-red-50 hover:text-red-600'}`}
+                title="Löschen"
+              >
+                ✕
+              </button>
+            </div>
           )}
-          <button
-            onClick={onRemove}
-            className={`shrink-0 rounded px-1 text-xs ${isIst ? 'text-zinc-400 hover:bg-zinc-800 hover:text-red-400' : 'text-slate-400 hover:bg-red-50 hover:text-red-600'}`}
-            title="Löschen"
-          >
-            ✕
-          </button>
         </div>
+
+        {/* Zeile darunter: AP mit allen Operationen zum Bearbeiten der Tables */}
+        {kopfExtra && (
+          <div className="mt-1 flex items-center justify-between gap-1.5 min-w-0 pt-0.5">
+            <div className="flex min-w-0 items-center gap-1">
+              {kopfExtra}
+            </div>
+            <div className="flex shrink-0 items-center gap-0.5">
+              {onKopieren && (
+                <button
+                  onClick={onKopieren}
+                  className={`shrink-0 rounded px-1 text-xs ${isIst ? 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-700'}`}
+                  title="Tabelle kopieren (Spalten + Zeilen)"
+                >
+                  ⧉
+                </button>
+              )}
+              <button
+                onClick={onRemove}
+                className={`shrink-0 rounded px-1 text-xs ${isIst ? 'text-zinc-400 hover:bg-zinc-800 hover:text-red-400' : 'text-slate-400 hover:bg-red-50 hover:text-red-600'}`}
+                title="Löschen"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        )}
+
         {unterzeile && (
           <div className={`mt-1 border-t pt-1 ${isIst ? 'border-zinc-800 text-zinc-300' : 'border-slate-100 text-slate-600'}`}>
             {unterzeile}
@@ -842,13 +874,13 @@ function ArbeitsplatzZeile({
         : 'border-red-300 text-slate-500 focus:border-zollern-400'
 
   return (
-    <span className="flex shrink-0 items-center gap-0.5">
+    <span className="flex shrink-0 items-center gap-1">
       <span className={`text-[9px] font-bold uppercase tracking-wide ${dark ? 'text-zinc-400' : 'text-slate-400'}`}>AP</span>
       <input
         value={draft}
         onChange={(e) => aendern(e.target.value)}
         placeholder="Nr."
-        className={`w-12 rounded border px-1 py-0.5 text-[10px] outline-none ${inputKlasse}`}
+        className={`w-14 rounded border px-1.5 py-0.5 text-[10px] outline-none ${inputKlasse}`}
         title={
           fehler ?? (draft ? 'Arbeitsplatz-Nummer (gilt für alle Einträge)' : 'Arbeitsplatz-Nummer fehlt')
         }
