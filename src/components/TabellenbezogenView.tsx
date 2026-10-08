@@ -108,7 +108,7 @@ function ColumnRow({
     <div
       ref={registerRef(nodeKey)}
       data-column-node={nodeKey}
-      className={`flex items-center gap-1 border-t ${dark ? 'border-zinc-800' : 'border-slate-50'} ${compact ? 'px-1.5 py-0.5' : 'px-2 py-1'}`}
+      className={`flex items-center gap-1 border-t ${dark ? 'border-zinc-800' : 'border-slate-200/60'} ${compact ? 'px-1.5 py-0.5' : 'px-2 py-1'}`}
     >
       {keyType === 'fk' && (
         <span
@@ -258,16 +258,16 @@ function EntityCard({
     rahmen === 'extern'
       ? 'border-purple-400 bg-purple-50 ring-2 ring-purple-300'
       : betont
-        ? 'border-zollern-300 bg-white shadow-md'
+        ? 'border-slate-300 bg-slate-100 shadow-sm'
         : 'border-slate-200 bg-white'
   const titelKlasse = isIst ? (compact ? 'text-[11px] font-semibold text-white' : 'text-xs font-semibold text-white') : betont
-    ? 'text-sm font-bold text-zollern-800'
+    ? 'text-sm font-bold text-slate-800'
     : compact
       ? 'text-[11px] font-semibold text-slate-700'
       : 'text-xs font-semibold text-slate-700'
   return (
     <div className={`overflow-hidden rounded-lg border shadow-sm ${rahmenKlasse}`}>
-      <div className={`border-b ${isIst ? 'border-zinc-800' : 'border-slate-100'} ${compact ? 'px-2 py-1.5' : 'px-2.5 py-2'}`}>
+      <div className={`border-b ${isIst ? 'border-zinc-800' : betont ? 'border-slate-200' : 'border-slate-100'} ${compact ? 'px-2 py-1.5' : 'px-2.5 py-2'}`}>
         {/* Imaginäre Zeile darüber: Name / Titel des Arbeitsplatzes / der Tabelle */}
         <div className="flex items-center gap-1.5 min-w-0">
           <span className={`shrink-0 rounded-full ${isIst ? 'bg-amber-400' : 'bg-zollern-500'} ${betont ? 'h-2.5 w-2.5' : 'h-2 w-2'}`} />
@@ -525,7 +525,13 @@ function EntityCard({
           ) : (
             <button
               onClick={() => setAddingCol(true)}
-              className={`w-full px-2 py-1 text-left text-[10px] font-medium ${isIst ? 'text-zinc-300 hover:bg-zinc-900' : 'text-zollern-700 hover:bg-zollern-50'}`}
+              className={`w-full px-2 py-1 text-left text-[10px] font-medium ${
+                isIst
+                  ? 'text-zinc-300 hover:bg-zinc-900'
+                  : betont
+                    ? 'text-slate-600 hover:bg-slate-200/60'
+                    : 'text-zollern-700 hover:bg-zollern-50'
+              }`}
             >
               + Feld
             </button>
@@ -1856,7 +1862,7 @@ export function TabellenbezogenView({ filter }: Props) {
                                           key={c.id}
                                           ref={registerRef(`s:${bst.id}:${c.id}`)}
                                           data-column-node={`s:${bst.id}:${c.id}`}
-                                          className="flex items-center gap-1 border-t border-slate-50 px-2 py-1"
+                                          className="flex items-center gap-1 border-t border-slate-200/60 px-2 py-1"
                                         >
                                           <span className="min-w-0 flex-1 text-[10px] font-medium text-slate-700">
                                             {c.name}
@@ -1895,7 +1901,7 @@ export function TabellenbezogenView({ filter }: Props) {
                                         />
                                       ))}
                                       {/* Zugehörigkeit + Überspringbar + Schleife (wie fester Schritt) */}
-                                      <div className="border-t border-slate-100 bg-slate-50/60 px-2 py-1.5">
+                                      <div className="border-t border-slate-200 bg-slate-200/40 px-2 py-1.5">
                                         <div className="mb-1 flex items-center gap-1">
                                           <span className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">
                                             Zugehörigkeit
@@ -2327,7 +2333,7 @@ export function TabellenbezogenView({ filter }: Props) {
                           rahmen="normal"
                           betont
                           footer={
-                            <div className="flex flex-col gap-1.5 border-t border-slate-100 px-2 py-1.5">
+                            <div className="flex flex-col gap-1.5 border-t border-slate-200 px-2 py-1.5">
                               <div className="flex flex-wrap items-center gap-1">
                                 <button
                                   onClick={() => addProduktionstabelle(st.id)}
@@ -2380,7 +2386,7 @@ export function TabellenbezogenView({ filter }: Props) {
                               key={c.id}
                               ref={registerRef(`s:${st.id}:${c.id}`)}
                               data-column-node={`s:${st.id}:${c.id}`}
-                              className="flex items-center gap-1 border-t border-slate-50 px-2 py-1"
+                              className="flex items-center gap-1 border-t border-slate-200/60 px-2 py-1"
                             >
                               <span className="min-w-0 flex-1 text-[10px] font-medium text-slate-700">
                                 {c.name}
@@ -2419,7 +2425,7 @@ export function TabellenbezogenView({ filter }: Props) {
                             />
                           ))}
                           {/* Überspringbar (optional) + Schleife (Rücksprung mit Bedingung) */}
-                          <div className="border-t border-slate-100 bg-slate-50/60 px-2 py-1.5">
+                          <div className="border-t border-slate-200 bg-slate-200/40 px-2 py-1.5">
                             <div className="mb-1 flex items-center gap-1">
                               <span className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">
                                 Zugehörigkeit
