@@ -1,4 +1,4 @@
-import { useStore, arbeitsplatzFehlerText } from '../store'
+import { useStore } from '../store'
 import { DataTable } from './DataTable'
 import { einfuegenNebentabelle, kopiereNebentabelle } from '../lib/tabellenKopie'
 import { useT } from '../lib/sprache'
@@ -15,7 +15,6 @@ export function NebentabellenColumn({ abteilungId }: Props) {
     addNebentabelle,
     renameNebentabelle,
     removeNebentabelle,
-    setNebenArbeitsplatz,
     setNebenModus,
     moveNebentabelle,
     addColumnNeben,
@@ -79,9 +78,6 @@ export function NebentabellenColumn({ abteilungId }: Props) {
             onAddRow={() => addRowNeben(t.id)}
             onUpdateCell={(ri, cid, v) => updateCellNeben(t.id, ri, cid, v)}
             onRemoveRow={(ri) => removeRowNeben(t.id, ri)}
-            arbeitsplatz={t.arbeitsplatz}
-            onArbeitsplatzChange={(wert) => setNebenArbeitsplatz(t.id, wert)}
-            arbeitsplatzPruefen={(wert) => arbeitsplatzFehlerText(t.id, wert)}
             onKopieren={() => kopiereNebentabelle(t.id)}
             modus={t.modus ?? 'soll'}
             onModusChange={(modus) => setNebenModus(t.id, modus)}

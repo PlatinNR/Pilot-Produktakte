@@ -941,7 +941,6 @@ export function TabellenbezogenView({ filter }: Props) {
     addNebentabelle,
     renameNebentabelle,
     removeNebentabelle,
-    setNebenArbeitsplatz,
     setNebenModus,
     setNebenSchritt,
     loescheBeziehung,
@@ -2122,14 +2121,7 @@ export function TabellenbezogenView({ filter }: Props) {
                                   onRenameRegister={(regId, name) => renameRegister(n.id, regId, name)}
                                   onRemoveRegister={(regId) => removeRegister(n.id, regId)}
                                   kopfExtra={
-                                    <div className="flex shrink-0 items-center gap-1">
-                                      <ArbeitsplatzZeile
-                                        tabelleId={n.id}
-                                        wert={n.arbeitsplatz}
-                                        onChange={setNebenArbeitsplatz}
-                                        dark={n.modus === 'ist'}
-                                      />
-                                      <span className="flex shrink-0 items-center gap-0.5">
+                                    <span className="flex shrink-0 items-center gap-0.5">
                                         <button
                                           onClick={() => moveNebenToStep(n.id, 'up')}
                                           className={`rounded px-1 text-[11px] ${
@@ -2153,7 +2145,6 @@ export function TabellenbezogenView({ filter }: Props) {
                                           ↓
                                         </button>
                                       </span>
-                                    </div>
                                   }
                                 >
                                   {nVisibleCols.map((c) => (
@@ -2523,13 +2514,6 @@ export function TabellenbezogenView({ filter }: Props) {
                                 onRenameRegister={(regId, name) => renameRegister(n.id, regId, name)}
                                 onRemoveRegister={(regId) => removeRegister(n.id, regId)}
                                 kopfExtra={
-                                  <div className="flex shrink-0 items-center gap-1">
-                                    <ArbeitsplatzZeile
-                                      tabelleId={n.id}
-                                      wert={n.arbeitsplatz}
-                                      onChange={setNebenArbeitsplatz}
-                                      dark={n.modus === 'ist'}
-                                    />
                                     <span className="flex shrink-0 items-center gap-0.5">
                                       <button
                                         onClick={() => moveNebenToStep(n.id, 'up')}
@@ -2554,8 +2538,7 @@ export function TabellenbezogenView({ filter }: Props) {
                                         ↓
                                       </button>
                                     </span>
-                                  </div>
-                                }
+                                  }
                               >
                                 {nVisibleCols.map((c) => (
                                   <ColumnRow
@@ -2634,14 +2617,7 @@ export function TabellenbezogenView({ filter }: Props) {
                               onAddRegister={(name) => addRegister(n.id, name)}
                               onRenameRegister={(regId, name) => renameRegister(n.id, regId, name)}
                               onRemoveRegister={(regId) => removeRegister(n.id, regId)}
-                              kopfExtra={
-                                <ArbeitsplatzZeile
-                                  tabelleId={n.id}
-                                  wert={n.arbeitsplatz}
-                                  onChange={setNebenArbeitsplatz}
-                                  dark={n.modus === 'ist'}
-                                />
-                              }
+                              
                             >
                               {nVisibleCols.map((c) => (
                                 <ColumnRow

@@ -287,10 +287,6 @@ export function arbeitsplatzBelegt(tabelleId: string, wert: string): string | nu
     (t) => t.id !== tabelleId && schrittIds.has(t.schrittId) && t.arbeitsplatz.trim() === w,
   )
   if (maschine) return maschine.name
-  const neben = s.nebentabellen.find(
-    (t) => t.id !== tabelleId && abteilungIds.has(t.abteilungId) && t.arbeitsplatz.trim() === w,
-  )
-  if (neben) return neben.name
   return null
 }
 
@@ -327,9 +323,6 @@ function arbeitsplatzVergeben(s: AppState, chainId: string): Set<string> {
   const werte = new Set<string>()
   for (const t of s.produktionstabellen) {
     if (schrittIds.has(t.schrittId) && t.arbeitsplatz.trim()) werte.add(t.arbeitsplatz.trim())
-  }
-  for (const n of s.nebentabellen) {
-    if (abteilungIds.has(n.abteilungId) && n.arbeitsplatz.trim()) werte.add(n.arbeitsplatz.trim())
   }
   return werte
 }
@@ -1239,12 +1232,11 @@ export const useStore = create<Store>()(
     for (const t of s.produktionstabellen) {
       if (schrittIds.has(t.schrittId) && t.arbeitsplatz.trim()) vergeben.add(t.arbeitsplatz.trim())
     }
-    for (const n of s.nebentabellen) {
-      if (abteilungIds.has(n.abteilungId) && n.arbeitsplatz.trim()) vergeben.add(n.arbeitsplatz.trim())
-    }
     const arbeitsplatzGeleert =
-      kopie.arbeitsplatz.trim().length > 0 && vergeben.has(kopie.arbeitsplatz.trim())
-    const arbeitsplatz = arbeitsplatzGeleert ? '' : kopie.arbeitsplatz
+      kopie.art === 'maschine' &&
+      kopie.arbeitsplatz.trim().length > 0 &&
+      vergeben.has(kopie.arbeitsplatz.trim())
+    const arbeitsplatz = kopie.art === 'maschine' ? (arbeitsplatzGeleert ? '' : kopie.arbeitsplatz) : ''
 
     // Standardspalten sicherstellen
     const standard = kopie.art === 'maschine' ? PRODUKTION_SPALTEN : NEBEN_SPALTEN
