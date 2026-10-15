@@ -6,6 +6,7 @@ import { useSprache } from './sprache'
 /** Übersetzt mit der aktuell eingestellten Sprache. */
 const tt = (text: string, werte?: Record<string, string | number>) =>
   uebersetze(text, useSprache.getState().sprache, werte)
+import { getTabellenRegister } from '../utils/register'
 import type { AbteilungKopie, TabellenKopie } from '../types'
 
 let status: string | null = null
@@ -68,7 +69,7 @@ export async function kopiereMaschine(tabelleId: string): Promise<void> {
     rows: t.rows,
     keys: t.keys,
     modus: t.modus ?? 'soll',
-    register: t.register ? t.register.map((r) => ({ ...r })) : undefined,
+    register: getTabellenRegister(t).map((r) => ({ ...r })),
     activeRegisterId: t.activeRegisterId,
     quelle: { schrittId: t.schrittId },
   }
@@ -91,7 +92,7 @@ export async function kopiereNebentabelle(tabelleId: string): Promise<void> {
     keys: t.keys,
     modus: t.modus ?? 'soll',
     schrittId: t.schrittId,
-    register: t.register ? t.register.map((r) => ({ ...r })) : undefined,
+    register: getTabellenRegister(t).map((r) => ({ ...r })),
     activeRegisterId: t.activeRegisterId,
     quelle: { abteilungId: t.abteilungId, schrittId: t.schrittId ?? undefined },
   }

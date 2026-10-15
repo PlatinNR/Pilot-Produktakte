@@ -1238,9 +1238,42 @@ export const useStore = create<Store>()(
       vergeben.has(kopie.arbeitsplatz.trim())
     const arbeitsplatz = kopie.art === 'maschine' ? (arbeitsplatzGeleert ? '' : kopie.arbeitsplatz) : ''
 
-    // Standardspalten sicherstellen
+    // Register kopieren & IDs neu zuweisen (Standard-ID 'allgemein' bleibt erhalten)
+    const quellenRegister =
+      kopie.register && kopie.register.length > 0
+        ? kopie.register
+        : getTabellenRegister(kopie)
+    const regMap = new Map<string, string>()
+    regMap.set(DEFAULT_REGISTER_ID, DEFAULT_REGISTER_ID)
+
+    const register: TabellenRegister[] = quellenRegister.map((r) => {
+      if (r.id === DEFAULT_REGISTER_ID) {
+        return { ...r }
+      }
+      const neuId = nextId('reg')
+      regMap.set(r.id, neuId)
+      return { id: neuId, name: r.name }
+    })
+
+    const activeRegisterId =
+      kopie.activeRegisterId === null
+        ? null
+        : kopie.activeRegisterId
+          ? (regMap.get(kopie.activeRegisterId) ?? register[0]?.id ?? DEFAULT_REGISTER_ID)
+          : register[0]?.id ?? DEFAULT_REGISTER_ID
+
+    // Standardspalten sicherstellen und Register-IDs anpassen
     const standard = kopie.art === 'maschine' ? PRODUKTION_SPALTEN : NEBEN_SPALTEN
-    const columns = [...kopie.columns.map((c) => ({ ...c }))]
+    const columns: TableColumn[] = kopie.columns.map((c): TableColumn => {
+      let regId = c.registerId ? regMap.get(c.registerId) : undefined
+      if (c.registerId && !regId) {
+        regId = DEFAULT_REGISTER_ID
+      }
+      return {
+        ...c,
+        registerId: regId,
+      }
+    })
     for (const std of standard) {
       if (!columns.some((c) => c.id === std.id)) columns.push({ ...std })
     }
@@ -1275,6 +1308,8 @@ export const useStore = create<Store>()(
             rows: kopie.rows.map((r) => ({ ...r })),
             keys,
             modus: kopie.modus ?? 'soll',
+            register,
+            activeRegisterId,
           },
         ],
       }))
@@ -1293,6 +1328,8 @@ export const useStore = create<Store>()(
             rows: kopie.rows.map((r) => ({ ...r })),
             keys,
             modus: kopie.modus ?? 'soll',
+            register,
+            activeRegisterId,
           },
         ],
       }))
@@ -1367,6 +1404,7 @@ export const useStore = create<Store>()(
       columns: t.columns.map((c) => ({ ...c })),
       rows: t.rows.map((r) => ({ ...r })),
       keys: remapKeys(t.keys),
+      register: t.register ? t.register.map((r) => ({ ...r })) : undefined,
     }))
     const nebentabellen: Nebentabelle[] = kopie.nebentabellen.map((n) => ({
       ...n,
@@ -1376,6 +1414,7 @@ export const useStore = create<Store>()(
       columns: n.columns.map((c) => ({ ...c })),
       rows: n.rows.map((r) => ({ ...r })),
       keys: remapKeys(n.keys),
+      register: n.register ? n.register.map((r) => ({ ...r })) : undefined,
     }))
 
     set((st) => ({
