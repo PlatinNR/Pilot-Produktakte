@@ -90,10 +90,10 @@ export function formatPercent(percent: number): string {
 }
 
 export const MASCHINEN_FARBEN = [
-  'bg-zollern-700',
-  'bg-zollern-500',
-  'bg-zollern-300',
-  'bg-zollern-200',
+  'bg-slate-800',
+  'bg-slate-700',
+  'bg-slate-600',
+  'bg-slate-500',
   'bg-slate-400',
   'bg-slate-300',
 ]

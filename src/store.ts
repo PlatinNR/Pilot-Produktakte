@@ -205,6 +205,7 @@ interface Store extends AppState {
   renameProduktionstabelle: (id: string, name: string) => void
   setProduktionArbeitsplatz: (id: string, arbeitsplatz: string) => void
   setProduktionModus: (id: string, modus: TabellenModus) => void
+  setProduktionPilot: (id: string, pilot: boolean) => void
   removeProduktionstabelle: (id: string) => void
   addColumnProduktion: (tabelleId: string, name: string, type: ColumnType, registerId?: string) => void
   renameColumnProduktion: (tabelleId: string, spalteId: string, name: string) => void
@@ -233,6 +234,7 @@ interface Store extends AppState {
   renameNebentabelle: (id: string, name: string) => void
   setNebenArbeitsplatz: (id: string, arbeitsplatz: string) => void
   setNebenModus: (id: string, modus: TabellenModus) => void
+  setNebenPilot: (id: string, pilot: boolean) => void
   setNebenSchritt: (id: string, schrittId: string | null) => void
   removeNebentabelle: (id: string) => void
   moveNebentabelle: (id: string, richtung: 'up' | 'down') => void
@@ -731,6 +733,11 @@ export const useStore = create<Store>()(
       produktionstabellen: s.produktionstabellen.map((t) => (t.id === id ? { ...t, modus } : t)),
     })),
 
+  setProduktionPilot: (id, pilot) =>
+    set((s) => ({
+      produktionstabellen: s.produktionstabellen.map((t) => (t.id === id ? { ...t, pilot } : t)),
+    })),
+
   removeProduktionstabelle: (id) =>
     set((s) => {
       const removed = s.produktionstabellen.find((t) => t.id === id)
@@ -984,6 +991,9 @@ export const useStore = create<Store>()(
 
   setNebenModus: (id, modus) =>
     set((s) => ({ nebentabellen: s.nebentabellen.map((t) => (t.id === id ? { ...t, modus } : t)) })),
+
+  setNebenPilot: (id, pilot) =>
+    set((s) => ({ nebentabellen: s.nebentabellen.map((t) => (t.id === id ? { ...t, pilot } : t)) })),
 
   setNebenSchritt: (id, schrittId) =>
     set((s) => ({
@@ -1308,6 +1318,7 @@ export const useStore = create<Store>()(
             rows: kopie.rows.map((r) => ({ ...r })),
             keys,
             modus: kopie.modus ?? 'soll',
+            pilot: kopie.pilot ?? false,
             register,
             activeRegisterId,
           },
@@ -1328,6 +1339,7 @@ export const useStore = create<Store>()(
             rows: kopie.rows.map((r) => ({ ...r })),
             keys,
             modus: kopie.modus ?? 'soll',
+            pilot: kopie.pilot ?? false,
             register,
             activeRegisterId,
           },

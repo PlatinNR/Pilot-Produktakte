@@ -113,7 +113,7 @@ function ColumnRow({
       {keyType === 'fk' && (
         <span
           onPointerDown={onStartDrag}
-          className="h-3 w-3 shrink-0 cursor-grab rounded-full border-2 border-white bg-zollern-500 shadow hover:bg-zollern-600"
+          className="h-3 w-3 shrink-0 cursor-grab rounded-full border-2 border-white bg-slate-900 shadow hover:bg-black"
           title="Fremdschlüssel – ziehen, um Verbindung zu erstellen"
         />
       )}
@@ -202,6 +202,8 @@ interface EntityProps {
   unterzeile?: React.ReactNode
   modus?: TabellenModus
   onModusChange?: (modus: TabellenModus) => void
+  isPilot?: boolean
+  onPilotChange?: (pilot: boolean) => void
   registers?: TabellenRegister[]
   activeRegisterId?: string | null
   columns?: TableColumn[]
@@ -228,6 +230,8 @@ function EntityCard({
   unterzeile,
   modus = 'soll',
   onModusChange,
+  isPilot = false,
+  onPilotChange,
   registers,
   activeRegisterId,
   columns,
@@ -254,12 +258,17 @@ function EntityCard({
     setAddingCol(false)
   }
   const isIst = modus === 'ist'
-  const rahmenKlasse = isIst ? 'border-zinc-800 bg-zinc-950 text-white shadow-sm ring-1 ring-zinc-800' :
-    rahmen === 'extern'
-      ? 'border-purple-400 bg-purple-50 ring-2 ring-purple-300'
-      : betont
-        ? 'border-slate-300 bg-slate-100 shadow-sm'
-        : 'border-slate-200 bg-white'
+  const rahmenKlasse = isPilot
+    ? isIst
+      ? 'border-orange-500 bg-gradient-to-b from-zinc-950 via-zinc-900 to-orange-950/30 text-white shadow-md ring-2 ring-orange-500/50'
+      : 'border-orange-400 bg-gradient-to-b from-orange-50/80 via-white to-orange-50/40 text-slate-900 shadow-md ring-2 ring-orange-400/50'
+    : isIst
+      ? 'border-zinc-800 bg-zinc-950 text-white shadow-sm ring-1 ring-zinc-800'
+      : rahmen === 'extern'
+        ? 'border-purple-400 bg-purple-50 ring-2 ring-purple-300'
+        : betont
+          ? 'border-slate-300 bg-slate-100 shadow-sm'
+          : 'border-slate-200 bg-white'
   const titelKlasse = isIst ? (compact ? 'text-[11px] font-semibold text-white' : 'text-xs font-semibold text-white') : betont
     ? 'text-sm font-bold text-slate-800'
     : compact
@@ -267,18 +276,51 @@ function EntityCard({
       : 'text-xs font-semibold text-slate-700'
   return (
     <div className={`overflow-hidden rounded-lg border shadow-sm ${rahmenKlasse}`}>
-      <div className={`border-b ${isIst ? 'border-zinc-800' : betont ? 'border-slate-200' : 'border-slate-100'} ${compact ? 'px-2 py-1.5' : 'px-2.5 py-2'}`}>
+      <div
+        className={`border-b ${
+          isPilot
+            ? isIst
+              ? 'border-orange-900/60 bg-orange-950/30'
+              : 'border-orange-200 bg-orange-100/70'
+            : isIst
+              ? 'border-zinc-800'
+              : betont
+                ? 'border-slate-200'
+                : 'border-slate-100'
+        } ${compact ? 'px-2 py-1.5' : 'px-2.5 py-2'}`}
+      >
         {/* Imaginäre Zeile darüber: Name / Titel des Arbeitsplatzes / der Tabelle */}
         <div className="flex items-center gap-1.5 min-w-0">
-          <span className={`shrink-0 rounded-full ${isIst ? 'bg-amber-400' : 'bg-zollern-500'} ${betont ? 'h-2.5 w-2.5' : 'h-2 w-2'}`} />
+          <span
+            className={`shrink-0 rounded-full ${
+              isPilot
+                ? 'bg-orange-500 ring-2 ring-orange-400/30 shadow-xs'
+                : isIst
+                  ? 'bg-zinc-400'
+                  : 'bg-slate-900'
+            } ${betont ? 'h-2.5 w-2.5' : 'h-2 w-2'}`}
+          />
           <EditableName
             value={title}
             onCommit={onRename}
             dark={isIst}
             className={`min-w-0 flex-1 bg-transparent font-bold outline-none ${titelKlasse}`}
           />
+          {isPilot && (
+            <span className="shrink-0 rounded bg-orange-500 px-1.5 py-0.5 text-[9px] font-bold text-white uppercase tracking-wider shadow-xs">
+              Pilot
+            </span>
+          )}
           {typeof percent === 'number' && percent >= 0 && (
-            <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${isIst ? 'bg-zinc-800 text-zinc-300' : 'bg-zollern-50 text-zollern-700'}`}>
+            <span
+              className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
+                isPilot
+                  ? 'bg-orange-100 text-orange-800'
+                  : isIst
+                    ? 'bg-zinc-800 text-zinc-300'
+                    : 'bg-slate-100 text-slate-800'
+              }`}
+            >
               {formatPercent(percent)}
             </span>
           )}
@@ -339,7 +381,7 @@ function EntityCard({
       </div>
       {typeof percent === 'number' && percent >= 0 && (
         <div className={`h-0.5 w-full ${isIst ? 'bg-zinc-800' : 'bg-slate-100'}`}>
-          <div className={`h-full ${colorClass ?? 'bg-zollern-500'}`} style={{ width: `${percent}%` }} />
+          <div className={`h-full ${isPilot ? 'bg-orange-500' : colorClass ?? 'bg-slate-900'}`} style={{ width: `${percent}%` }} />
         </div>
       )}
       {registers && registers.length > 0 && (
@@ -426,7 +468,7 @@ function EntityCard({
                         setEditingRegId(reg.id)
                         setEditingRegName(reg.name)
                       }}
-                      className="opacity-0 group-hover:opacity-100 hover:text-zollern-500 p-0.5 text-[8px]"
+                      className="opacity-0 group-hover:opacity-100 hover:text-slate-900 p-0.5 text-[8px]"
                       title="Reiter umbenennen"
                     >
                       ✎
@@ -515,7 +557,7 @@ function EntityCard({
                 <option value="number">Zahl</option>
                 <option value="date">Datum</option>
               </select>
-              <button onClick={submitColumn} className="rounded bg-zollern-700 px-1.5 py-0.5 text-[10px] text-white hover:bg-zollern-800">
+              <button onClick={submitColumn} className="rounded bg-slate-900 px-1.5 py-0.5 text-[10px] text-white hover:bg-black">
                 ✓
               </button>
               <button onClick={() => setAddingCol(false)} className={`rounded px-1 ${isIst ? 'text-zinc-400 hover:text-zinc-200' : 'text-slate-400 hover:text-slate-600'}`}>
@@ -526,11 +568,15 @@ function EntityCard({
             <button
               onClick={() => setAddingCol(true)}
               className={`w-full px-2 py-1 text-left text-[10px] font-medium ${
-                isIst
-                  ? 'text-zinc-300 hover:bg-zinc-900'
-                  : betont
-                    ? 'text-slate-600 hover:bg-slate-200/60'
-                    : 'text-zollern-700 hover:bg-zollern-50'
+                isPilot
+                  ? isIst
+                    ? 'text-orange-400 hover:bg-zinc-900'
+                    : 'text-orange-700 hover:bg-orange-50'
+                  : isIst
+                    ? 'text-zinc-300 hover:bg-zinc-900'
+                    : betont
+                      ? 'text-slate-600 hover:bg-slate-200/60'
+                      : 'text-slate-700 hover:bg-slate-100'
               }`}
             >
               + Feld
@@ -539,36 +585,70 @@ function EntityCard({
         </div>
       )}
       {footer}
-      {onModusChange && (
-        <div className={`flex justify-end border-t px-2 py-1 ${isIst ? 'border-zinc-800' : 'border-slate-100'}`}>
-          <div className={`inline-flex items-center rounded p-0.5 text-[9px] font-medium ${
-            isIst ? 'bg-zinc-900 border border-zinc-700/80' : 'bg-slate-100 border border-slate-200'
-          }`}>
-            <button
-              type="button"
-              onClick={() => onModusChange('soll')}
-              className={`rounded px-1.5 py-0.5 transition-colors ${
-                !isIst
-                  ? 'bg-white text-slate-800 shadow-sm font-semibold'
-                  : 'text-zinc-400 hover:text-zinc-200'
-              }`}
-              title="Soll-Tabelle (Vorgabe/Planung)"
-            >
-              Soll
-            </button>
-            <button
-              type="button"
-              onClick={() => onModusChange('ist')}
-              className={`rounded px-1.5 py-0.5 transition-colors ${
-                isIst
-                  ? 'bg-zinc-800 text-white shadow-sm font-semibold'
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
-              title="Ist-Tabelle (Erfassung/Rückmeldung - Dunkelmodus)"
-            >
-              Ist
-            </button>
+      {(onModusChange || onPilotChange) && (
+        <div
+          className={`flex items-center justify-between border-t px-2 py-1 ${
+            isPilot
+              ? isIst
+                ? 'border-orange-900/60 bg-orange-950/20'
+                : 'border-orange-200/80 bg-orange-50/40'
+              : isIst
+                ? 'border-zinc-800'
+                : 'border-slate-100'
+          }`}
+        >
+          {/* LINKS UNTEN: Pilot-Schalter */}
+          <div>
+            {onPilotChange ? (
+              <button
+                type="button"
+                onClick={() => onPilotChange(!isPilot)}
+                className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                  isPilot
+                    ? 'bg-orange-500 text-white shadow-xs ring-1 ring-orange-600'
+                    : isIst
+                      ? 'border border-zinc-700/80 bg-zinc-900 text-zinc-400 hover:border-orange-500/50 hover:text-orange-400'
+                      : 'border border-slate-200 bg-white text-slate-500 hover:border-orange-400 hover:text-orange-600'
+                }`}
+                title={isPilot ? 'Pilot-Status aktiv (orange color-graded)' : 'Als Pilot markieren (Orange einfärben)'}
+              >
+                <span className={`h-1.5 w-1.5 rounded-full ${isPilot ? 'bg-white' : 'bg-orange-500'}`} />
+                Pilot
+              </button>
+            ) : <div />}
           </div>
+
+          {/* RECHTS UNTEN: Soll / Ist Modus */}
+          {onModusChange && (
+            <div className={`inline-flex items-center rounded p-0.5 text-[9px] font-medium ${
+              isIst ? 'bg-zinc-900 border border-zinc-700/80' : 'bg-slate-100 border border-slate-200'
+            }`}>
+              <button
+                type="button"
+                onClick={() => onModusChange('soll')}
+                className={`rounded px-1.5 py-0.5 transition-colors ${
+                  !isIst
+                    ? 'bg-white text-slate-800 shadow-sm font-semibold'
+                    : 'text-zinc-400 hover:text-zinc-200'
+                }`}
+                title="Soll-Tabelle (Vorgabe/Planung)"
+              >
+                Soll
+              </button>
+              <button
+                type="button"
+                onClick={() => onModusChange('ist')}
+                className={`rounded px-1.5 py-0.5 transition-colors ${
+                  isIst
+                    ? 'bg-zinc-800 text-white shadow-sm font-semibold'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+                title="Ist-Tabelle (Erfassung/Rückmeldung - Dunkelmodus)"
+              >
+                Ist
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -802,9 +882,9 @@ function LoopLine({ from, to, label }: { from: Rect; to: Rect; label: string }) 
   const halo = { paintOrder: 'stroke' as const, stroke: '#ffffff', strokeWidth: 3 }
   return (
     <g>
-      <path d={path} stroke="#c45004" strokeWidth={1.5} fill="none" strokeDasharray="5 4" markerEnd="url(#er-loop-arrow)" />
+      <path d={path} stroke="#18181b" strokeWidth={1.5} fill="none" strokeDasharray="5 4" markerEnd="url(#er-loop-arrow)" />
       {label && (
-        <text x={labelX} y={labelY} textAnchor="end" fontSize={9} fill="#c45004" style={halo}>
+        <text x={labelX} y={labelY} textAnchor="end" fontSize={9} fill="#18181b" style={halo}>
           {label}
         </text>
       )}
@@ -828,8 +908,8 @@ function VerwendetHinweis({
     <div
       className={`border-t px-2 py-0.5 text-[10px] font-semibold ${
         tabelle.modus === 'ist'
-          ? 'border-orange-950 bg-orange-950/40 text-orange-400'
-          : 'border-orange-100 bg-orange-50 text-orange-700'
+          ? 'border-zinc-800 bg-zinc-900 text-zinc-300'
+          : 'border-slate-200 bg-slate-100 text-slate-800'
       }`}
       title="So oft wurde die Maschine für diesen Fertigungsauftrag verwendet"
     >
@@ -874,10 +954,10 @@ function ArbeitsplatzZeile({
         ? 'border-zinc-700 bg-zinc-900 text-zinc-100 focus:border-zinc-500'
         : 'border-amber-600/60 bg-zinc-900 text-zinc-400 focus:border-amber-500'
     : fehler
-      ? 'border-red-400 text-red-600 focus:border-zollern-400'
+      ? 'border-red-400 text-red-600 focus:border-slate-700'
       : draft
-        ? 'border-slate-200 text-slate-700 focus:border-zollern-400'
-        : 'border-red-300 text-slate-500 focus:border-zollern-400'
+        ? 'border-slate-200 text-slate-700 focus:border-slate-700'
+        : 'border-red-300 text-slate-500 focus:border-slate-700'
 
   return (
     <span className="flex shrink-0 items-center gap-1">
@@ -957,6 +1037,8 @@ export function TabellenbezogenView({ filter }: Props) {
     setActiveRegister,
     moveColumnToRegister,
     setBeziehungKardinalitaet,
+    setProduktionPilot,
+    setNebenPilot,
   } = useStore()
 
   const trace = isTraceMode(filter)
@@ -1441,10 +1523,10 @@ export function TabellenbezogenView({ filter }: Props) {
             <path d="M0,0 L8,4 L0,8 z" fill="#94a3b8" />
           </marker>
           <marker id="er-loop-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
-            <path d="M0,0 L8,4 L0,8 z" fill="#c45004" />
+            <path d="M0,0 L8,4 L0,8 z" fill="#18181b" />
           </marker>
           <marker id="er-prozess-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
-            <path d="M0,0 L8,4 L0,8 z" fill="#F56405" />
+            <path d="M0,0 L8,4 L0,8 z" fill="#000000" />
           </marker>
         </defs>
         {(() => {
@@ -1536,7 +1618,7 @@ export function TabellenbezogenView({ filter }: Props) {
           if (!from || !to) return null
           return <LoopLine key={`loop-${i}`} from={from} to={to} label={lp.label} />
         })}
-        {/* Prozesspfeile: Arbeitsplatz → nächster Arbeitsplatz bzw. Variabler Block, prägnant orange */}
+        {/* Prozesspfeile: Arbeitsplatz → nächster Arbeitsplatz bzw. Variabler Block, prägnant schwarz */}
         {prozessStops.slice(0, -1).map((key, i) => {
           const from = boxes[key]
           const to = boxes[prozessStops[i + 1]]
@@ -1545,7 +1627,7 @@ export function TabellenbezogenView({ filter }: Props) {
             <path
               key={`prozess-${i}`}
               d={prozessPfad(from, to)}
-              stroke="#F56405"
+              stroke="#000000"
               strokeWidth={2.5}
               fill="none"
               markerEnd="url(#er-prozess-arrow)"
@@ -1553,7 +1635,7 @@ export function TabellenbezogenView({ filter }: Props) {
           )
         })}
         {dragLine && (
-          <path d={dragLine} stroke="#c45004" strokeWidth={2} fill="none" strokeDasharray="4 3" />
+          <path d={dragLine} stroke="#18181b" strokeWidth={2} fill="none" strokeDasharray="4 3" />
         )}
       </svg>
 
@@ -1655,7 +1737,7 @@ export function TabellenbezogenView({ filter }: Props) {
               className="relative rounded-xl p-4"
             >
               <div className="mb-3 flex items-center gap-2">
-                <span className="h-3 w-1 rounded-full bg-zollern-500" />
+                <span className="h-3 w-1 rounded-full bg-slate-900" />
                 <button
                   onClick={() => setInfoAbt(a.id)}
                   className="rounded border border-slate-300 bg-white/70 px-2 py-0.5 text-[11px] text-slate-600 hover:bg-white"
@@ -1673,17 +1755,17 @@ export function TabellenbezogenView({ filter }: Props) {
                 <EditableName
                   value={a.name}
                   onCommit={(name) => renameAbteilung(a.id, name)}
-                  className="min-w-0 flex-1 bg-transparent text-lg font-bold text-zollern-800 outline-none"
+                  className="min-w-0 flex-1 bg-transparent text-lg font-bold text-slate-900 outline-none"
                 />
                 <button
                   onClick={() => addSchritt(a.id)}
-                  className="rounded bg-zollern-700 px-3 py-1 text-xs font-medium text-white hover:bg-zollern-800"
+                  className="rounded bg-slate-900 px-3 py-1 text-xs font-medium text-white hover:bg-black"
                 >
                   + Schritt
                 </button>
                 <button
                   onClick={() => addBearbeitungsblock(a.id)}
-                  className="rounded border border-zollern-700 px-3 py-1 text-xs font-medium text-zollern-700 hover:bg-zollern-50"
+                  className="rounded border border-slate-900 px-3 py-1 text-xs font-medium text-slate-900 hover:bg-slate-100"
                 >
                   + Variabler Block
                 </button>
@@ -1779,17 +1861,17 @@ export function TabellenbezogenView({ filter }: Props) {
                         {/* 1. & 2. Variabler Block (Spalte 1 & 2: Produktbezogene Daten + Produktionskette, col-span-2) */}
                         <div
                           ref={registerRef(`bc:${item.block.id}`)}
-                          className="col-span-2 rounded-lg border border-zollern-200 bg-zollern-50/40 p-3"
+                          className="col-span-2 rounded-lg border border-slate-300 bg-slate-50/70 p-3"
                         >
                           <div ref={registerRef(`b:${item.block.id}`)} className="mb-2 flex items-center gap-2">
-                            <span className="h-2 w-2 rounded-full bg-zollern-400" />
-                            <span className="text-[9px] font-semibold uppercase tracking-wide text-zollern-500">
+                            <span className="h-2 w-2 rounded-full bg-slate-500" />
+                            <span className="text-[9px] font-semibold uppercase tracking-wide text-slate-500">
                               Variabler Block
                             </span>
                             <EditableName
                               value={item.block.name}
                               onCommit={(name) => renameBearbeitungsblock(item.block.id, name)}
-                              className="min-w-0 flex-1 text-xs font-semibold text-zollern-800 outline-none"
+                              className="min-w-0 flex-1 text-xs font-semibold text-slate-800 outline-none"
                             />
                             <button
                               onClick={() => moveBearbeitungsblock(item.block.id, 'up')}
@@ -1809,7 +1891,7 @@ export function TabellenbezogenView({ filter }: Props) {
                             </button>
                             <button
                               onClick={() => addSchritt(a.id, item.block.id)}
-                              className="rounded bg-zollern-700 px-2 py-0.5 text-[11px] font-medium text-white hover:bg-zollern-800"
+                              className="rounded bg-slate-900 px-2 py-0.5 text-[11px] font-medium text-white hover:bg-black"
                             >
                               + Schritt
                             </button>
@@ -1924,7 +2006,7 @@ export function TabellenbezogenView({ filter }: Props) {
                                             type="checkbox"
                                             checked={bst.optional}
                                             onChange={(e) => setSchrittOptional(bst.id, e.target.checked)}
-                                            className="h-3 w-3 accent-zollern-600"
+                                            className="h-3 w-3 accent-slate-900"
                                           />
                                           optional (überspringbar, wenn kein Eintrag)
                                         </label>
@@ -1990,7 +2072,7 @@ export function TabellenbezogenView({ filter }: Props) {
                                             className="rounded-lg"
                                             style={{
                                               opacity,
-                                              outline: trace && used ? '2px solid #F56405' : 'none',
+                                              outline: trace && used ? '2px solid #000000' : 'none',
                                               outlineOffset: '1px',
                                             }}
                                           >
@@ -1999,6 +2081,8 @@ export function TabellenbezogenView({ filter }: Props) {
                                               title={m.name}
                                               modus={m.modus ?? 'soll'}
                                               onModusChange={(neu) => setProduktionModus(m.id, neu)}
+                                isPilot={m.pilot ?? false}
+                                onPilotChange={(pilot) => setProduktionPilot(m.id, pilot)}
                                               onRename={(name) => renameProduktionstabelle(m.id, name)}
                                               onRemove={() => removeProduktionstabelle(m.id)}
                                               percent={aggregate && agg ? (anteil?.percent ?? 0) : null}
@@ -2089,7 +2173,7 @@ export function TabellenbezogenView({ filter }: Props) {
                                 )
                               })}
                               {blockSteps.length === 0 && (
-                                <div className="rounded border border-dashed border-zollern-300 px-4 py-8 text-center text-xs text-zollern-600">
+                                <div className="rounded border border-dashed border-slate-300 px-4 py-8 text-center text-xs text-slate-500">
                                   Keine Schritte im Block. Klicke oben auf „+ Schritt“.
                                 </div>
                               )}
@@ -2109,6 +2193,8 @@ export function TabellenbezogenView({ filter }: Props) {
                                   title={n.name || 'Prozess-Tabelle'}
                                   modus={n.modus ?? 'soll'}
                                   onModusChange={(neu) => setNebenModus(n.id, neu)}
+                                isPilot={n.pilot ?? false}
+                                onPilotChange={(pilot) => setNebenPilot(n.id, pilot)}
                                   onRename={(name) => renameNebentabelle(n.id, name)}
                                   onRemove={() => removeNebentabelle(n.id)}
                                   onAddColumn={(name, type) => addColumnNeben(n.id, name, type)}
@@ -2235,7 +2321,7 @@ export function TabellenbezogenView({ filter }: Props) {
                               className="rounded-lg"
                               style={{
                                 opacity,
-                                outline: trace && used ? '2px solid #F56405' : 'none',
+                                outline: trace && used ? '2px solid #000000' : 'none',
                                 outlineOffset: '1px',
                               }}
                             >
@@ -2244,6 +2330,8 @@ export function TabellenbezogenView({ filter }: Props) {
                                 title={m.name}
                                 modus={m.modus ?? 'soll'}
                                 onModusChange={(neu) => setProduktionModus(m.id, neu)}
+                                isPilot={m.pilot ?? false}
+                                onPilotChange={(pilot) => setProduktionPilot(m.id, pilot)}
                                 onRename={(name) => renameProduktionstabelle(m.id, name)}
                                 onRemove={() => removeProduktionstabelle(m.id)}
                                 percent={aggregate && agg ? (anteil?.percent ?? 0) : null}
@@ -2440,7 +2528,7 @@ export function TabellenbezogenView({ filter }: Props) {
                                 type="checkbox"
                                 checked={st.optional}
                                 onChange={(e) => setSchrittOptional(st.id, e.target.checked)}
-                                className="h-3 w-3 accent-zollern-600"
+                                className="h-3 w-3 accent-slate-900"
                               />
                               optional (überspringbar, wenn kein Eintrag)
                             </label>
@@ -2502,6 +2590,8 @@ export function TabellenbezogenView({ filter }: Props) {
                                 title={n.name || 'Prozess-Tabelle'}
                                 modus={n.modus ?? 'soll'}
                                 onModusChange={(neu) => setNebenModus(n.id, neu)}
+                                isPilot={n.pilot ?? false}
+                                onPilotChange={(pilot) => setNebenPilot(n.id, pilot)}
                                 onRename={(name) => renameNebentabelle(n.id, name)}
                                 onRemove={() => removeNebentabelle(n.id)}
                                 onAddColumn={(name, type) => addColumnNeben(n.id, name, type)}
@@ -2606,6 +2696,8 @@ export function TabellenbezogenView({ filter }: Props) {
                               title={n.name || 'Prozess-Tabelle'}
                               modus={n.modus ?? 'soll'}
                               onModusChange={(neu) => setNebenModus(n.id, neu)}
+                                isPilot={n.pilot ?? false}
+                                onPilotChange={(pilot) => setNebenPilot(n.id, pilot)}
                               onRename={(name) => renameNebentabelle(n.id, name)}
                               onRemove={() => removeNebentabelle(n.id)}
                               onAddColumn={(name, type) => addColumnNeben(n.id, name, type)}
@@ -2708,7 +2800,7 @@ export function TabellenbezogenView({ filter }: Props) {
                       }}
                       className={`flex flex-col items-center rounded border px-2 py-1 text-center transition-all cursor-pointer ${
                         isSelected
-                          ? 'border-zollern-600 bg-zollern-50 text-zollern-800 font-bold shadow-xs'
+                          ? 'border-slate-900 bg-slate-100 text-slate-900 font-bold shadow-xs'
                           : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-300'
                       }`}
                     >

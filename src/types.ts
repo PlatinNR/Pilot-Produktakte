@@ -116,6 +116,8 @@ export interface Produktionstabelle {
   keys: TableKey[]
   /** Soll- oder Ist-Tabelle (default: 'soll') */
   modus?: TabellenModus
+  /** Pilot-Tabelle (orange hervorgehoben) */
+  pilot?: boolean
   /** Unterregister (Reiter) der Maschine (Default: [{ id: 'allgemein', name: 'Allgemein' }]) */
   register?: TabellenRegister[]
   /** Aktiver Reiter oder null wenn eingeklappt */
@@ -138,6 +140,8 @@ export interface Nebentabelle {
   keys: TableKey[]
   /** Soll- oder Ist-Tabelle (default: 'soll') */
   modus?: TabellenModus
+  /** Pilot-Tabelle (orange hervorgehoben) */
+  pilot?: boolean
   /** Unterregister (Reiter) der Nebentabelle (Default: [{ id: 'allgemein', name: 'Allgemein' }]) */
   register?: TabellenRegister[]
   /** Aktiver Reiter oder null wenn eingeklappt */
@@ -185,6 +189,8 @@ export interface TabellenKopie {
   keys: TableKey[]
   /** Soll- oder Ist-Tabelle (default: 'soll') */
   modus?: TabellenModus
+  /** Pilot-Tabelle (orange hervorgehoben) */
+  pilot?: boolean
   schrittId?: string | null
   register?: TabellenRegister[]
   activeRegisterId?: string | null

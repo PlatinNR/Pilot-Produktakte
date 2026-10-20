@@ -5,6 +5,7 @@ import { useStore } from '../store'
 import { loadFromCloud, saveAllChains, useSyncStatus } from '../lib/sync'
 import { fuegeAbteilungEin } from '../lib/tabellenKopie'
 import { useSprache, useT } from '../lib/sprache'
+import { exportiereAlsJson, exportiereAlsPng, exportiereAlsSvg } from '../lib/exportProzesskette'
 import { FilterBar } from '../components/FilterBar'
 import { TabellenbezogenView } from '../components/TabellenbezogenView'
 import { ProduktHinzufuegenView } from '../components/ProduktHinzufuegenView'
@@ -30,6 +31,7 @@ export function Dashboard() {
   const [view, setView] = useState<View>('tabellen')
   const [produktinfoOffen, setProduktinfoOffen] = useState(false)
   const [hinweis, setHinweis] = useState<string | null>(null)
+  const [isExporting, setIsExporting] = useState(false)
 
   const abteilungen = alleAbteilungen.filter((a) => a.chainId === activeChainId)
   const activeChain = chains.find((c) => c.id === activeChainId)
@@ -53,6 +55,40 @@ export function Dashboard() {
     removeChain(activeChain.id)
     setHinweis(t('Prozesskette „{name}" gelöscht.', { name: activeChain.name }))
     setTimeout(() => setHinweis(null), 5000)
+  }
+
+  const handleExport = async (format: 'png' | 'svg' | 'json') => {
+    const ketteName = activeChain?.name || 'Prozesskette'
+    if (format === 'json') {
+      exportiereAlsJson(useStore.getState(), activeChainId, ketteName)
+      setHinweis(t('Prozesskette „{name}" als JSON exportiert.', { name: ketteName }))
+      setTimeout(() => setHinweis(null), 4000)
+      return
+    }
+
+    const el = document.getElementById('prozesskette-darstellung')
+    if (!el) {
+      setHinweis(t('Darstellung konnte nicht gefunden werden.'))
+      setTimeout(() => setHinweis(null), 4000)
+      return
+    }
+
+    setIsExporting(true)
+    try {
+      if (format === 'png') {
+        await exportiereAlsPng(el, ketteName)
+        setHinweis(t('Darstellung der Prozesskette als PNG exportiert.'))
+      } else if (format === 'svg') {
+        await exportiereAlsSvg(el, ketteName)
+        setHinweis(t('Darstellung der Prozesskette als SVG exportiert.'))
+      }
+    } catch (err) {
+      console.error('Export fehlgeschlagen:', err)
+      setHinweis(t('Export fehlgeschlagen. Bitte erneut versuchen.'))
+    } finally {
+      setIsExporting(false)
+      setTimeout(() => setHinweis(null), 4000)
+    }
   }
 
   const busy = sync.phase !== 'idle'
@@ -93,7 +129,7 @@ export function Dashboard() {
             <select
               value={activeChainId}
               onChange={(e) => setActiveChain(e.target.value)}
-              className="max-w-[14rem] rounded border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-600 outline-none focus:border-zollern-400"
+              className="max-w-[14rem] rounded border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-600 outline-none focus:border-slate-400"
               title={t('Prozesskette wechseln')}
             >
               {chains.map((c) => (
@@ -148,7 +184,7 @@ export function Dashboard() {
               <button
                 onClick={() => setSprache('de')}
                 className={`px-1.5 py-0.5 text-[10px] font-semibold ${
-                  sprache === 'de' ? 'bg-zollern-600 text-white' : 'text-slate-400 hover:bg-slate-100'
+                  sprache === 'de' ? 'bg-slate-900 text-white' : 'text-slate-400 hover:bg-slate-100'
                 }`}
                 title="Deutsch"
               >
@@ -157,7 +193,7 @@ export function Dashboard() {
               <button
                 onClick={() => setSprache('en')}
                 className={`px-1.5 py-0.5 text-[10px] font-semibold ${
-                  sprache === 'en' ? 'bg-zollern-600 text-white' : 'text-slate-400 hover:bg-slate-100'
+                  sprache === 'en' ? 'bg-slate-900 text-white' : 'text-slate-400 hover:bg-slate-100'
                 }`}
                 title="English"
               >
@@ -184,6 +220,36 @@ export function Dashboard() {
               title={t('Kopierte Abteilung in die aktive Kette einfügen')}
             >
               ⧉ {t('einfügen')}
+            </button>
+          </div>
+
+          {/* Zeile 4: Export der Prozesskette */}
+          <div className="flex items-center gap-1 pt-0.5">
+            <span className="w-16 text-right text-[10px] uppercase tracking-wide text-slate-400 font-medium">
+              {t('Export')}
+            </span>
+            <button
+              onClick={() => handleExport('png')}
+              disabled={isExporting}
+              className="rounded bg-slate-900 px-2 py-0.5 text-xs font-semibold text-white hover:bg-black disabled:opacity-50 flex items-center gap-1 shadow-xs cursor-pointer"
+              title={t('Darstellung der Prozesskette als PNG-Bild exportieren')}
+            >
+              {isExporting ? '…' : '⤓ PNG'}
+            </button>
+            <button
+              onClick={() => handleExport('svg')}
+              disabled={isExporting}
+              className="rounded border border-slate-300 bg-white px-2 py-0.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 cursor-pointer"
+              title={t('Darstellung der Prozesskette als SVG-Vektorgrafik exportieren')}
+            >
+              SVG
+            </button>
+            <button
+              onClick={() => handleExport('json')}
+              className="rounded border border-slate-300 bg-white px-2 py-0.5 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer"
+              title={t('Prozesskettendaten als JSON exportieren')}
+            >
+              JSON
             </button>
           </div>
         </div>
@@ -215,7 +281,7 @@ export function Dashboard() {
           onClick={() => setView('tabellen')}
           className={`px-4 py-2 text-sm font-medium ${
             view === 'tabellen'
-              ? 'border-b-2 border-zollern-500 text-zollern-700'
+              ? 'border-b-2 border-slate-900 text-slate-900 font-bold'
               : 'text-slate-500 hover:text-slate-700'
           }`}
         >
@@ -225,7 +291,7 @@ export function Dashboard() {
           onClick={() => setView('produkt')}
           className={`px-4 py-2 text-sm font-medium ${
             view === 'produkt'
-              ? 'border-b-2 border-zollern-500 text-zollern-700'
+              ? 'border-b-2 border-slate-900 text-slate-900 font-bold'
               : 'text-slate-500 hover:text-slate-700'
           }`}
         >
@@ -243,7 +309,7 @@ export function Dashboard() {
               onClick={() => setProduktinfoOffen((o) => !o)}
               className={`px-4 py-2 text-sm font-medium ${
                 produktinfoOffen
-                  ? 'border-b-2 border-zollern-500 text-zollern-700'
+                  ? 'border-b-2 border-slate-900 text-slate-900 font-bold'
                   : 'text-slate-500 hover:text-slate-700'
               }`}
             >
@@ -258,7 +324,9 @@ export function Dashboard() {
       {view === 'produkt' ? (
         <ProduktHinzufuegenView />
       ) : (
-        <TabellenbezogenView filter={filter} />
+        <div id="prozesskette-darstellung" className="rounded-xl bg-[#f8f8f8] p-2">
+          <TabellenbezogenView filter={filter} />
+        </div>
       )}
     </div>
   )
