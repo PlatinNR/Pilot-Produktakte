@@ -710,12 +710,29 @@ interface LaneRoutingResult {
 function computeLaneRouting(
   lines: RawLineDef[],
   boxes: Record<string, Rect>,
+  alleMaschinen?: Produktionstabelle[],
 ): LaneRoutingResult {
   const validLines = lines
     .map((ln) => {
       const from = boxes[ln.sourceKey]
       const to = boxes[ln.targetKey]
       if (!from || !to) return null
+
+      // Falls die Quelle ein Arbeitsplatz in einem Block-Schritt ist:
+      // Verhindern, dass eine Verbindung zu einer oberhalb/unterhalb aus dem Scroller weggescrollten Zeile gezeichnet wird
+      if (alleMaschinen && ln.keyKind === 'm' && ln.keyTableId) {
+        const m = alleMaschinen.find((x) => x.id === ln.keyTableId)
+        if (m?.schrittId) {
+          const scrollerBox = boxes[`mscroller:${m.schrittId}`]
+          if (
+            scrollerBox &&
+            (from.y < scrollerBox.y - 6 || from.y > scrollerBox.y + scrollerBox.h + 6)
+          ) {
+            return null
+          }
+        }
+      }
+
       const ltr = from.x + from.w <= to.x + 20
       const rtl = from.x >= to.x + to.w - 20
       const sameCol = !ltr && !rtl
@@ -794,7 +811,9 @@ function computeLaneRouting(
 
       const path = `M ${item.x1} ${item.y1} H ${xLane} V ${item.y2} H ${item.x2}`
       const handleX = xLane
-      const handleY = (item.y1 + item.y2) / 2
+      const handleY = item.sameCol
+        ? Math.max(item.minY + 14, Math.min(item.maxY - 14, (item.y1 + item.y2) / 2))
+        : (item.y1 + item.y2) / 2
 
       // Farbe nach Tabelle: Nebentabelle (Unterstützung) = Teal, Maschine = Slate, Schritt = Violett
       const color =
@@ -849,6 +868,45 @@ function computeLaneRouting(
   }
 
   return { connections, junctionDots }
+}
+
+/**
+ * Ermittelt für einen Schritt den passenden Arbeitsplatz für die FAUF-Verbindung.
+ * Bei Schritten in einem variablen Block wird dynamisch die aktuell im Scroller sichtbare Maschine gewählt,
+ * damit die Verbindung nicht nach oben ins Leere wandert, wenn eine Maschine weggescrollt wird.
+ */
+function getActiveMachineForStep(
+  stId: string,
+  machines: Produktionstabelle[],
+  boxes: Record<string, Rect>,
+): Produktionstabelle | undefined {
+  const stepMs = machines.filter((m) => m.schrittId === stId)
+  if (stepMs.length === 0) return undefined
+  const scrollerBox = boxes[`mscroller:${stId}`]
+  if (!scrollerBox) return stepMs[0]
+
+  // Finde die erste Maschine, deren Fertigungsauftrag-Zeile im sichtbaren Bereich des Scroll-Containers liegt
+  for (const m of stepMs) {
+    const rowBox = boxes[`m:${m.id}:auftragsnummer`]
+    if (
+      rowBox &&
+      rowBox.y >= scrollerBox.y - 6 &&
+      rowBox.y + rowBox.h <= scrollerBox.y + scrollerBox.h + 10
+    ) {
+      return m
+    }
+  }
+
+  // Fallback: Erste Maschine, deren Zeile zumindest noch nicht oberhalb des Containers weggescrollt ist
+  for (const m of stepMs) {
+    const rowBox = boxes[`m:${m.id}:auftragsnummer`]
+    if (rowBox && rowBox.y >= scrollerBox.y - 6 && rowBox.y <= scrollerBox.y + scrollerBox.h) {
+      return m
+    }
+  }
+
+  // Wenn alle Maschinen nach oben weggescrollt sind: keine Verbindung nach oben ins Leere zeichnen
+  return undefined
 }
 
 /** Kürzeste rechtwinklige Prozessverbindung: normal unten → oben, sonst Seite → Seite. */
@@ -1336,8 +1394,10 @@ export function TabellenbezogenView({ filter }: Props) {
       if (targetKind === 's') {
         // Zwischen Produktarbeitsplatz und Schritt nur noch den Fertigungsauftrag (FAUF) darstellen
         if (k.columnId !== 'auftragsnummer' || k.refColumnId !== 'auftragsnummer') continue
-        // Pro Schritt maximal 1 FAUF-Verbindung anzeigen
+        // Pro Schritt maximal 1 FAUF-Verbindung zur aktuell sichtbaren Maschine anzeigen
         if (seenStepFauf.has(k.refTableId)) continue
+        const activeM = getActiveMachineForStep(k.refTableId, alleMaschinen, boxes)
+        if (!activeM || m.id !== activeM.id) continue
         seenStepFauf.add(k.refTableId)
       }
 
@@ -1418,17 +1478,17 @@ export function TabellenbezogenView({ filter }: Props) {
   // Mindestens eine Verbindung des Fertigungsauftrags (FAUF) je Schritt mit Arbeitsplätzen garantieren
   for (const st of alleSchritte) {
     if (!seenStepFauf.has(st.id)) {
-      const firstM = alleMaschinen.find((m) => m.schrittId === st.id)
-      if (firstM) {
+      const activeM = getActiveMachineForStep(st.id, alleMaschinen, boxes)
+      if (activeM) {
         seenStepFauf.add(st.id)
         lines.push({
-          sourceKey: `m:${firstM.id}:auftragsnummer`,
+          sourceKey: `m:${activeM.id}:auftragsnummer`,
           targetKey: `s:${st.id}:auftragsnummer`,
           label: 'FAUF',
           n1: true,
           kardinalitaet: 'n:1',
           keyKind: 'm',
-          keyTableId: firstM.id,
+          keyTableId: activeM.id,
           keyColumnId: 'auftragsnummer',
           offset: 0,
         })
@@ -1502,7 +1562,7 @@ export function TabellenbezogenView({ filter }: Props) {
       : undefined
 
   // Feste Spuren-Routing (Lane Routing) berechnen
-  const { connections: laneConnections, junctionDots } = computeLaneRouting(lines, boxes)
+  const { connections: laneConnections, junctionDots } = computeLaneRouting(lines, boxes, alleMaschinen)
 
   return (
     <div ref={containerRef} className="relative flex flex-col gap-6" onContextMenu={onKontextMenue}>
@@ -2058,7 +2118,10 @@ export function TabellenbezogenView({ filter }: Props) {
                                     </EntityCard>
 
                                     {/* Maschinen des Block-Schritts mit vertikaler Scrollbar bei vielen Maschinen */}
-                                    <div className="flex max-h-[32rem] flex-col gap-2 overflow-y-auto pr-1">
+                                    <div
+                                      ref={registerRef(`mscroller:${bst.id}`)}
+                                      className="flex max-h-[32rem] flex-col gap-2 overflow-y-auto pr-1"
+                                    >
                                       {bstepMaschinen.map((m, mi) => {
                                         const anteil = agg?.entries.find((e) => e.tabelle.id === m.id)
                                         const used = m.rows.some((r) => r.auftragsnummer === auftrag)
