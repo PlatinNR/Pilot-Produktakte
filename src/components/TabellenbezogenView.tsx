@@ -1145,9 +1145,11 @@ export function TabellenbezogenView({ filter }: Props) {
     const ro = new ResizeObserver(measure)
     if (containerRef.current) ro.observe(containerRef.current)
     window.addEventListener('resize', measure)
+    window.addEventListener('scroll', measure, true)
     return () => {
       ro.disconnect()
       window.removeEventListener('resize', measure)
+      window.removeEventListener('scroll', measure, true)
     }
   }, [alleAbteilungen, alleBloecke, alleSchritte, alleMaschinen, alleNeben])
 
@@ -1734,7 +1736,7 @@ export function TabellenbezogenView({ filter }: Props) {
             <section
               key={a.id}
               ref={registerRef(`abt:${a.id}`)}
-              className="relative rounded-xl p-4"
+              className="relative rounded-xl p-4 min-w-0 max-w-full"
             >
               <div className="mb-3 flex items-center gap-2">
                 <span className="h-3 w-1 rounded-full bg-slate-900" />
@@ -1794,7 +1796,7 @@ export function TabellenbezogenView({ filter }: Props) {
               </div>
 
                             <div
-                className="grid items-start gap-x-6 gap-y-6"
+                className="grid items-start gap-x-6 gap-y-6 min-w-0 max-w-full"
                 style={{ gridTemplateColumns: 'minmax(0, 50fr) minmax(0, 20fr) minmax(0, 30fr)' }}
               >
                 {/* Spalte 1 (Links, 50%): Produktbezogene Daten */}
@@ -1839,10 +1841,10 @@ export function TabellenbezogenView({ filter }: Props) {
 
                 {renderItems.map((item, i) => {
                   if (item.type === 'block') {
-                    // Rechts verankert: der erste (älteste) Schritt steht rechts, neue kommen nach links
+                    // Schritte im Block in natürlicher Reihenfolge (von links nach rechts)
                     const blockSteps = schritte
                       .filter((x) => x.blockId === item.block.id)
-                      .sort((x, y) => y.position - x.position)
+                      .sort((x, y) => x.position - y.position)
                     const blockStepIds = new Set(blockSteps.map((s) => s.id))
                     const blockNeben = neben.filter((n) => {
                       if (n.schrittId && blockStepIds.has(n.schrittId)) return true
@@ -1861,7 +1863,7 @@ export function TabellenbezogenView({ filter }: Props) {
                         {/* 1. & 2. Variabler Block (Spalte 1 & 2: Produktbezogene Daten + Produktionskette, col-span-2) */}
                         <div
                           ref={registerRef(`bc:${item.block.id}`)}
-                          className="col-span-2 rounded-lg border border-slate-300 bg-slate-50/70 p-3"
+                          className="col-span-2 min-w-0 max-w-full rounded-lg border border-slate-300 bg-slate-50/70 p-3"
                         >
                           <div ref={registerRef(`b:${item.block.id}`)} className="mb-2 flex items-center gap-2">
                             <span className="h-2 w-2 rounded-full bg-slate-500" />
@@ -1904,9 +1906,9 @@ export function TabellenbezogenView({ filter }: Props) {
                             </button>
                           </div>
 
-                          {/* Schritte als Spalten, rechts verankert (neue Schritte kommen nach links) */}
-                          <div className="overflow-x-auto pb-1" style={{ direction: 'rtl' }}>
-                            <div className="flex items-start gap-3" style={{ direction: 'ltr' }}>
+                          {/* Schritte als Spalten von links nach rechts mit horizontaler Scrollbar */}
+                          <div className="custom-horizontal-scrollbar w-full min-w-0 overflow-x-auto pb-3">
+                            <div className="flex min-w-full items-start gap-3">
                               {blockSteps.map((bst) => {
                                 const bstepMaschinen = alleMaschinen.filter((m) => m.schrittId === bst.id)
                                 const agg = aggregate ? aggregateSchritt(bst, bstepMaschinen, filter) : null

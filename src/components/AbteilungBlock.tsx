@@ -101,11 +101,11 @@ export function AbteilungBlock({ abteilung, filter, index }: Props) {
             <div className="flex flex-col gap-3">
               {renderItems.map((item) => {
                 if (item.type === 'block') {
-                  const blockSteps = schritte.filter((x) => x.blockId === item.block.id).sort((x, y) => y.position - x.position)
+                  const blockSteps = schritte.filter((x) => x.blockId === item.block.id).sort((x, y) => x.position - y.position)
                   return (
                     <div
                       key={`block-${item.block.id}`}
-                      className="rounded-lg border border-zollern-200 bg-zollern-50/40 p-2"
+                      className="min-w-0 max-w-full rounded-lg border border-zollern-200 bg-zollern-50/40 p-2"
                     >
                       <div className="mb-2 flex items-center gap-2">
                         <span className="h-2 w-2 rounded-full bg-zollern-400" />
@@ -146,8 +146,8 @@ export function AbteilungBlock({ abteilung, filter, index }: Props) {
                         </button>
                       </div>
 
-                      <div className="overflow-x-auto pb-1" style={{ direction: 'rtl' }}>
-                        <div className="flex items-start gap-3" style={{ direction: 'ltr' }}>
+                      <div className="custom-horizontal-scrollbar w-full min-w-0 overflow-x-auto pb-3">
+                        <div className="flex min-w-full items-start gap-3">
                           {blockSteps.map((st) => (
                             <div key={st.id} className="w-[28rem] shrink-0">
                               <SchrittRow schritt={st} filter={filter} />
