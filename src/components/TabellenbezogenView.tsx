@@ -113,7 +113,7 @@ function ColumnRow({
       {keyType === 'fk' && (
         <span
           onPointerDown={onStartDrag}
-          className="h-3 w-3 shrink-0 cursor-grab rounded-full border-2 border-white bg-slate-900 shadow hover:bg-black"
+          className="h-3 w-3 shrink-0 cursor-grab rounded-full border-2 border-white bg-orange-500 shadow hover:bg-orange-600"
           title="Fremdschlüssel – ziehen, um Verbindung zu erstellen"
         />
       )}
