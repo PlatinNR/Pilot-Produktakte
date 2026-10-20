@@ -139,7 +139,7 @@ export function SchrittRow({ schritt, filter }: Props) {
                 onRemove={() => removeProduktionstabelle(t.id)}
                 columns={t.columns}
                 rows={t.rows}
-                onAddColumn={(name, type) => addColumnProduktion(t.id, name, type)}
+                onAddColumn={(name, type, regId) => addColumnProduktion(t.id, name, type, regId)}
                 onRenameColumn={(cid, name) => renameColumnProduktion(t.id, cid, name)}
                 onChangeColumnType={(cid, type) => changeColumnTypeProduktion(t.id, cid, type)}
                 onRemoveColumn={(cid) => removeColumnProduktion(t.id, cid)}

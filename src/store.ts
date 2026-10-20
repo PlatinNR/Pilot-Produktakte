@@ -784,7 +784,11 @@ export const useStore = create<Store>()(
             ? t.activeRegisterId
             : t.register?.[0]?.id) ||
           DEFAULT_REGISTER_ID
-        return { ...t, columns: addColumn(t.columns, name, type, regId) }
+        return {
+          ...t,
+          columns: addColumn(t.columns, name, type, regId),
+          activeRegisterId: t.activeRegisterId === null ? regId : (t.activeRegisterId ?? regId),
+        }
       }),
     })),
 
@@ -1013,7 +1017,11 @@ export const useStore = create<Store>()(
             ? t.activeRegisterId
             : t.register?.[0]?.id) ||
           DEFAULT_REGISTER_ID
-        return { ...t, columns: addColumn(t.columns, name, type, regId) }
+        return {
+          ...t,
+          columns: addColumn(t.columns, name, type, regId),
+          activeRegisterId: t.activeRegisterId === null ? regId : (t.activeRegisterId ?? regId),
+        }
       }),
     })),
 

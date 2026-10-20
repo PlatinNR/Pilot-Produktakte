@@ -129,6 +129,9 @@ export function DataTable({
     if (!trimmed) return
     const targetReg = currentActive || DEFAULT_REGISTER_ID
     onAddColumn(trimmed, colType, targetReg)
+    if (isCollapsed && onSelectRegister) {
+      onSelectRegister(targetReg)
+    }
     setColName('')
     setColType('text')
     setAddingCol(false)
@@ -669,7 +672,10 @@ export function DataTable({
                 }`}
                 autoFocus
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') submitColumn()
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    submitColumn()
+                  }
                   if (e.key === 'Escape') setAddingCol(false)
                 }}
               />
@@ -685,14 +691,18 @@ export function DataTable({
                 <option value="date">Datum</option>
               </select>
               <button
+                type="button"
                 onClick={submitColumn}
-                className="rounded bg-zollern-700 px-2 py-0.5 text-xs text-white hover:bg-zollern-800"
+                title="Parameter hinzufügen (Bestätigen)"
+                className="rounded bg-zollern-700 px-2 py-0.5 text-xs font-semibold text-white hover:bg-zollern-800 cursor-pointer flex items-center gap-1"
               >
-                ✓
+                ✓ Bestätigen
               </button>
               <button
+                type="button"
                 onClick={() => setAddingCol(false)}
-                className={`rounded px-1 text-xs ${
+                title="Abbrechen"
+                className={`rounded px-1 text-xs cursor-pointer ${
                   isIst ? 'text-zinc-500 hover:text-zinc-300' : 'text-slate-400 hover:text-slate-600'
                 }`}
               >

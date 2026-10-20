@@ -30,6 +30,7 @@ import {
   getTabellenRegister,
   filterColumnsByRegister,
   countColumnsInRegister,
+  DEFAULT_REGISTER_ID,
 } from '../utils/register'
 
 interface Props {
@@ -190,7 +191,7 @@ interface EntityProps {
   children: React.ReactNode
   footer?: React.ReactNode
   compact?: boolean
-  onAddColumn?: (name: string, type: ColumnType) => void
+  onAddColumn?: (name: string, type: ColumnType, registerId?: string) => void
   /** 'extern' = Schritt wurde extern bearbeitet (lila Markierung) */
   rahmen?: 'normal' | 'extern'
   /** Betonte Darstellung (der Schritt ist leitend) */
@@ -252,7 +253,11 @@ function EntityCard({
   const submitColumn = () => {
     const trimmed = colName.trim()
     if (!trimmed) return
-    onAddColumn?.(trimmed, colType)
+    const targetReg = currentActive || DEFAULT_REGISTER_ID
+    onAddColumn?.(trimmed, colType, targetReg)
+    if (isCollapsed && onSelectRegister) {
+      onSelectRegister(targetReg)
+    }
     setColName('')
     setColType('text')
     setAddingCol(false)
@@ -541,10 +546,14 @@ function EntityCard({
               <input
                 value={colName}
                 onChange={(e) => setColName(e.target.value)}
+                placeholder="Parametername..."
                 className={`min-w-0 flex-1 rounded border px-1.5 py-0.5 text-[10px] ${isIst ? 'border-zinc-700 bg-zinc-900 text-white placeholder-zinc-500' : 'border-slate-200 bg-white text-slate-800'}`}
                 autoFocus
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') submitColumn()
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    submitColumn()
+                  }
                   if (e.key === 'Escape') setAddingCol(false)
                 }}
               />
@@ -557,17 +566,28 @@ function EntityCard({
                 <option value="number">Zahl</option>
                 <option value="date">Datum</option>
               </select>
-              <button onClick={submitColumn} className="rounded bg-slate-900 px-1.5 py-0.5 text-[10px] text-white hover:bg-black">
-                ✓
+              <button
+                type="button"
+                onClick={submitColumn}
+                title="Parameter hinzufügen (Bestätigen)"
+                className="rounded bg-slate-900 px-2 py-0.5 text-[10px] font-semibold text-white hover:bg-black cursor-pointer shadow-xs flex items-center gap-1"
+              >
+                ✓ Bestätigen
               </button>
-              <button onClick={() => setAddingCol(false)} className={`rounded px-1 ${isIst ? 'text-zinc-400 hover:text-zinc-200' : 'text-slate-400 hover:text-slate-600'}`}>
+              <button
+                type="button"
+                onClick={() => setAddingCol(false)}
+                title="Abbrechen"
+                className={`rounded px-1 text-[10px] cursor-pointer ${isIst ? 'text-zinc-400 hover:text-zinc-200' : 'text-slate-400 hover:text-slate-600'}`}
+              >
                 ✕
               </button>
             </div>
           ) : (
             <button
+              type="button"
               onClick={() => setAddingCol(true)}
-              className={`w-full px-2 py-1 text-left text-[10px] font-medium ${
+              className={`w-full px-2 py-1 text-left text-[10px] font-medium cursor-pointer ${
                 isPilot
                   ? isIst
                     ? 'text-orange-400 hover:bg-zinc-900'
@@ -579,7 +599,7 @@ function EntityCard({
                       : 'text-slate-700 hover:bg-slate-100'
               }`}
             >
-              + Feld
+              + Parameter / Feld
             </button>
           )}
         </div>
@@ -2152,7 +2172,7 @@ export function TabellenbezogenView({ filter }: Props) {
                                               onRemove={() => removeProduktionstabelle(m.id)}
                                               percent={aggregate && agg ? (anteil?.percent ?? 0) : null}
                                               colorClass={MASCHINEN_FARBEN[mi % MASCHINEN_FARBEN.length]}
-                                              onAddColumn={(name, type) => addColumnProduktion(m.id, name, type)}
+                                              onAddColumn={(name, type, regId) => addColumnProduktion(m.id, name, type, regId)}
                                               onKopieren={() => kopiereMaschine(m.id)}
                                               registers={mRegisters}
                                               activeRegisterId={m.activeRegisterId}
@@ -2262,7 +2282,7 @@ export function TabellenbezogenView({ filter }: Props) {
                                 onPilotChange={(pilot) => setNebenPilot(n.id, pilot)}
                                   onRename={(name) => renameNebentabelle(n.id, name)}
                                   onRemove={() => removeNebentabelle(n.id)}
-                                  onAddColumn={(name, type) => addColumnNeben(n.id, name, type)}
+                                  onAddColumn={(name, type, regId) => addColumnNeben(n.id, name, type, regId)}
                                   onKopieren={() => kopiereNebentabelle(n.id)}
                                   registers={nRegisters}
                                   activeRegisterId={n.activeRegisterId}
@@ -2401,7 +2421,7 @@ export function TabellenbezogenView({ filter }: Props) {
                                 onRemove={() => removeProduktionstabelle(m.id)}
                                 percent={aggregate && agg ? (anteil?.percent ?? 0) : null}
                                 colorClass={MASCHINEN_FARBEN[mi % MASCHINEN_FARBEN.length]}
-                                onAddColumn={(name, type) => addColumnProduktion(m.id, name, type)}
+                                onAddColumn={(name, type, regId) => addColumnProduktion(m.id, name, type, regId)}
                                 onKopieren={() => kopiereMaschine(m.id)}
                                 registers={mRegisters}
                                 activeRegisterId={m.activeRegisterId}
@@ -2659,7 +2679,7 @@ export function TabellenbezogenView({ filter }: Props) {
                                 onPilotChange={(pilot) => setNebenPilot(n.id, pilot)}
                                 onRename={(name) => renameNebentabelle(n.id, name)}
                                 onRemove={() => removeNebentabelle(n.id)}
-                                onAddColumn={(name, type) => addColumnNeben(n.id, name, type)}
+                                onAddColumn={(name, type, regId) => addColumnNeben(n.id, name, type, regId)}
                                 onKopieren={() => kopiereNebentabelle(n.id)}
                                 registers={nRegisters}
                                 activeRegisterId={n.activeRegisterId}
@@ -2765,7 +2785,7 @@ export function TabellenbezogenView({ filter }: Props) {
                                 onPilotChange={(pilot) => setNebenPilot(n.id, pilot)}
                               onRename={(name) => renameNebentabelle(n.id, name)}
                               onRemove={() => removeNebentabelle(n.id)}
-                              onAddColumn={(name, type) => addColumnNeben(n.id, name, type)}
+                              onAddColumn={(name, type, regId) => addColumnNeben(n.id, name, type, regId)}
                               onKopieren={() => kopiereNebentabelle(n.id)}
                               registers={nRegisters}
                               activeRegisterId={n.activeRegisterId}

@@ -71,7 +71,7 @@ export function NebentabellenColumn({ abteilungId }: Props) {
             onRemove={() => removeNebentabelle(t.id)}
             columns={t.columns}
             rows={t.rows}
-            onAddColumn={(name, type) => addColumnNeben(t.id, name, type)}
+            onAddColumn={(name, type, regId) => addColumnNeben(t.id, name, type, regId)}
             onRenameColumn={(cid, name) => renameColumnNeben(t.id, cid, name)}
             onChangeColumnType={(cid, type) => changeColumnTypeNeben(t.id, cid, type)}
             onRemoveColumn={(cid) => removeColumnNeben(t.id, cid)}
