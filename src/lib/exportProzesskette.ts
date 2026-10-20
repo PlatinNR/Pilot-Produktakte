@@ -2,16 +2,35 @@ import { toPng, toSvg } from 'html-to-image'
 import type { AppState } from '../types'
 
 /**
+ * Filtert rein interaktive oder temporäre Menü-Elemente beim Export heraus.
+ */
+function exportFilter(node: HTMLElement): boolean {
+  if (node.classList?.contains('export-ignore')) return false
+  return true
+}
+
+/**
  * Exportiert das übergebene DOM-Element als hochauflösendes PNG-Bild.
  */
 export async function exportiereAlsPng(
   element: HTMLElement,
   dateiname: string = 'Prozesskette',
 ): Promise<void> {
+  const width = Math.max(element.scrollWidth, element.offsetWidth)
+  const height = Math.max(element.scrollHeight, element.offsetHeight)
+
   const dataUrl = await toPng(element, {
     backgroundColor: '#f8f8f8',
-    pixelRatio: 2,
-    cacheBust: true,
+    skipFonts: true,
+    pixelRatio: 1.5,
+    width,
+    height,
+    filter: exportFilter,
+    style: {
+      width: `${width}px`,
+      height: `${height}px`,
+      maxWidth: 'none',
+    },
   })
   const link = document.createElement('a')
   link.download = `${dateiname.replace(/[/\\?%*:|"<>]/g, '_')}.png`
@@ -26,8 +45,20 @@ export async function exportiereAlsSvg(
   element: HTMLElement,
   dateiname: string = 'Prozesskette',
 ): Promise<void> {
+  const width = Math.max(element.scrollWidth, element.offsetWidth)
+  const height = Math.max(element.scrollHeight, element.offsetHeight)
+
   const dataUrl = await toSvg(element, {
     backgroundColor: '#f8f8f8',
+    skipFonts: true,
+    width,
+    height,
+    filter: exportFilter,
+    style: {
+      width: `${width}px`,
+      height: `${height}px`,
+      maxWidth: 'none',
+    },
   })
   const link = document.createElement('a')
   link.download = `${dateiname.replace(/[/\\?%*:|"<>]/g, '_')}.svg`

@@ -2819,11 +2819,11 @@ export function TabellenbezogenView({ filter }: Props) {
       {kardinalitaetMenue && (
         <>
           <div
-            className="fixed inset-0 z-40"
+            className="fixed inset-0 z-40 export-ignore"
             onClick={() => setKardinalitaetMenue(null)}
           />
           <div
-            className="fixed z-50 min-w-[14rem] rounded-lg border border-slate-200 bg-white p-3 shadow-xl select-none"
+            className="fixed z-50 min-w-[14rem] rounded-lg border border-slate-200 bg-white p-3 shadow-xl select-none export-ignore"
             style={{
               left: Math.max(8, Math.min(kardinalitaetMenue.x - 70, window.innerWidth - 240)),
               top: Math.max(8, Math.min(kardinalitaetMenue.y - 10, window.innerHeight - 200)),
@@ -2899,7 +2899,7 @@ export function TabellenbezogenView({ filter }: Props) {
       {menue && (
         <>
           <div
-            className="fixed inset-0 z-40"
+            className="fixed inset-0 z-40 export-ignore"
             onClick={() => setMenue(null)}
             onContextMenu={(ev) => {
               ev.preventDefault()
@@ -2907,7 +2907,7 @@ export function TabellenbezogenView({ filter }: Props) {
             }}
           />
           <div
-            className="fixed z-50 min-w-[15rem] rounded-lg border border-slate-200 bg-white py-1 shadow-lg"
+            className="fixed z-50 min-w-[15rem] rounded-lg border border-slate-200 bg-white py-1 shadow-lg export-ignore"
             style={{ left: menue.x, top: menue.y }}
           >
             <div className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">

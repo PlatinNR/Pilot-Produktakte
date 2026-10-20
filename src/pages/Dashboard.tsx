@@ -74,6 +74,9 @@ export function Dashboard() {
     }
 
     setIsExporting(true)
+    // Kurze Verzögerung, damit React den Ladezustand rendern kann
+    await new Promise((r) => setTimeout(r, 60))
+
     try {
       if (format === 'png') {
         await exportiereAlsPng(el, ketteName)
